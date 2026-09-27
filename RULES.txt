@@ -1,0 +1,7 @@
+some basic rules since github is pay to win
+- dont push to main ever - always create separate own branch and got throughpull request 
+- pull request should be approved / reviewed by at least one member - unless the change is minor (so you dont have to wait for someone to approve readme change...) but generally wait for approve or wait for somebody else you assign to merge your pull request.
+- commits should be well written as we discussed ,download the Conventional
+Commits so it forces you to write pretty commits
+
+might have forgot something but this should be generally enough if you have any ideas for rules feel free to add to this file
