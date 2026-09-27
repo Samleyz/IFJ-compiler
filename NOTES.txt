@@ -19,3 +19,5 @@ Project structure and repository settings
 
 - The .gitkeep files are placeholders that let Git track otherwise-empty folders.
 - No branch protection/ruleset is configured. For a private repository on GitHub its paid and we are poor :)
+
+ps: the clang-format only checks if its well formated it doesnt format itself for that you will have to download it and run it locally the gha will only tell you its good or fix it ...
