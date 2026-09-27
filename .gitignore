@@ -1,0 +1,53 @@
+# Object files and compiled libraries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.la
+*.lo
+
+# Executables and generated compiler outputs
+*.exe
+*.out
+/my_program
+/main
+/a.out
+
+# Build directories and generated build metadata
+/build/
+/bin/
+/dist/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake-build-*/
+/compile_commands.json
+
+# Generated dependency files
+*.d
+*.dep
+
+# Test and coverage output
+/test-results/
+/coverage/
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+
+# Static analysis and memory-checker output
+/.clang-tidy.yaml
+valgrind.log
+vgcore.*
+
+# Editor and operating-system files
+.DS_Store
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
