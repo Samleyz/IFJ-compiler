@@ -8,13 +8,13 @@ This project uses `clang-format` to enforce a consistent C source code style. Th
 
 **For VS Code users:**
 
-Install the C/C++ extension in VS code and configure settings.json in the .vscode folder like this:
+Install the C/C++ extension in VS code and configure `settings.json` in the `.vscode` folder like this:
 
-    ```json
-    {
-    "editor.formatOnSave": true,
-    }
-    ```
+```json
+{
+"editor.formatOnSave": true
+}
+```
 
 **For CLI and other editors**
 
