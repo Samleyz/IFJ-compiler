@@ -4,19 +4,21 @@
 
 ### Code formatting
 
-This project uses `clang-format` to enforce a consistent C source code style. The rules will soon be defined in the `.clang-format` file.
+This project uses `clang-format` to enforce a consistent C source code style.
+The rules will soon be defined in the `.clang-format` file.
 
 **For VS Code users:**
 
-Install the C/C++ extension in VS code and configure `settings.json` in the `.vscode` folder like this:
+Install the C/C++ extension in VS code and configure `settings.json`
+in the `.vscode` folder like this:
 
 ```json
 {
-"editor.formatOnSave": true
+    "editor.formatOnSave": true
 }
 ```
 
-**For CLI and other editors**
+**For CLI and other editors:**
 
 1. Install the tool using your system's package manager (e.g., on Fedora):
 
@@ -35,6 +37,8 @@ Install the C/C++ extension in VS code and configure `settings.json` in the `.vs
 
 This repository uses Commitlint to enforce Conventional Commits formatting.
 
+#### Installation
+
 After cloning the repository, you must activate the local git hooks:
 
 1. Ensure you have Node.js and npm installed (e.g., `sudo dnf install nodejs npm`).
@@ -43,3 +47,18 @@ After cloning the repository, you must activate the local git hooks:
     ```bash
     npm install
     ```
+
+All the commits must be in the Conventional commits format.
+For more details see [Conventional Commits](https://www.conventionalcommits.org/).
+
+#### Commit message format
+
+Every commit message must follow this strict format:
+
+```text
+type(scope): subject
+```
+
+The **type** must be a standard Conventional Commits type, the **scope** must be from the
+`scope-enum` in `commitlint.config.js` (add new ones if needed), and the **subject** is your
+mandatory custom description of the change.
