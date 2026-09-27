@@ -1,0 +1,65 @@
+name: C code quality
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang-format clang-tidy
+      - name: Check formatting and run clang-tidy
+        shell: bash
+        run: |
+          mapfile -d '' c_files < <(find . -type f -name '*.c' -not -path './.git/*' -print0)
+          mapfile -d '' headers < <(find . -type f -name '*.h' -not -path './.git/*' -print0)
+          files=("${c_files[@]}" "${headers[@]}")
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No C source or header files found; skipping analysis."
+            exit 0
+          fi
+
+          clang-format --dry-run --Werror --style=LLVM "${files[@]}"
+
+          if [ "${#c_files[@]}" -eq 0 ]; then
+            echo "No C source files found; skipping clang-tidy."
+            exit 0
+          fi
+
+          for file in "${c_files[@]}"; do
+            clang-tidy "$file" \
+              '--checks=-*,clang-analyzer-*,bugprone-*,performance-*,readability-*' \
+              '--warnings-as-errors=*' -- -std=c17 -Wall -Wextra
+          done
+      - name: Install GCC and Valgrind
+        if: github.event_name == 'pull_request'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc valgrind
+      # TODO: Once the Makefile and tests are available, build the complete
+      # project with make and run its test suite under Valgrind instead of
+      # compiling and checking only main.c.
+      - name: Build and run under Valgrind
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          if [ ! -f main.c ]; then
+            echo "main.c not found; skipping Valgrind until the program is added."
+            exit 0
+          fi
+
+          gcc -g -O0 -Wall -Wextra main.c -o my_program
+          valgrind --leak-check=full --track-origins=yes \
+            --show-leak-kinds=all --errors-for-leak-kinds=all \
+            --error-exitcode=1 ./my_program
