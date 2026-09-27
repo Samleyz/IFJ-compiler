@@ -51,3 +51,6 @@ vgcore.*
 *.swo
 .vscode/
 .idea/
+
+# Node.js dependencies
+node_modules/
