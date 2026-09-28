@@ -34,6 +34,14 @@ dstring_t dstring_init();
 bool dstring_append_char(dstring_t d_str, char c);
 
 /**
+ * @brief Translates the dynamic string content into heap allocated C library compatible string
+ *
+ * @param d_str Dynamic string to translate
+ * @return char* Heap allocated compatible C string (nullptr if failed)
+ */
+char *dstring_get_string(dstring_t d_str);
+
+/**
  * @brief Clears and frees dynamic string
  *
  * @param d_str Dynamic string to destruct
