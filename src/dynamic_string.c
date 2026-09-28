@@ -64,6 +64,16 @@ bool dstring_append_char(dstring_t d_str, char c)
 	return true;
 }
 
+char *dstring_get_string(dstring_t d_str)
+{
+	char *str = malloc(d_str->length + 1);
+	if (str)
+	{
+		strcpy(str, d_str->string);
+	}
+	return str;
+}
+
 dstring_t dstring_dtor(dstring_t d_str)
 {
 	free(d_str->string);
