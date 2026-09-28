@@ -1,7 +1,7 @@
 /**
  * @file dynamic_string.h
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
- * @brief Public interface for dynamic string ADT
+ * @brief Internal declarations for dynamic string ADT
  *
  * @todo As of now, contains only basic functionality. For further needs must be extended
  */
@@ -11,6 +11,17 @@
 
 #include "dynamic_string_interface.h"
 
-// TODO
+struct dstring {
+	unsigned long size;	  /**< Allocated bite count */
+	unsigned long length; /**< Current string length */
+	char *string;		  /**< \0 terminated string content */
+};
+
+/**
+ * @brief Allocates dynamic string to be twice as large
+ *
+ * @param d_str Dynamic string to inflate
+ */
+bool dstring_inflate(dstring_t d_str);
 
 #endif
