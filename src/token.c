@@ -23,8 +23,9 @@ const char *operators[] = {"+", "-", "*", "/", "<", "<=", ">", ">=", "==", "!="}
 
 token *create_token(token_type tkn_type, dstring_t lexeme) {
 	token *tkn = (token *)malloc(sizeof(token));
-	if (!tkn)
+	if (!tkn) {
 		return NULL;
+	}
 	tkn->type = tkn_type;
 	tkn->lexeme = lexeme;
 	return tkn;
@@ -39,12 +40,13 @@ void free_token(token *tkn) {
 
 int check_keyword(dstring_t lexeme) {
 	char *str = dstring_get_string(lexeme);
-	if (!str)
+	if (!str) {
 		return 0;
+	}
 
 	// comparing lexeme to keywords of IFJ26
-	for (int x = 0; x < KEYWORDS_LEN; x++) {
-		if (strcmp(str, keywords[x]) == 0) {
+	for (int kw_idx = 0; kw_idx < KEYWORDS_LEN; kw_idx++) {
+		if (strcmp(str, keywords[kw_idx]) == 0) {
 			return 1; // match -> the id is a keyword
 		}
 	}
@@ -54,12 +56,13 @@ int check_keyword(dstring_t lexeme) {
 
 int check_operator_validity(dstring_t lexeme) {
 	char *str = dstring_get_string(lexeme);
-	if (!str)
+	if (!str) {
 		return 0;
+	}
 
 	// comparing lexeme to operators of IFJ26
-	for (int x = 0; x < OPERATORS_LEN; x++) {
-		if (strcmp(str, operators[x]) == 0) {
+	for (int op_idx = 0; op_idx < OPERATORS_LEN; op_idx++) {
+		if (strcmp(str, operators[op_idx]) == 0) {
 			return 1; // match -> operator is valid
 		}
 	}

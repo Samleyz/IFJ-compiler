@@ -73,7 +73,8 @@ dstring_t dstring_dtor(dstring_t d_str) {
 }
 
 unsigned long dstring_get_len(dstring_t d_str) {
-	if (!d_str)
+	if (!d_str) {
 		return 0;
+	}
 	return d_str->length;
 }
