@@ -18,6 +18,7 @@ export default {
             'scanner',   // Lexical analysis
             'parser',    // Syntax analysis
             'symtable',  // Symbol table / semantics
+            'adt',       // Abstract data types
             'codegen',   // Target code generation
             'expr',      // Expression parsing (Precedence analysis)
             'docs',      // Documentation (README, etc.)
