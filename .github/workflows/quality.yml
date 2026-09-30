@@ -30,7 +30,7 @@ jobs:
             exit 0
           fi
 
-          clang-format --dry-run --Werror --style=LLVM "${files[@]}"
+          clang-format --dry-run --Werror --style=file "${files[@]}"
 
           if [ "${#c_files[@]}" -eq 0 ]; then
             echo "No C source files found; skipping clang-tidy."
