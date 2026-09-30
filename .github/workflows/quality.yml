@@ -40,7 +40,7 @@ jobs:
           for file in "${c_files[@]}"; do
             clang-tidy "$file" \
               '--checks=-*,clang-analyzer-*,bugprone-*,performance-*,readability-*' \
-              '--warnings-as-errors=*' -- -std=c17 -Wall -Wextra
+              '--warnings-as-errors=*' -- -std=c23 -Wall -Wextra
           done
       - name: Install GCC and Valgrind
         if: github.event_name == 'pull_request'
@@ -59,7 +59,7 @@ jobs:
             exit 0
           fi
 
-          gcc -g -O0 -Wall -Wextra main.c -o my_program
+          gcc -std=c23 -g -O0 -Wall -Wextra main.c -o my_program
           valgrind --leak-check=full --track-origins=yes \
             --show-leak-kinds=all --errors-for-leak-kinds=all \
             --error-exitcode=1 ./my_program
