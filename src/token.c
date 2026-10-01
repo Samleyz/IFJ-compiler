@@ -1,5 +1,5 @@
 /*
- * tokens.c
+ * token.c
  * Implementation IFJ-26, 30.9.2026
  * Autor: Michal Sobek, xsobekm00, VUT FIT
  * Translated: gcc 13.3.0
@@ -11,15 +11,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define KEYWORDS_LEN 22
-#define OPERATORS_LEN 10
-
 const char *keywords[] = {"def", "do",	   "Double",  "else", "if",	   "import",
 						  "Int", "return", "String",  "then", "Unit",  "val",
 						  "var", "while",  "Boolean", "case", "class", "extension",
 						  "for", "List",   "match",	  "type"};
 
 const char *operators[] = {"+", "-", "*", "/", "<", "<=", ">", ">=", "==", "!="};
+
+#define KEYWORDS_LEN (int)(sizeof(keywords) / sizeof(keywords[0]))
+#define OPERATORS_LEN (int)(sizeof(operators) / sizeof(operators[0]))
 
 token *create_token(token_type tkn_type, dstring_t lexeme) {
 	token *tkn = (token *)malloc(sizeof(token));
@@ -38,34 +38,38 @@ void free_token(token *tkn) {
 	}
 }
 
-int check_keyword(dstring_t lexeme) {
+bool check_keyword(dstring_t lexeme) {
 	char *str = dstring_get_string(lexeme);
 	if (!str) {
-		return 0;
+		return false;
 	}
 
 	// comparing lexeme to keywords of IFJ26
 	for (int kw_idx = 0; kw_idx < KEYWORDS_LEN; kw_idx++) {
 		if (strcmp(str, keywords[kw_idx]) == 0) {
-			return 1; // match -> the id is a keyword
+			free(str);
+			return true; // match -> the id is a keyword
 		}
 	}
 
-	return 0;
+	free(str);
+	return false;
 }
 
-int check_operator_validity(dstring_t lexeme) {
+bool check_operator_validity(dstring_t lexeme) {
 	char *str = dstring_get_string(lexeme);
 	if (!str) {
-		return 0;
+		return false;
 	}
 
 	// comparing lexeme to operators of IFJ26
 	for (int op_idx = 0; op_idx < OPERATORS_LEN; op_idx++) {
 		if (strcmp(str, operators[op_idx]) == 0) {
-			return 1; // match -> operator is valid
+			free(str);
+			return true; // match -> operator is valid
 		}
 	}
 
-	return 0;
+	free(str);
+	return false;
 }

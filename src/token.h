@@ -1,5 +1,5 @@
 /**
- * tokens.h
+ * token.h
  * Implementation IFJ-26, 30.9.2026
  * Autor: Michal Sobek, xsobekm00, VUT FIT
  * Translated: gcc 13.3.0
@@ -10,9 +10,10 @@
 #define TOKEN_H
 
 #include "dynamic_string_interface.h"
+#include "stdbool.h"
 
 /**
- * @brief we are differentiating between these 8 token types (for now :D)
+ * @brief we are differentiating between these token types (for now :D)
  */
 typedef enum {
 	TOKEN_IDENTIFIER,
@@ -62,12 +63,12 @@ void free_token(token *tkn);
  * @brief func to determine if the lexeme is an identifier or a keyword
  * @param lexeme - lexeme to be checked
  */
-int check_keyword(dstring_t lexeme);
+bool check_keyword(dstring_t lexeme);
 
 /**
  * @brief helper func to check if a operator token has a valid value
  * @param lexeme - operator lexeme to be validated
  */
-int check_operator_validity(dstring_t lexeme);
+bool check_operator_validity(dstring_t lexeme);
 
 #endif
