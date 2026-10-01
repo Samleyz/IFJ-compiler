@@ -49,4 +49,11 @@ char *dstring_get_string(dstring_t d_str);
  */
 dstring_t dstring_dtor(dstring_t d_str);
 
+/**
+ * @brief Returns the "intuitive" length of string: "aaa\0\0\0\0\0" -> 3
+ * @param d_str Dynamic string to get length of
+ * @return length of the string
+ */
+unsigned long dstring_get_len(dstring_t d_str);
+
 #endif
