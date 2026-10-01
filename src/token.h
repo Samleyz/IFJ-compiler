@@ -6,32 +6,32 @@
  * header file for tokens
  */
 
-#ifndef TOKENS_H
-#define TOKENS_H
+#ifndef TOKEN_H
+#define TOKEN_H
+
+#include "dynamic_string_interface.h"
 
 /**
  * @brief we are differentiating between these 8 token types (for now :D)
  */
-typedef enum
-{
-    TOKEN_IDENTIFIER,
-    TOKEN_NUMBER,
-    TOKEN_FLOAT,       // number containing exactly one '.'
-    TOKEN_STRING,      // " ",""" """
-    TOKEN_OPERATOR,    // \b(+|-|*|/|=|<|>|<=|>=|==|!=)\b
-    TOKEN_KEYWORD,     // \b(def|do|int|...)\b check project spec for all keywords
-    TOKEN_PUNCTUATION, // [()\{\}\[\];,\t]
-    TOKEN_UNDERSLASH,
-    TOKEN_EOF,
+typedef enum {
+	TOKEN_IDENTIFIER,
+	TOKEN_NUMBER,
+	TOKEN_FLOAT,	   // number containing exactly one '.'
+	TOKEN_STRING,	   // " ",""" """
+	TOKEN_OPERATOR,	   // \b(+|-|*|/|=|<|>|<=|>=|==|!=)\b
+	TOKEN_KEYWORD,	   // \b(def|do|int|...)\b check project spec for all keywords
+	TOKEN_PUNCTUATION, // [()\{\}\[\];,\t]
+	TOKEN_UNDERSLASH,
+	TOKEN_EOF,
 } token_type;
 
 /**
  * @brief token struct --- abstract representation of a lexeme [lexeme_type, lexeme]
  */
-typedef struct
-{
-    token_type type;
-    char *lexeme;
+typedef struct {
+	token_type type;
+	dstring_t lexeme;
 } token;
 
 /**
@@ -50,24 +50,24 @@ extern const char *operators[];
  * @param lexeme - lexeme to be analyzed
  * @return a pointer to the token type for later analysation
  */
-token *create_token(token_type type, char *lexeme);
+token *create_token(token_type type, dstring_t lexeme);
 
 /**
  * @brief free the allocated memory of token
  * @param token pointer of token to be freed
  */
-void free_token(token *token);
+void free_token(token *tkn);
 
 /**
- * @brief func to determine if the lexeme is an identifier or an keyword
+ * @brief func to determine if the lexeme is an identifier or a keyword
  * @param lexeme - lexeme to be checked
  */
-void check_keyword(char *lexeme);
+int check_keyword(dstring_t lexeme);
 
 /**
  * @brief helper func to check if a operator token has a valid value
  * @param lexeme - operator lexeme to be validated
  */
-void check_operator_validity(char *lexeme);
+int check_operator_validity(dstring_t lexeme);
 
 #endif
