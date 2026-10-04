@@ -23,7 +23,8 @@ export default {
             'expr',      // Expression parsing (Precedence analysis)
             'docs',      // Documentation (README, etc.)
             'setup',     // Repository configuration
-            'test'       // Test scripts and test cases
+            'test',      // Test scripts and test cases
+			'utils'      // Shared utilities
             ]
         ]
     }
