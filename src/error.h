@@ -37,6 +37,8 @@ typedef enum {
  * @param[in] line_num Number of the line where the error is located
  * @param[in] fmt Formatted error string to be printed to stderr
  */
+__attribute__((noreturn))
+__attribute__((format(printf, 3, 4)))
 void throw_err(err_c_t code, int line_num, const char *fmt, ...);
 
 /**
@@ -45,6 +47,7 @@ void throw_err(err_c_t code, int line_num, const char *fmt, ...);
  * @param[in] line_num Number of the line where the warning is located
  * @param[in] fmt Formatted warning string to be printed to stderr
  */
+__attribute__((format(printf, 2, 3)))
 void throw_warning(int line_num, const char *fmt, ...);
 
 #endif
