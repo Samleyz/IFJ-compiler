@@ -6,6 +6,7 @@
  */
 
 #include "lexer.h"
+#include "error.h"
 #include <stdio.h>
 
 typedef enum {
@@ -29,11 +30,21 @@ static int comment_depth_cnt = 0;
 static unsigned line_num = 0;
 
 void lexer_init(FILE *source) {
-	// TODO
+	if (source == NULL) {
+		throw_err(ERR_INTERNAL, -1, "Pointer to input file can not be NULL");
+	}
+
+	fsm_state = START;
+	bracket_cnt = 0;
+	comment_depth_cnt = 0;
+	line_num = 1;
+	source_file = source;
+
+	// TODO stack init
 }
 
 void lexer_cleanup(void) {
-	// TODO
+	// TODO free stack
 }
 
 token *lexer_get_token(void) {
