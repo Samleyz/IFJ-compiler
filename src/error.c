@@ -30,5 +30,18 @@ void throw_err(err_c_t code, int line_num, const char *fmt, ...) {
 }
 
 void throw_warning(int line_num, const char *fmt, ...) {
-	// TODO
+	fprintf(stderr, "Warning");
+
+	if (line_num > 0) {
+		fprintf(stderr, " on line %d", line_num);
+	}
+
+	fprintf(stderr, ": ");
+
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+
+	fputc('\n', stderr);
 }
