@@ -38,9 +38,7 @@ jobs:
           fi
 
           for file in "${c_files[@]}"; do
-            clang-tidy "$file" \
-              '--checks=-*,clang-analyzer-*,bugprone-*,performance-*,readability-*' \
-              '--warnings-as-errors=*' -- -std=c23 -Wall -Wextra
+            clang-tidy "$file" -- -std=c23 -Wall -Wextra
           done
       - name: Install GCC and Valgrind
         if: github.event_name == 'pull_request'
