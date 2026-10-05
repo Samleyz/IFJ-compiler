@@ -1,51 +1,74 @@
 /**
  * @file hashtable.h
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
- * @brief Internal declarations for hastable ADT
+ * @brief Public interface for hastable ADT
  */
 
 #ifndef HASHTABLE_H
 #define HASHTABLE_H
 
-#include "hashtable_interface.h"
-#include <stdint.h>
+#include <stddef.h>
 
-#define MIN_HTABLE_SIZE 32768 /**< Minimum amount of boxes in hashtable. Power of 2 */
-
-/**
- * @brief Calculates hash value of string
- *
- * 64-bit FNV-1a (Fowler–Noll–Vo) hash function with XOR-folding
- *
- * @param key String to hash
- * @return size_t Computed hash value
- */
-uint64_t hash_function(const char *key);
+struct htable; // Ignore (for linking)
 
 /**
- * @brief Computes index of entry
- *
- * @param hash Hash of entry key
- * @param htab_size Size of the internal hash table array
- * @return size_t Index of the entry
+ * @brief Type that is used to manipulate with hashtable
  */
-size_t get_index(uint64_t hash, size_t htab_size);
+typedef struct htable *htable_t;
 
 /**
- * @brief Structure that represents single hash table box
+ * @brief Initializes empty hash table
+ *
+ * @param htable_value_dtor Function that is used to destruct htable values
+ * @return htable_t Initialized hash table (nullptr if failed)
  */
-typedef struct {
-	char *key;	/**< Key of the stored data (invalid when status is not set to OCCUPIED) */
-	void *data; /**< Pointer to stored data under specified key, when status is OCCUPIED */
-} htable_box_t;
+htable_t htable_init(void htable_value_dtor(void *item));
 
-struct htable {
-	size_t size;			   /**< Hash table box count */
-	size_t used;			   /**< Hash table used box count */
-	void (*data_dtor)(void *); /**< Value destructor function */
-	htable_box_t *boxes;	   /**< Array of hash table boxes */
-};
+/**
+ * @brief Returns how many records are currently in hash table
+ *
+ * @param htab Hash table to get the count from
+ * @return size_t Record count
+ */
+size_t htable_record_count(htable_t htab);
 
-// TODO scaling
+/**
+ * @brief Stores pointer to specified heap allocated value in the hashtable
+ *
+ * @param htab Hash table to write to
+ * @param key Key under which you want the data to be stored
+ * @param data Pointer to data you want to store (must be heap allocated)
+ * @return true Success
+ * @return false Failed
+ */
+bool htable_write(htable_t htab, const char *key, void *data);
+
+/**
+ * @brief Gets you a pointer to data stored under specified key
+ *
+ * @param htab Hash table to search
+ * @param key Searched key
+ * @return void* Pointer to your specified value (nullptr if empty)
+ */
+void *htable_read(htable_t htab, const char *key);
+
+/**
+ * @brief Clears a record under specified key
+ *
+ * @param htab Hash table where to clear it
+ * @param key Creared item key
+ * @return true Item was cleared
+ * @return false There already wasn't anything
+ */
+bool htable_remove(htable_t htab, const char *key);
+
+/**
+ * @brief Destructs specified hash table
+ *
+ * @param htab Hash table to destruct
+ * @return htable_t Always nullptr (can be used to overide htable_t variable
+ * after destruction)
+ */
+htable_t htable_dtor(htable_t htab);
 
 #endif
