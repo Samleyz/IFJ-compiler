@@ -6,7 +6,7 @@
  * @todo As of now, contains only basic functionality. For further needs must be extended
  */
 
-#include "dynamic_string.h"
+#include "dynamic_string_private.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -72,9 +72,4 @@ dstring_t dstring_dtor(dstring_t d_str) {
 	return nullptr;
 }
 
-unsigned long dstring_get_len(dstring_t d_str) {
-	if (!d_str) {
-		return 0;
-	}
-	return d_str->length;
-}
+unsigned long dstring_get_len(dstring_t d_str) { return d_str->length; }
