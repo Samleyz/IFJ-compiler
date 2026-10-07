@@ -9,4 +9,13 @@
 
 #include "symtable.h"
 
+/**
+ * @brief Frees specified symbol pointed to by void pointer
+ *
+ * helper function
+ *
+ * @param sym Symbol to free
+ */
+void symbol_dtor(void *sym);
+
 #endif

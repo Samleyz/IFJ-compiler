@@ -9,6 +9,9 @@
 
 #include <stddef.h>
 
+struct htable;					 // Ignore (for linking)
+typedef struct htable *htable_t; // Ignore (for linking)
+
 /**
  * @brief Type that is used to manipulate with symtable
  */
