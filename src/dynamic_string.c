@@ -58,6 +58,7 @@ bool dstring_append_char(dstring_t d_str, char c) {
 char *dstring_get_string(dstring_t d_str) {
 	char *str = malloc(d_str->length + 1);
 	if (str) {
+		// strcpy is safe in this scenario, because i know the length of source and destination
 		strcpy(str, d_str->string); // NOLINT
 	}
 	return str;
