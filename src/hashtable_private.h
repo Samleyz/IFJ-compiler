@@ -10,7 +10,7 @@
 #include "hashtable.h"
 #include <stdint.h>
 
-#define MIN_HTABLE_SIZE 32768 /**< Minimum amount of boxes in hashtable. Power of 2 */
+#define MIN_HTABLE_SIZE 32 /**< Minimum amount of boxes in hashtable. Power of 2 */
 
 /**
  * @brief Calculates hash value of string
@@ -46,6 +46,13 @@ struct htable {
 	htable_box_t *boxes;	   /**< Array of hash table boxes */
 };
 
-// TODO scaling
+/**
+ * @brief Makes hastable two times larger
+ *
+ * @param htab Hastable to resize
+ * @return true Success
+ * @return false Failed
+ */
+bool upscale_htab(htable_t htab);
 
 #endif
