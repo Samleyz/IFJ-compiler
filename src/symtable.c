@@ -24,15 +24,18 @@ stable_t stable_init() { return htable_init(symbol_dtor); }
 size_t stable_record_count(stable_t stab) { return htable_record_count((htable_t)stab); }
 
 bool stable_write(stable_t stab, symbol_t entry) {
+	// Alloc memory
 	symbol_t *tmp_sym = malloc(sizeof(symbol_t));
 	char *tmp_key = strdup(entry.key);
-	if (tmp_sym && tmp_key) {
+	if (tmp_sym && tmp_key) { // If success
+		// Transfer symbol data there
+		*tmp_sym = entry;
+		tmp_sym->key = tmp_key;
 		if (htable_write((htable_t)stab, entry.key, tmp_sym)) {
-			*tmp_sym = entry;
-			tmp_sym->key = tmp_key;
 			return true;
 		}
 	}
+	// Failed memory alloc
 	free(tmp_sym);
 	free(tmp_key);
 	return false;
