@@ -6,7 +6,7 @@
  * @todo As of now, contains only basic functionality. For further needs must be extended
  */
 
-#include "dynamic_string.h"
+#include "dynamic_string_private.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -58,7 +58,8 @@ bool dstring_append_char(dstring_t d_str, char c) {
 char *dstring_get_string(dstring_t d_str) {
 	char *str = malloc(d_str->length + 1);
 	if (str) {
-		strcpy(str, d_str->string);
+		// strcpy is safe in this scenario, because i know the length of source and destination
+		strcpy(str, d_str->string); // NOLINT
 	}
 	return str;
 }
@@ -72,9 +73,4 @@ dstring_t dstring_dtor(dstring_t d_str) {
 	return nullptr;
 }
 
-unsigned long dstring_get_len(dstring_t d_str) {
-	if (!d_str) {
-		return 0;
-	}
-	return d_str->length;
-}
+unsigned long dstring_get_len(dstring_t d_str) { return d_str->length; }

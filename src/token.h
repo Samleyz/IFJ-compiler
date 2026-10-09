@@ -9,7 +9,7 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
-#include "dynamic_string_interface.h"
+#include "dynamic_string.h"
 #include "stdbool.h"
 
 /**
