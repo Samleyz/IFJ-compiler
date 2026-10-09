@@ -10,8 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-token *create_token(token_type tkn_type, dstring_t lexeme) {
-	token *tkn = (token *)malloc(sizeof(token));
+token *create_token(token_type tkn_type, char *lexeme) {
+	token *tkn = (token *)calloc(1, sizeof(token));
 	if (!tkn) {
 		return NULL;
 	}
@@ -22,7 +22,7 @@ token *create_token(token_type tkn_type, dstring_t lexeme) {
 
 void free_token(token *tkn) {
 	if (tkn) {
-		dstring_dtor(tkn->lexeme);
+		free(tkn->lexeme);
 		free(tkn);
 	}
 }
