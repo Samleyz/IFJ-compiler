@@ -9,6 +9,7 @@
 #define LEXER_PRIVATE_H
 
 #include "dynamic_string.h"
+#include <stdint.h>
 #include <stdio.h>
 
 /**
@@ -95,5 +96,31 @@ typedef struct {
 	dstring_t dynamic_string; /**< Dynamic string used to store lexemes */
 							  // TODO add stack
 } lexer_state_t;
+
+/**
+ * @brief [TODO:summary]
+ *
+ * @param[in] lexer_state Current state of the lexer
+ * @return [TODO:description] 1, -1, 0
+ */
+int handle_indent(lexer_state_t lexer_state);
+
+/**
+ * @brief Converts an integer from a string in the Scala int format to a 32-bit C variable
+ *
+ * @param[in] num_string String number in the Scala format to be converted
+ * @param[out] int_number Pointer to the variable in which the result will be stored
+ * @return true if the conversion was successful, false if the conversion was unsuccessful
+ */
+bool convert_int(const char *num_string, int32_t *int_number);
+
+/**
+ * @brief Converts a double from a string in the Scala double format to a 64-bit C variable
+ *
+ * @param[in] num_string String number in the Scala format to be converted
+ * @param[out] double_number Pointer to the variable in which the result will be stored
+ * @return true if the conversion was successful, false if the conversion was unsuccessful
+ */
+bool convert_double(const char *num_string, double *double_number);
 
 #endif
