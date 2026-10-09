@@ -104,7 +104,7 @@ typedef struct {
  * @param[in] lexer_state Current state of the lexer
  * @return [TODO:description] 1, -1, 0
  */
-int handle_indent(lexer_state_t lexer_state);
+int handle_indent(lexer_state_t *lexer_state);
 
 /**
  * @brief Converts an integer from a string in the Scala int format to a 32-bit C variable

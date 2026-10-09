@@ -15,7 +15,7 @@ const char *keywords[] = {"def", "do",	   "Double",  "else", "if",	   "import",
 
 #define KEYWORDS_LEN (int)(sizeof(keywords) / sizeof(keywords[0]))
 
-int handle_indent(lexer_state_t lexer_state) {
+int handle_indent(lexer_state_t *lexer_state) {
 	// TODO
 	return 0;
 }
