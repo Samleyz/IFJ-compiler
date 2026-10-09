@@ -36,16 +36,6 @@ typedef struct {
 } token;
 
 /**
- * @brief a list of keywords defined in the project spec, used in check_keyword()
- */
-extern const char *keywords[];
-
-/**
- * @brief a list of operators defined in the project spec used, in check_operator_validity()
- */
-extern const char *operators[];
-
-/**
  * @brief token creation & storage on heap
  * @param type - type of the token (op, id, number, str,...)
  * @param lexeme - lexeme to be analyzed
@@ -58,17 +48,5 @@ token *create_token(token_type type, dstring_t lexeme);
  * @param token pointer of token to be freed
  */
 void free_token(token *tkn);
-
-/**
- * @brief func to determine if the lexeme is an identifier or a keyword
- * @param lexeme - lexeme to be checked
- */
-bool check_keyword(dstring_t lexeme);
-
-/**
- * @brief helper func to check if a operator token has a valid value
- * @param lexeme - operator lexeme to be validated
- */
-bool check_operator_validity(dstring_t lexeme);
 
 #endif

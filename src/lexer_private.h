@@ -1,6 +1,6 @@
 /**
  * @file lexer_private.h
- * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz), Michal Sobek (xsobekm00@vutbr.cz)
  * @brief Internal private declarations for lexer
  * @date 2026-10-09
  */
@@ -9,6 +9,7 @@
 #define LEXER_PRIVATE_H
 
 #include "dynamic_string.h"
+#include "token.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -122,5 +123,12 @@ bool convert_int(const char *num_string, int32_t *int_number);
  * @return true if the conversion was successful, false if the conversion was unsuccessful
  */
 bool convert_double(const char *num_string, double *double_number);
+
+/**
+ * @brief Function to determine if the string is an identifier or a keyword
+ * @param[in] string - string to be checked
+ * @return Type of the analyzed string
+ */
+token_type check_keyword(const char *string);
 
 #endif
