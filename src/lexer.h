@@ -28,6 +28,6 @@ void lexer_cleanup(void);
  *
  * @param [in] source file from which the lexer will read
  */
-void lexer_init(FILE *source);
+bool lexer_init(FILE *source);
 
 #endif

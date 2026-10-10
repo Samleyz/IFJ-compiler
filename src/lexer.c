@@ -6,15 +6,14 @@
  */
 
 #include "lexer.h"
-#include "error.h"
 #include "lexer_private.h"
 #include "token.h"
 
 static lexer_state_t lexer_state;
 
-void lexer_init(FILE *source) {
+bool lexer_init(FILE *source) {
 	if (source == NULL) {
-		throw_err(ERR_INTERNAL, 0, "Pointer to input file can not be NULL");
+		return false;
 	}
 
 	lexer_state.fsm_state = START;
@@ -24,6 +23,7 @@ void lexer_init(FILE *source) {
 	lexer_state.source_file = source;
 
 	// TODO stack init
+	return true;
 }
 
 void lexer_cleanup(void) {
