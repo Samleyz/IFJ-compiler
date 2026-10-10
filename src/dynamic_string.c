@@ -65,24 +65,19 @@ char *dstring_get_string(dstring_t d_str) {
 }
 
 dstring_t dstring_dtor(dstring_t d_str) {
-	free(d_str->string);
-	d_str->string = nullptr;
-	d_str->length = 0;
-	d_str->size = 0;
-	free(d_str);
+	if (d_str) {
+		free(d_str->string);
+		d_str->string = nullptr;
+		d_str->length = 0;
+		d_str->size = 0;
+		free(d_str);
+	}
 	return nullptr;
 }
 
 unsigned long dstring_get_len(dstring_t d_str) { return d_str->length; }
 
 void dstring_erase(dstring_t d_str) {
-	// Shrink
-	char *tmp_string_memory = realloc(d_str->string, sizeof(char));
-	if (tmp_string_memory) {
-		d_str->string = tmp_string_memory;
-		d_str->size = 1;
-	}
-	// Clear
 	d_str->string[0] = '\0';
 	d_str->length = 0;
 }
