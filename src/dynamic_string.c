@@ -65,11 +65,13 @@ char *dstring_get_string(dstring_t d_str) {
 }
 
 dstring_t dstring_dtor(dstring_t d_str) {
-	free(d_str->string);
-	d_str->string = nullptr;
-	d_str->length = 0;
-	d_str->size = 0;
-	free(d_str);
+	if (d_str) {
+		free(d_str->string);
+		d_str->string = nullptr;
+		d_str->length = 0;
+		d_str->size = 0;
+		free(d_str);
+	}
 	return nullptr;
 }
 
