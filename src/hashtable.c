@@ -147,18 +147,20 @@ bool htable_remove(htable_t htab, const char *key) {
 }
 
 htable_t htable_dtor(htable_t htab) {
-	// Clear entries
-	for (size_t i = 0; i < htab->size; i++) {
-		free(htab->boxes[i].key);
-		if (htab->data_dtor && htab->boxes[i].data) {
-			htab->data_dtor(htab->boxes[i].data);
+	if (htab) {
+		// Clear entries
+		for (size_t i = 0; i < htab->size; i++) {
+			free(htab->boxes[i].key);
+			if (htab->data_dtor && htab->boxes[i].data) {
+				htab->data_dtor(htab->boxes[i].data);
+			}
 		}
+		// Clear array
+		free(htab->boxes);
+		htab->boxes = nullptr;
+		// Clear structure
+		free(htab);
 	}
-	// Clear array
-	free(htab->boxes);
-	htab->boxes = nullptr;
-	// Clear structure
-	free(htab);
 	return (htable_t) nullptr;
 }
 
