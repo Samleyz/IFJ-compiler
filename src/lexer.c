@@ -8,12 +8,13 @@
 #include "lexer.h"
 #include "error.h"
 #include "lexer_private.h"
+#include "token.h"
 
 static lexer_state_t lexer_state;
 
 void lexer_init(FILE *source) {
 	if (source == NULL) {
-		throw_err(ERR_INTERNAL, -1, "Pointer to input file can not be NULL");
+		throw_err(ERR_INTERNAL, 0, "Pointer to input file can not be NULL");
 	}
 
 	lexer_state.fsm_state = START;

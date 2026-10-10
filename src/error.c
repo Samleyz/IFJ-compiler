@@ -11,11 +11,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void throw_err(err_c_t code, int line_num, const char *fmt, ...) {
+void throw_err(err_c_t code, unsigned line_num, const char *fmt, ...) {
 	fprintf(stderr, "Error %d", code);
 
 	if (line_num > 0) {
-		fprintf(stderr, " on line %d", line_num);
+		fprintf(stderr, " on line %u", line_num);
 	}
 
 	fprintf(stderr, ": ");
@@ -29,11 +29,11 @@ void throw_err(err_c_t code, int line_num, const char *fmt, ...) {
 	exit(code);
 }
 
-void throw_warning(int line_num, const char *fmt, ...) {
+void throw_warning(unsigned line_num, const char *fmt, ...) {
 	fprintf(stderr, "Warning");
 
 	if (line_num > 0) {
-		fprintf(stderr, " on line %d", line_num);
+		fprintf(stderr, " on line %u", line_num);
 	}
 
 	fprintf(stderr, ": ");
