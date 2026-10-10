@@ -126,9 +126,11 @@ bool convert_double(const char *num_string, double *double_number);
 
 /**
  * @brief Function to determine if the string is an identifier or a keyword
- * @param[in] string - string to be checked
- * @return Type of the analyzed string
+ * @param[in] string String to be checked
+ * @param[out] kw_type Pointer to a variable in which the type of the analyzed keyword will be
+ * stored
+ * @return true if the string is a keyword, false if the string is not a keyword
  */
-token_type check_keyword(const char *string);
+bool is_keyword(const char *string, kw_type_t *kw_type);
 
 #endif

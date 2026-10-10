@@ -30,13 +30,14 @@ bool convert_double(const char *num_string, double *double_number) {
 	return false;
 }
 
-token_type check_keyword(const char *string) {
+bool is_keyword(const char *string, kw_type_t *kw_type) {
 	// TODO:
 	// 1. Changed signature to `const char *str` to keep it universal and decoupled from dstring
 	// ADT.
-	// 2. Return type is `token_type_t` instead of `bool` (returns specific TOKEN_KW_*
-	//    or TOKEN_IDENTIFIER if no match is found).
+	// 2. Return type is bool - if the string is keyword true otherwise false
 	// 3. Iterate through the `keywords` array and return the matching token type.
+	// 4. If return is true then return through the parameter kw_type type of the keyword
 	(void)string;
-	return TOKEN_IDENTIFIER;
+	(void)kw_type;
+	return true;
 }
