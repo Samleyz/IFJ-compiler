@@ -22,7 +22,7 @@ void throw_err(err_c_t code, int line_num, const char *fmt, ...) {
 
 	va_list args;
 	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
+	vfprintf(stderr, fmt, args); // NOLINT(clang-analyzer-security.VAList)
 	va_end(args);
 
 	fputc('\n', stderr);
@@ -40,7 +40,7 @@ void throw_warning(int line_num, const char *fmt, ...) {
 
 	va_list args;
 	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
+	vfprintf(stderr, fmt, args); // NOLINT(clang-analyzer-security.VAList)
 	va_end(args);
 
 	fputc('\n', stderr);
