@@ -8,6 +8,7 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+#include "error.h"
 #include "stdbool.h"
 #include <stdint.h>
 
@@ -71,12 +72,16 @@ typedef enum {
  * @brief attributes of the token
  */
 typedef union {
-	op_type_t operator; /**< operator type */
-	kw_type_t keyword;	/**< keyword type */
-	int32_t int_val;	/**< integer value */
-	double double_val;	/**< double value */
-	bool bool_literal;	/**< bool literal value */
-	char *string_val;	/**< string literal value */
+	op_type_t operator;			 /**< operator type */
+	kw_type_t keyword;			 /**< keyword type */
+	int32_t int_val;			 /**< integer value */
+	double double_val;			 /**< double value */
+	bool bool_literal;			 /**< bool literal value */
+	char *string_val;			 /**< string literal value */
+	struct {					 /**< struct representing error */
+		err_c_t err_code;		 /**< code of the error */
+		const char *err_message; /**< string with the error message */
+	} err_info;
 } token_attr_t;
 
 /**
@@ -100,7 +105,8 @@ typedef enum {
 	TOKEN_RPAREN,	  /**< right parenthesis */
 	TOKEN_LSQUARE,	  /**< left square parenthesis */
 	TOKEN_RSQUARE,	  /**< right square parenthesis */
-	TOKEN_MAIN		  /**< @main token */
+	TOKEN_MAIN,		  /**< @main token */
+	TOKEN_INVALID	  /**< token sent if error occured */
 } token_type;
 
 /**
@@ -109,6 +115,7 @@ typedef enum {
 typedef struct {
 	token_type type;		/**< type of the token */
 	token_attr_t attribute; /**< token attribute (string, operator type etc.) */
+	unsigned line_num;		/**< number of the line where was the token located */
 } token;
 
 /**
@@ -117,7 +124,7 @@ typedef struct {
  * @param attribute - attribute of the token
  * @return a pointer to the token type for later analysation
  */
-token *create_token(token_type tkn_type, token_attr_t attribute);
+token *create_token(token_type tkn_type, token_attr_t attribute, unsigned line_num);
 
 /**
  * @brief free the allocated memory of token

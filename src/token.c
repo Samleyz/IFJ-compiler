@@ -8,13 +8,14 @@
 #include "token.h"
 #include <stdlib.h>
 
-token *create_token(token_type tkn_type, token_attr_t attribute) {
+token *create_token(token_type tkn_type, token_attr_t attribute, unsigned line_num) {
 	token *tkn = (token *)calloc(1, sizeof(token));
 	if (!tkn) {
 		return NULL;
 	}
 	tkn->attribute = attribute;
 	tkn->type = tkn_type;
+	tkn->line_num = line_num;
 	return tkn;
 }
 
