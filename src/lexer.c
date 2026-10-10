@@ -34,6 +34,7 @@ token *lexer_get_token(void) {
 
 	while (true) {
 		c = fgetc(lexer_state.source_file);
+		(void)c;
 
 		switch (lexer_state.fsm_state) {
 		case START:
@@ -112,7 +113,7 @@ token *lexer_get_token(void) {
 			break;
 		case OP_MINUS:
 			break;
-		case OP_DOUBLE_DOT:
+		case OP_COLON:
 			break;
 		case OP_STAR:
 			break;
