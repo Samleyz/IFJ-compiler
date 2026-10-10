@@ -62,3 +62,15 @@ TEST_F(Dynamic_string_test, long_getstring) {
 	EXPECT_STREQ(tmp_str, s.c_str());
 	free(tmp_str);
 }
+
+TEST_F(Dynamic_string_test, erase_string) {
+	for (int i = 0; i < 100; i++) {
+		EXPECT_TRUE(dstring_append_char(dstr, 'a'));
+	}
+	EXPECT_EQ(dstring_get_len(dstr), 100);
+	dstring_erase(dstr);
+	EXPECT_EQ(dstring_get_len(dstr), 0);
+	char *tmp_str = dstring_get_string(dstr);
+	EXPECT_STREQ(tmp_str, "");
+	free(tmp_str);
+}

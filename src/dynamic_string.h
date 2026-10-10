@@ -50,6 +50,13 @@ char *dstring_get_string(dstring_t d_str);
 unsigned long dstring_get_len(dstring_t d_str);
 
 /**
+ * @brief Erases dynamic string content
+ *
+ * @param d_str Dynamic string to erase
+ */
+void dstring_erase(dstring_t d_str);
+
+/**
  * @brief Clears and frees dynamic string
  *
  * @param d_str Dynamic string to destruct
