@@ -65,6 +65,7 @@ typedef union {
 	kw_type_t keyword;
 	int32_t int_val;
 	double double_val;
+	bool bool_literal;
 } token_attr_t;
 
 /**
@@ -77,6 +78,7 @@ typedef enum {
 	TOKEN_STRING,	// " ",""" """
 	TOKEN_OPERATOR, // \b(+|-|*|/|=|<|>|<=|>=|==|!=)\b
 	TOKEN_KEYWORD,	// \b(def|do|int|...)\b check project spec for all keywords
+	TOKEN_BOOLEAN,
 	TOKEN_UNDERSCORE,
 	TOKEN_EOF,
 	TOKEN_EOL,

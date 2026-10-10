@@ -41,3 +41,8 @@ bool is_keyword(const char *string, kw_type_t *kw_type) {
 	(void)kw_type;
 	return true;
 }
+
+bool is_bool_literal(const char *string, bool *literal_val) {
+	// TODO
+	return true;
+}

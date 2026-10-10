@@ -133,4 +133,13 @@ bool convert_double(const char *num_string, double *double_number);
  */
 bool is_keyword(const char *string, kw_type_t *kw_type);
 
+/**
+ * @brief Function to dertermine if the string is a boolean literal
+ *
+ * @param[in] string String to be checked
+ * @param[out] literal_val Value of the boolean literal
+ * @return true if the string is a boolean literal, otherwise false
+ */
+bool is_bool_literal(const char *string, bool *literal_val);
+
 #endif
