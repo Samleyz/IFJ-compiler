@@ -1,6 +1,6 @@
 /**
  * @file error.h
- * @author Jan Mejzlík
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Provides interface for error and warning functions for centralized error handling. This
  * module provides interface for printing formated error messages to stderr. Includes mechanisms for
  * safely terminating the program.

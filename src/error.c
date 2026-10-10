@@ -1,6 +1,6 @@
 /**
  * @file error.c
- * @author Jan Mejzlík
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Contains implementation of error and warning functions for central error handling.
  * Includes mechanisms for safely terminating the program.
  * @date 2026-10-04
