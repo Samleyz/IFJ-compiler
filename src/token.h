@@ -11,6 +11,9 @@
 #include "stdbool.h"
 #include <stdint.h>
 
+/**
+ * @brief types of operators
+ */
 typedef enum {
 	OPERATOR_AND,
 	OPERATOR_PLUS_PLUS,
@@ -36,6 +39,9 @@ typedef enum {
 	OPERATOR_DOT
 } op_type_t;
 
+/**
+ * @breif types of keywords
+ */
 typedef enum {
 	KW_DEF,
 	KW_DO,
@@ -61,44 +67,48 @@ typedef enum {
 	KW_TYPE
 } kw_type_t;
 
+/**
+ * @brief attributes of the token
+ */
 typedef union {
-	op_type_t operator;
-	kw_type_t keyword;
-	int32_t int_val;
-	double double_val;
-	bool bool_literal;
-	char *string_val;
+	op_type_t operator; /**< operator type */
+	kw_type_t keyword;	/**< keyword type */
+	int32_t int_val;	/**< integer value */
+	double double_val;	/**< double value */
+	bool bool_literal;	/**< bool literal value */
+	char *string_val;	/**< string literal value */
 } token_attr_t;
 
 /**
- * @brief we are differentiating between these token types (for now :D)
+ * @brief types of tokens
  */
 typedef enum {
-	TOKEN_IDENTIFIER,
-	TOKEN_INTEGER,
-	TOKEN_DOUBLE,	// number containing exactly one '.'
-	TOKEN_STRING,	// " ",""" """
-	TOKEN_OPERATOR, // \b(+|-|*|/|=|<|>|<=|>=|==|!=)\b
-	TOKEN_KEYWORD,	// \b(def|do|int|...)\b check project spec for all keywords
-	TOKEN_BOOLEAN,
-	TOKEN_UNDERSCORE,
-	TOKEN_EOF,
-	TOKEN_EOL,
-	TOKEN_INDENT,
-	TOKEN_DEDENT,
-	TOKEN_LPAREN,
-	TOKEN_RPAREN,
-	TOKEN_LSQUARE,
-	TOKEN_RSQUARE,
-	TOKEN_MAIN
+	TOKEN_IDENTIFIER, /**< letters A-Z and _	*/
+	TOKEN_INTEGER,	  /**< integer number */
+	TOKEN_DOUBLE,	  /**< number containing exactly one '.' */
+	TOKEN_STRING,	  /**< " ",""" """ */
+	TOKEN_OPERATOR,	  /**< \b(+|-|*|/|=|<|>|<=|>=|==|!=|....)\b check project spec for all operators
+					   */
+	TOKEN_KEYWORD,	  /**< \b(def|do|int|...)\b check project spec for all keywords */
+	TOKEN_BOOLEAN,	  /**< true of false literal */
+	TOKEN_UNDERSCORE, /**< _ character */
+	TOKEN_EOF,		  /**< end of file */
+	TOKEN_EOL,		  /**< end of line */
+	TOKEN_INDENT,	  /**< indentation token */
+	TOKEN_DEDENT,	  /**< dedentation token */
+	TOKEN_LPAREN,	  /**< left parenthesis */
+	TOKEN_RPAREN,	  /**< right parenthesis */
+	TOKEN_LSQUARE,	  /**< left square parenthesis */
+	TOKEN_RSQUARE,	  /**< right square parenthesis */
+	TOKEN_MAIN		  /**< @main token */
 } token_type;
 
 /**
- * @brief token struct --- abstract representation of a lexeme [lexeme_type, lexeme]
+ * @brief token struct abstract representation of a lexeme [lexeme_type, lexeme]
  */
 typedef struct {
-	token_type type;
-	token_attr_t attribute;
+	token_type type;		/**< type of the token */
+	token_attr_t attribute; /**< token attribute (string, operator type etc.) */
 } token;
 
 /**
