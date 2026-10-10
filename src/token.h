@@ -66,6 +66,7 @@ typedef union {
 	int32_t int_val;
 	double double_val;
 	bool bool_literal;
+	char *string_val;
 } token_attr_t;
 
 /**
@@ -97,16 +98,15 @@ typedef enum {
 typedef struct {
 	token_type type;
 	token_attr_t attribute;
-	char *lexeme;
 } token;
 
 /**
  * @brief token creation & storage on heap
- * @param type - type of the token (op, id, number, str,...)
- * @param lexeme - lexeme to be analyzed
+ * @param tkn_type - type of the token (op, id, number, str,...)
+ * @param attribute - attribute of the token
  * @return a pointer to the token type for later analysation
  */
-token *create_token(token_type type, char *lexeme);
+token *create_token(token_type tkn_type, token_attr_t attribute);
 
 /**
  * @brief free the allocated memory of token
