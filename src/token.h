@@ -1,0 +1,74 @@
+/**
+ * token.h
+ * Implementation IFJ-26, 30.9.2026
+ * Autor: Michal Sobek, xsobekm00, VUT FIT
+ * Translated: gcc 13.3.0
+ * header file for tokens
+ */
+
+#ifndef TOKEN_H
+#define TOKEN_H
+
+#include "dynamic_string.h"
+#include "stdbool.h"
+
+/**
+ * @brief we are differentiating between these token types (for now :D)
+ */
+typedef enum {
+	TOKEN_IDENTIFIER,
+	TOKEN_NUMBER,
+	TOKEN_FLOAT,	   // number containing exactly one '.'
+	TOKEN_STRING,	   // " ",""" """
+	TOKEN_OPERATOR,	   // \b(+|-|*|/|=|<|>|<=|>=|==|!=)\b
+	TOKEN_KEYWORD,	   // \b(def|do|int|...)\b check project spec for all keywords
+	TOKEN_PUNCTUATION, // [()\{\}\[\];,\t]
+	TOKEN_UNDERSLASH,
+	TOKEN_EOF,
+} token_type;
+
+/**
+ * @brief token struct --- abstract representation of a lexeme [lexeme_type, lexeme]
+ */
+typedef struct {
+	token_type type;
+	dstring_t lexeme;
+} token;
+
+/**
+ * @brief a list of keywords defined in the project spec, used in check_keyword()
+ */
+extern const char *keywords[];
+
+/**
+ * @brief a list of operators defined in the project spec used, in check_operator_validity()
+ */
+extern const char *operators[];
+
+/**
+ * @brief token creation & storage on heap
+ * @param type - type of the token (op, id, number, str,...)
+ * @param lexeme - lexeme to be analyzed
+ * @return a pointer to the token type for later analysation
+ */
+token *create_token(token_type type, dstring_t lexeme);
+
+/**
+ * @brief free the allocated memory of token
+ * @param token pointer of token to be freed
+ */
+void free_token(token *tkn);
+
+/**
+ * @brief func to determine if the lexeme is an identifier or a keyword
+ * @param lexeme - lexeme to be checked
+ */
+bool check_keyword(dstring_t lexeme);
+
+/**
+ * @brief helper func to check if a operator token has a valid value
+ * @param lexeme - operator lexeme to be validated
+ */
+bool check_operator_validity(dstring_t lexeme);
+
+#endif
