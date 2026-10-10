@@ -55,7 +55,7 @@ typedef enum state {
 	ALERT_ESC,
 	OP_SEMICOLON,
 	OP_MINUS,
-	OP_DOUBLE_DOT,
+	OP_COLON,
 	OP_STAR,
 	OP_COMMA,
 	OP_EX_MARK,
