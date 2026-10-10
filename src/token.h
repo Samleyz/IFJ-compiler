@@ -32,7 +32,8 @@ typedef enum {
 	OPERATOR_MINUS,
 	OPERATOR_SEMICOLON,
 	OPERATOR_COLON,
-	OPERATOR_SLASH
+	OPERATOR_SLASH,
+	OPERATOR_DOT
 } op_type_t;
 
 typedef enum {
