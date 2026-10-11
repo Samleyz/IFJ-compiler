@@ -4,6 +4,7 @@
  * @brief stack ADTs function implementations
  */
 
+#include "error.h"
 #include "stack_private.h"
 #include <stdlib.h>
 
@@ -69,10 +70,10 @@ bool stack_push(stack_t stk, void *data) {
 
 void *stack_top(stack_t stk) {
 	if (!stk) {
-		exit(1);
+		throw_err(ERR_INTERNAL, -1, "Called top on NULL");
 	}
 	if (stack_is_empty(stk)) {
-		exit(1);
+		throw_err(ERR_INTERNAL, -1, "Called top on empty stack");
 	}
 	return stk->top->data;
 }
