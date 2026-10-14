@@ -16,7 +16,7 @@
  *
  * @return pointer to the new loaded token
  */
-token *lexer_get_token(void);
+token lexer_get_token(void);
 
 /**
  * @brief Performs cleanup after using lexer

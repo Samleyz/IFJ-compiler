@@ -30,7 +30,7 @@ void lexer_cleanup(void) {
 	// TODO free stack
 }
 
-token *lexer_get_token(void) {
+token lexer_get_token(void) {
 	int c;
 
 	while (true) {
