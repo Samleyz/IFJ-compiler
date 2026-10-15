@@ -1,6 +1,7 @@
 /**
  * @file lexer_private.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz), Michal Sobek (xsobekm00@vutbr.cz)
+ * @author Tomáš Černý (xcernyt00@vutbr.cz)
  * @brief Internal private declarations for lexer
  * @date 2026-10-09
  */
@@ -9,12 +10,14 @@
 #define LEXER_PRIVATE_H
 
 #include "dynamic_string.h"
+#include "lexer.h"
+#include "stack.h"
 #include "token.h"
 #include <stdint.h>
 #include <stdio.h>
 
 /**
- * @biref state of the fsm
+ * @brief state of the fsm
  */
 typedef enum state {
 	START,
@@ -95,14 +98,18 @@ typedef struct {
 	int comment_depth_cnt; /**< Current depth of the comment */
 
 	dstring_t dynamic_string; /**< Dynamic string used to store lexemes */
-							  // TODO add stack
+	stack_t indent_stack;	  /**< Stack used to store indentation levels */
 } lexer_state_t;
 
 /**
- * @brief [TODO:summary]
+ * @brief Determines what tokens regarding indentations should be sent (if any)
  *
  * @param[in] lexer_state Current state of the lexer
- * @return [TODO:description] 1, -1, 0
+ * @return 0 Indentation is resolved, move to next state
+ * @return 1 Indentation is deeper, send INDENT
+ * @return -1 Indentation is shallower, send DEDENT
+ * @return -2 Indentation error
+ * @return -3 Internal error (failed malloc)
  */
 int handle_indent(lexer_state_t *lexer_state);
 

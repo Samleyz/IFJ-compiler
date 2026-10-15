@@ -1,11 +1,13 @@
 /**
  * @file lexer.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
+ * @author Tomáš Černý (xcernyt00@vutbr.cz)
  * @brief Implementation of a lexer, provides token on demand
  * @date 2026-10-04
  */
 
 #include "lexer.h"
+#include "error.h"
 #include "lexer_private.h"
 #include "token.h"
 
@@ -22,12 +24,15 @@ bool lexer_init(FILE *source) {
 	lexer_state.line_num = 1;
 	lexer_state.source_file = source;
 
-	// TODO stack init
-	return true;
+	bool init_status =
+		(lexer_state.indent_stack = stack_init()) &&	 // Stack init
+		stack_push(lexer_state.indent_stack, (size_t)0); // Set initial indent level to be zero
+
+	return init_status;
 }
 
 void lexer_cleanup(void) {
-	// TODO free stack
+	stack_dtor(lexer_state.indent_stack); // isn't memory leak, nothing allocated is in the stack
 }
 
 token lexer_get_token(void) {
@@ -73,6 +78,34 @@ token lexer_get_token(void) {
 		case EOF_STATE:
 			break;
 		case HANDLE_INDENT:
+			ungetc(c, lexer_state.source_file);
+			int hi_status = handle_indent(&lexer_state);
+			if (hi_status == 0) {
+				// Continue in FSM
+				c = fgetc(lexer_state.source_file);
+				if (c == '\t') {
+					lexer_state.fsm_state = TAB_STATE;
+				} else {
+					ungetc(c, lexer_state.source_file);
+					lexer_state.fsm_state = START;
+				}
+			} else if (hi_status == 1) {
+				return (token){.type = TOKEN_INDENT,
+							   .attribute = (token_attr_t){},
+							   .line_num = lexer_state.line_num};
+			} else if (hi_status == -1) {
+				return (token){.type = TOKEN_DEDENT,
+							   .attribute = (token_attr_t){},
+							   .line_num = lexer_state.line_num};
+			} else if (hi_status == -2) {
+				// Indentation error
+				return (token){.type = TOKEN_INVALID,
+							   .attribute = (token_attr_t){},
+							   .line_num = lexer_state.line_num};
+			} else if (hi_status == -3) {
+				throw_err(ERR_INTERNAL, lexer_state.line_num,
+						  "failed stack push inside handle indent");
+			}
 			break;
 		case TAB_STATE:
 			break;
