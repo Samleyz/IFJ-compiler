@@ -25,8 +25,8 @@ int handle_indent(lexer_state_t *lexer_state) {
 	}
 	ungetc(c, lexer_state->source_file);
 	// Choose outcome
-	if (space_counter > stack_top(lexer_state->indent_stack)) {		 // If deeper
-		if (!stack_push(lexer_state->indent_stack, space_counter)) { // Store
+	if (space_counter > stack_top(lexer_state->indent_stack)) {				 // If deeper
+		if (!stack_push(lexer_state->indent_stack, (void *)space_counter)) { // Store
 			// FAILED MALLOC
 			return -3;
 		}

@@ -11,6 +11,7 @@
 #include "error.h"
 #include "lexer_private.h"
 #include "token.h"
+#include <stdlib.h>
 
 static lexer_state_t lexer_state;
 
@@ -58,7 +59,10 @@ token lexer_get_token(void) {
 		case NUMBER:
 			if (c >= '0' && c <= '9') {
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 				// stay
 			} else if (c == '_') {
 				// move
@@ -67,12 +71,18 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = DOT_STATE;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else if (c == 'e' || c == 'E') {
 				// move
 				lexer_state.fsm_state = EXPONENT;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else if (c == 'd' || c == 'D') {
 				// move
 				lexer_state.fsm_state = D_RETURN;
@@ -83,6 +93,10 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = START;
 				// return number token
 				char *num_str = dstring_get_string(lexer_state.dynamic_string);
+				if (!num_str) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to get string from dynamic string");
+				}
 				int num;
 				if (convert_int(num_str, &num)) {
 					free(num_str);
@@ -105,7 +119,10 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = NUMBER;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else {
 				// invalid
 				return (token){.type = TOKEN_INVALID,
@@ -118,12 +135,18 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = EXPONENT;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else if (c == '.') {
 				// move
 				lexer_state.fsm_state = DOT_STATE;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else if (c == 'd' || c == 'D') {
 				// move
 				lexer_state.fsm_state = D_RETURN;
@@ -144,13 +167,19 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = EXPONENT;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else if (c == '_') {
 				// move
 				lexer_state.fsm_state = UND_FOR_DOUBLES;
 			} else if (c >= '0' && c <= '9') {
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 				// stay
 			} else if (c == 'd' || c == 'D') {
 				// move
@@ -162,6 +191,10 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = START;
 				// return double token
 				char *num_str = dstring_get_string(lexer_state.dynamic_string);
+				if (!num_str) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to get string from dynamic string");
+				}
 				double num;
 				if (convert_double(num_str, &num)) {
 					free(num_str);
@@ -183,12 +216,18 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = EXP_SIGN;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else if (c >= '0' && c <= '9') {
 				// move
 				lexer_state.fsm_state = EX_NUM;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else {
 				// invalid
 				return (token){.type = TOKEN_INVALID,
@@ -199,7 +238,10 @@ token lexer_get_token(void) {
 		case EX_NUM:
 			if (c >= '0' && c <= '9') {
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 				// stay
 			} else if (c == '_') {
 				// move
@@ -214,6 +256,10 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = START;
 				// return number token
 				char *num_str = dstring_get_string(lexer_state.dynamic_string);
+				if (!num_str) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to get string from dynamic string");
+				}
 				double double_num;
 				if (convert_double(num_str, &double_num)) {
 					free(num_str);
@@ -235,7 +281,10 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = EX_NUM;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else {
 				// invalid
 				return (token){.type = TOKEN_INVALID,
@@ -248,7 +297,10 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = DOUBLE;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else {
 				// invalid
 				return (token){.type = TOKEN_INVALID,
@@ -261,7 +313,10 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = DOUBLE;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else {
 				// invalid
 				return (token){.type = TOKEN_INVALID,
@@ -276,6 +331,10 @@ token lexer_get_token(void) {
 			lexer_state.fsm_state = START;
 			// try return double token
 			char *num_str = dstring_get_string(lexer_state.dynamic_string);
+			if (!num_str) {
+				throw_err(ERR_INTERNAL, lexer_state.line_num,
+						  "failed to get string from dynamic string");
+			}
 			double double_num;
 			if (convert_double(num_str, &double_num)) {
 				free(num_str);
@@ -298,7 +357,10 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = DOUBLE;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else {
 				// invalid
 				return (token){.type = TOKEN_INVALID,
@@ -313,7 +375,10 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = EX_NUM;
 				// append
-				dstring_append_char(lexer_state.dynamic_string, c);
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
 			} else {
 				// invalid
 				return (token){.type = TOKEN_INVALID,
