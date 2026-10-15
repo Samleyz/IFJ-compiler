@@ -21,12 +21,37 @@ int handle_indent(lexer_state_t *lexer_state) {
 }
 
 bool convert_int(const char *num_string, int32_t *int_number) {
-	// TODO
-	return false;
+
+	if (!num_string || !int_number || num_string[0] == '\0') {
+		throw_err(ERR_INTERNAL, -1, "num_string or int_number is NULL");
+	}
+
+	int64_t result = 0; // 64b for error detection later on
+
+	for (int c_idx = 0; num_string[c_idx] != '\0'; c_idx++) {
+		char c_tmp = num_string[c_idx];
+
+		if (c_tmp < '0' || c_tmp > '9') {
+			return false; // not digit, how did you do this???
+		}
+
+		result = result * 10 + (c_tmp - '0'); // '0'-'0'= 0,...,'9'-'0'= 9
+
+		if (result > INT32_MAX) {
+			return false; // int too big
+		}
+	}
+
+	*int_number = (int32_t)result;
+	return true;
 }
 
 bool convert_double(const char *num_string, double *double_number) {
-	// TODO
+
+	if (!num_string || !double_number) {
+		throw_err(ERR_INTERNAL, -1, "num_string or double_number is NULL");
+	}
+
 	return false;
 }
 
@@ -43,6 +68,20 @@ bool is_keyword(const char *string, kw_type_t *kw_type) {
 }
 
 bool is_bool_literal(const char *string, bool *literal_val) {
-	// TODO
-	return true;
+
+	if (!string || !literal_val) {
+		throw_err(ERR_INTERNAL, -1, "string or literal_val is NULL");
+	}
+
+	if (strcmp(string, "true") == true) {
+		literal_val = true;
+		return true;
+	}
+
+	if (strcmp(string, "false") == false) {
+		literal_val = false;
+		return true;
+	}
+
+	return false;
 }
