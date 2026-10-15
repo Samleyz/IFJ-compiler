@@ -30,27 +30,13 @@ typedef struct stack {
  * @return pointer to initialised stack item
  * @return nullptr init failed
  */
-static stack_item_t s_item_ctor(void) {
-	stack_item_t itm = malloc(sizeof(stack_item));
-	if (!itm) {
-		return NULL;
-	}
-	itm->data = NULL;
-	itm->next = NULL;
-	return itm;
-}
+static stack_item_t s_item_ctor(void);
 
 /**
  * @brief Helper function: Frees the item struct
  * @param itm Target item
  * @return true Succesfully freed
  */
-static bool s_item_dtor(stack_item_t itm) {
-	if (!itm) {
-		return false;
-	}
-	free(itm);
-	return true;
-}
+static bool s_item_dtor(stack_item_t itm);
 
 #endif

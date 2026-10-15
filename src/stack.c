@@ -8,6 +8,24 @@
 #include "stack_private.h"
 #include <stdlib.h>
 
+static stack_item_t s_item_ctor(void) {
+	stack_item_t itm = malloc(sizeof(stack_item));
+	if (!itm) {
+		return NULL;
+	}
+	itm->data = NULL;
+	itm->next = NULL;
+	return itm;
+}
+
+static bool s_item_dtor(stack_item_t itm) {
+	if (!itm) {
+		return false;
+	}
+	free(itm);
+	return true;
+}
+
 stack_t stack_init(void) {
 	stack_t stck = malloc(sizeof(stack));
 	if (!stck) {
