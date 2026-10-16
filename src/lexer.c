@@ -253,9 +253,7 @@ token lexer_get_token(void) {
 								   .line_num = lexer_state.line_num};
 				} else {
 					free(num_str);
-					return (token){.type = TOKEN_INVALID,
-								   .attribute = (token_attr_t){},
-								   .line_num = lexer_state.line_num};
+					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid integer literal");
 				}
 			}
 			break;
@@ -271,10 +269,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				// invalid
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid underscore in integer");
 			}
 			break;
 		case ZERO:
@@ -350,11 +345,8 @@ token lexer_get_token(void) {
 								   .attribute = (token_attr_t){.double_val = num},
 								   .line_num = lexer_state.line_num};
 				} else {
-					// invalid
 					free(num_str);
-					return (token){.type = TOKEN_INVALID,
-								   .attribute = (token_attr_t){},
-								   .line_num = lexer_state.line_num};
+					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
 				}
 			}
 			break;
@@ -376,10 +368,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				// invalid
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid exponent");
 			}
 			break;
 		case EX_NUM:
@@ -415,11 +404,8 @@ token lexer_get_token(void) {
 								   .attribute = (token_attr_t){.double_val = double_num},
 								   .line_num = lexer_state.line_num};
 				} else {
-					// invalid
 					free(num_str);
-					return (token){.type = TOKEN_INVALID,
-								   .attribute = (token_attr_t){},
-								   .line_num = lexer_state.line_num};
+					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
 				}
 			}
 			break;
@@ -433,10 +419,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				// invalid
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid exponent");
 			}
 			break;
 		case DOT_STATE:
@@ -449,10 +432,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				// invalid
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Expected digit after decimal point");
 			}
 			break;
 		case DOT_STATE_2:
@@ -465,10 +445,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				// invalid
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Expected digit after decimal point");
 			}
 			break;
 		case D_RETURN:
@@ -490,11 +467,8 @@ token lexer_get_token(void) {
 							   .attribute = (token_attr_t){.double_val = double_num},
 							   .line_num = lexer_state.line_num};
 			} else {
-				// invalid
 				free(num_str);
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
 			}
 			break;
 		case UND_FOR_DOUBLES:
@@ -509,10 +483,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				// invalid
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
 			}
 			break;
 		case UND_FOR_EXP:
@@ -527,10 +498,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				// invalid
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid exponent");
 			}
 			break;
 		case EOL_STATE:
@@ -558,10 +526,7 @@ token lexer_get_token(void) {
 							   .attribute = (token_attr_t){},
 							   .line_num = lexer_state.line_num};
 			} else if (hi_status == -2) {
-				// Indentation error
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid indentation");
 			} else if (hi_status == -3) {
 				throw_err(ERR_INTERNAL, lexer_state.line_num,
 						  "failed stack push inside handle indent");
@@ -757,10 +722,7 @@ token lexer_get_token(void) {
 							  "failed to append backslash to dynamic string");
 				}
 			} else {
-				// invalid
-				return (token){.type = TOKEN_INVALID,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid string escape");
 			}
 			break;
 		case OP_SEMICOLON:
