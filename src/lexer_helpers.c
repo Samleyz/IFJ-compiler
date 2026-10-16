@@ -1,6 +1,7 @@
 /**
  * @file lexer_helpers.c
- * @author Jan Mejzlík (xmejzlj00@vutbr.cz), Michal Sobek (xsobekm00@vutbr.cz)
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
+ * @author Michal Sobek (xsobekm00@vutbr.cz)
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
  * @brief Helper functions for lexer.c file
  * @date 2026-10-09
