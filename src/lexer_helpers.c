@@ -7,6 +7,9 @@
 
 #include "lexer_private.h"
 #include "token.h"
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 
 const char *keywords[] = {"def", "do",	   "Double",  "else", "if",	   "import",
 						  "Int", "return", "String",  "then", "Unit",  "val",
@@ -17,6 +20,7 @@ const char *keywords[] = {"def", "do",	   "Double",  "else", "if",	   "import",
 
 int handle_indent(lexer_state_t *lexer_state) {
 	// TODO
+	(void)lexer_state;
 	return 0;
 }
 
@@ -48,11 +52,20 @@ bool convert_int(const char *num_string, int32_t *int_number) {
 
 bool convert_double(const char *num_string, double *double_number) {
 
-	if (!num_string || !double_number) {
+	if (!num_string || !double_number || num_string[0] == '\0') {
 		throw_err(ERR_INTERNAL, -1, "num_string or double_number is NULL");
 	}
 
-	return false;
+	errno = 0;
+	char *endptr = NULL;
+	double result = strtod(num_string, &endptr);
+
+	if (errno == ERANGE || *endptr != '\0') {
+		return false;
+	}
+
+	*double_number = result;
+	return true;
 }
 
 bool is_keyword(const char *string, kw_type_t *kw_type) {
@@ -73,13 +86,13 @@ bool is_bool_literal(const char *string, bool *literal_val) {
 		throw_err(ERR_INTERNAL, -1, "string or literal_val is NULL");
 	}
 
-	if (strcmp(string, "true") == true) {
-		literal_val = true;
+	if (strcmp(string, "true") == 0) {
+		*literal_val = true;
 		return true;
 	}
 
-	if (strcmp(string, "false") == false) {
-		literal_val = false;
+	if (strcmp(string, "false") == 0) {
+		*literal_val = false;
 		return true;
 	}
 
