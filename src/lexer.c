@@ -443,18 +443,159 @@ token lexer_get_token(void) {
 		case C_SQUARE_BRACKET:
 			break;
 		case STRING:
+			if (c == '\\') {
+				// move
+				lexer_state.fsm_state = ALERT_ESC;
+			} else if (c == '"') {
+				// move
+				lexer_state.fsm_state = STRING_END;
+			} else {
+				// append
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
+			}
 			break;
 		case STRING_END:
+			if (c == '"') {
+				// move
+				lexer_state.fsm_state = BLOCK_STRING;
+			} else {
+				// unget
+				ungetc(c, lexer_state.source_file);
+				// move
+				lexer_state.fsm_state = START;
+				// return string token
+				char *str_val = dstring_get_string(lexer_state.dynamic_string);
+				if (!str_val) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to get string from dynamic string");
+				}
+				dstring_erase(lexer_state.dynamic_string);
+				return (token){.type = TOKEN_STRING,
+							   .attribute = (token_attr_t){.string_val = str_val},
+							   .line_num = lexer_state.line_num};
+			}
 			break;
 		case BLOCK_STRING:
+			if (c == '"') {
+				// move
+				lexer_state.fsm_state = BLOCK_STRING_EX_1;
+			} else {
+				// append
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
+			}
 			break;
 		case BLOCK_STRING_END:
+			// unget
+			ungetc(c, lexer_state.source_file);
+			// move
+			lexer_state.fsm_state = START;
+			// return string token
+			char *str_val = dstring_get_string(lexer_state.dynamic_string);
+			if (!str_val) {
+				throw_err(ERR_INTERNAL, lexer_state.line_num,
+						  "failed to get string from dynamic string");
+			}
+			dstring_erase(lexer_state.dynamic_string);
+			return (token){.type = TOKEN_STRING,
+						   .attribute = (token_attr_t){.string_val = str_val},
+						   .line_num = lexer_state.line_num};
 			break;
 		case BLOCK_STRING_EX_1:
+			if (c == '"') {
+				// move
+				lexer_state.fsm_state = BLOCK_STRING_EX_2;
+			} else {
+				// move
+				lexer_state.fsm_state = BLOCK_STRING;
+				// append "
+				if (!dstring_append_char(lexer_state.dynamic_string, '"')) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append \" to dynamic string");
+				}
+				// append
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
+			}
 			break;
 		case BLOCK_STRING_EX_2:
+			if (c == '"') {
+				// move
+				lexer_state.fsm_state = BLOCK_STRING_END;
+			} else {
+				// move
+				lexer_state.fsm_state = BLOCK_STRING;
+				// append "
+				if (!dstring_append_char(lexer_state.dynamic_string, '"')) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append \" to dynamic string");
+				}
+				// append "
+				if (!dstring_append_char(lexer_state.dynamic_string, '"')) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append \" to dynamic string");
+				}
+				// append
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
+			}
 			break;
 		case ALERT_ESC:
+			if (c == 't') {
+				// move
+				lexer_state.fsm_state = STRING;
+				// append tab
+				if (!dstring_append_char(lexer_state.dynamic_string, '\t')) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append tab to dynamic string");
+				}
+			} else if (c == 'r') {
+				// move
+				lexer_state.fsm_state = STRING;
+				// append return
+				if (!dstring_append_char(lexer_state.dynamic_string, '\r')) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append return to dynamic string");
+				}
+			} else if (c == 'n') {
+				// move
+				lexer_state.fsm_state = STRING;
+				// append newline
+				if (!dstring_append_char(lexer_state.dynamic_string, '\n')) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append newline to dynamic string");
+				}
+			} else if (c == '"') {
+				// move
+				lexer_state.fsm_state = STRING;
+				// append double quote
+				if (!dstring_append_char(lexer_state.dynamic_string, '"')) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append double quote to dynamic string");
+				}
+			} else if (c == '\\') {
+				// move
+				lexer_state.fsm_state = STRING;
+				// append backslash
+				if (!dstring_append_char(lexer_state.dynamic_string, '\\')) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append backslash to dynamic string");
+				}
+			} else {
+				// invalid
+				return (token){.type = TOKEN_INVALID,
+							   .attribute = (token_attr_t){},
+							   .line_num = lexer_state.line_num};
+			}
 			break;
 		case OP_SEMICOLON:
 			break;
