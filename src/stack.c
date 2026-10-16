@@ -86,7 +86,7 @@ bool stack_pop(stack_t stk) {
 
 bool stack_dtor(stack_t stk) {
 	if (!stk) {
-		throw_err(ERR_INTERNAL, -1, "Called stack_dtor on NULL");
+		return false;
 	}
 	while (!stack_is_empty(stk)) {
 		stack_pop(stk);
