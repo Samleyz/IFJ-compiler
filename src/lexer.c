@@ -53,8 +53,74 @@ token lexer_get_token(void) {
 		case START:
 			break;
 		case IDENTIFIER:
+			if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+				c == '_') {
+				// append
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
+				// stay
+			} else {
+				// unget
+				ungetc(c, lexer_state.source_file);
+				// move
+				lexer_state.fsm_state = START;
+				// extract string
+				char *id_str = dstring_get_string(lexer_state.dynamic_string);
+				if (!id_str) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to get string from dynamic string");
+				}
+				// check keyword
+				kw_type_t kw_type;
+				if (is_keyword(id_str, &kw_type)) {
+					free(id_str);
+					dstring_erase(lexer_state.dynamic_string);
+					return (token){.type = TOKEN_KEYWORD,
+								   .attribute = (token_attr_t){.keyword = kw_type},
+								   .line_num = lexer_state.line_num};
+				}
+				// check bool literal
+				bool bool_val;
+				if (is_bool_literal(id_str, &bool_val)) {
+					free(id_str);
+					dstring_erase(lexer_state.dynamic_string);
+					return (token){.type = TOKEN_BOOLEAN,
+								   .attribute = (token_attr_t){.bool_literal = bool_val},
+								   .line_num = lexer_state.line_num};
+				}
+				// normal identifier
+				dstring_erase(lexer_state.dynamic_string);
+				return (token){.type = TOKEN_IDENTIFIER,
+							   .attribute = (token_attr_t){.string_val = id_str},
+							   .line_num = lexer_state.line_num};
+			}
 			break;
 		case UNDERSCORE:
+			if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+				c == '_') {
+				// append _
+				if (!dstring_append_char(lexer_state.dynamic_string, '_')) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append _ to dynamic string");
+				}
+				// append
+				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to append char to dynamic string");
+				}
+			} else {
+				// unget
+				ungetc(c, lexer_state.source_file);
+				// move
+				lexer_state.fsm_state = START;
+				// return underscore token
+				dstring_erase(lexer_state.dynamic_string);
+				return (token){.type = TOKEN_UNDERSCORE,
+							   .attribute = (token_attr_t){},
+							   .line_num = lexer_state.line_num};
+			}
 			break;
 		case NUMBER:
 			if (c >= '0' && c <= '9') {
