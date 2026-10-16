@@ -656,6 +656,8 @@ token lexer_get_token(void) {
 			} else if (c == '"') {
 				// move
 				lexer_state.fsm_state = STRING_END;
+			} else if (c == EOF) {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");
 			} else {
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
@@ -689,6 +691,8 @@ token lexer_get_token(void) {
 			if (c == '"') {
 				// move
 				lexer_state.fsm_state = BLOCK_STRING_EX_1;
+			} else if (c == EOF) {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated block string");
 			} else {
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
