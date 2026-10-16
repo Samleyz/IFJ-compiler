@@ -2,6 +2,7 @@
  * @file lexer.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
+ * @author Cehlarik Samuel (xcehlas00@vutbr.cz)
  * @brief Implementation of a lexer, provides token on demand
  * @date 2026-10-04
  */
@@ -59,8 +60,7 @@ token lexer_get_token(void) {
 			if (c == EOF) {
 				lexer_state.fsm_state = EOF_STATE;
 			} else if (c == '\n') {
-				lexer_state.fsm_state =
-					lexer_state.bracket_cnt == 0 ? EOL_STATE : B_EOL_STATE;
+				lexer_state.fsm_state = lexer_state.bracket_cnt == 0 ? EOL_STATE : B_EOL_STATE;
 			} else if (c == ' ') {
 				lexer_state.fsm_state = START;
 			} else if (c == '\t') {
@@ -766,27 +766,32 @@ token lexer_get_token(void) {
 		case OP_SEMICOLON:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_SEMICOLON,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_SEMICOLON,
 						   .line_num = lexer_state.line_num};
 		case OP_MINUS:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_MINUS,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_MINUS,
 						   .line_num = lexer_state.line_num};
 		case OP_COLON:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_COLON,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_COLON,
 						   .line_num = lexer_state.line_num};
 		case OP_STAR:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_STAR,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_STAR,
 						   .line_num = lexer_state.line_num};
 		case OP_COMMA:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_COMMA,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_COMMA,
 						   .line_num = lexer_state.line_num};
 		case OP_EX_MARK:
 			if (c == '=') {
@@ -794,19 +799,22 @@ token lexer_get_token(void) {
 			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
-				return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_EX_MARK,
+				return (token){.type = TOKEN_OPERATOR,
+							   .attribute.operator= OPERATOR_EX_MARK,
 							   .line_num = lexer_state.line_num};
 			}
 			break;
 		case OP_NOT_EQUAL:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_NOT_EQUAL,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_NOT_EQUAL,
 						   .line_num = lexer_state.line_num};
 		case OP_AND:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_AND,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_AND,
 						   .line_num = lexer_state.line_num};
 		case OP_AND_ENTRY:
 			if (c != '&') {
@@ -820,14 +828,16 @@ token lexer_get_token(void) {
 			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
-				return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_PLUS,
+				return (token){.type = TOKEN_OPERATOR,
+							   .attribute.operator= OPERATOR_PLUS,
 							   .line_num = lexer_state.line_num};
 			}
 			break;
 		case OP_PLUS_PLUS:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_PLUS_PLUS,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_PLUS_PLUS,
 						   .line_num = lexer_state.line_num};
 		case OP_VERTICAL_BAR:
 			if (c == '|') {
@@ -835,14 +845,16 @@ token lexer_get_token(void) {
 			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
-				return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_VERTICAL_BAR,
+				return (token){.type = TOKEN_OPERATOR,
+							   .attribute.operator= OPERATOR_VERTICAL_BAR,
 							   .line_num = lexer_state.line_num};
 			}
 			break;
 		case OP_OR:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_OR,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_OR,
 						   .line_num = lexer_state.line_num};
 		case OP_SLASH:
 			if (c == '/') {
@@ -853,7 +865,8 @@ token lexer_get_token(void) {
 			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
-				return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_SLASH,
+				return (token){.type = TOKEN_OPERATOR,
+							   .attribute.operator= OPERATOR_SLASH,
 							   .line_num = lexer_state.line_num};
 			}
 			break;
@@ -865,19 +878,22 @@ token lexer_get_token(void) {
 			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
-				return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_LESS,
+				return (token){.type = TOKEN_OPERATOR,
+							   .attribute.operator= OPERATOR_LESS,
 							   .line_num = lexer_state.line_num};
 			}
 			break;
 		case OP_LESS_EQUAL:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_LESS_EQUAL,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_LESS_EQUAL,
 						   .line_num = lexer_state.line_num};
 		case OP_LEFT_ARROW:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_LEFT_ARROW,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_LEFT_ARROW,
 						   .line_num = lexer_state.line_num};
 		case OP_GREATER:
 			if (c == '=') {
@@ -885,14 +901,16 @@ token lexer_get_token(void) {
 			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
-				return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_GREATER,
+				return (token){.type = TOKEN_OPERATOR,
+							   .attribute.operator= OPERATOR_GREATER,
 							   .line_num = lexer_state.line_num};
 			}
 			break;
 		case OP_GREATER_EQUAL:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_GREATER_EQUAL,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_GREATER_EQUAL,
 						   .line_num = lexer_state.line_num};
 		case OP_ASSIGN:
 			if (c == '=') {
@@ -902,7 +920,8 @@ token lexer_get_token(void) {
 			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
-				return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_ASSIGN,
+				return (token){.type = TOKEN_OPERATOR,
+							   .attribute.operator= OPERATOR_ASSIGN,
 							   .line_num = lexer_state.line_num};
 			}
 			break;
@@ -910,12 +929,13 @@ token lexer_get_token(void) {
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
 			return (token){.type = TOKEN_OPERATOR,
-						   .attribute.operator = OPERATOR_RIGHT_DOUBLE_ARROW,
+						   .attribute.operator= OPERATOR_RIGHT_DOUBLE_ARROW,
 						   .line_num = lexer_state.line_num};
 		case OP_EQUAL:
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
-			return (token){.type = TOKEN_OPERATOR, .attribute.operator = OPERATOR_EQUAL,
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute.operator= OPERATOR_EQUAL,
 						   .line_num = lexer_state.line_num};
 		case ONE_LINE_COM:
 			if (c == EOF) {
@@ -969,8 +989,7 @@ token lexer_get_token(void) {
 		case ALERT_COM_OUT_1:
 			if (c == '/') {
 				lexer_state.comment_depth_cnt--;
-				lexer_state.fsm_state =
-					lexer_state.comment_depth_cnt == 0 ? START : BLOCK_COM;
+				lexer_state.fsm_state = lexer_state.comment_depth_cnt == 0 ? START : BLOCK_COM;
 			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = BLOCK_COM;
