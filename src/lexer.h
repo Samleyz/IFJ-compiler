@@ -14,7 +14,7 @@
 /**
  * @brief Performs lexical analysis and gets new token from source
  *
- * @return pointer to the new loaded token
+ * @return new loaded token
  */
 token lexer_get_token(void);
 
