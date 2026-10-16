@@ -1,6 +1,7 @@
 /**
  * @file token.h
- * @author Michal Sobek (xsobekm00@vutbr.cz), Jan Mejzlík (xmejzlj00@vutbr.cz)
+ * @author Michal Sobek (xsobekm00@vutbr.cz)
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Token datatype interface
  * @date 2026-10-10
  */
