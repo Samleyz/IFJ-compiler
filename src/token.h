@@ -73,12 +73,12 @@ typedef enum {
  * @brief attributes of the token
  */
 typedef union {
-	op_type_t operator; /**< operator type */
-	kw_type_t keyword;	/**< keyword type */
-	int32_t int_val;	/**< integer value */
-	double double_val;	/**< double value */
-	bool bool_literal;	/**< bool literal value */
-	char *string_val;	/**< string literal value */
+	op_type_t operator_type; /**< operator type */
+	kw_type_t keyword;		 /**< keyword type */
+	int32_t int_val;		 /**< integer value */
+	double double_val;		 /**< double value */
+	bool bool_literal;		 /**< bool literal value */
+	char *string_val;		 /**< string literal value */
 } token_attr_t;
 
 /**
