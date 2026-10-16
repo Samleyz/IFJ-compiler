@@ -61,6 +61,7 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = EOF_STATE;
 			} else if (c == '\n') {
 				lexer_state.fsm_state = lexer_state.bracket_cnt == 0 ? EOL_STATE : B_EOL_STATE;
+				lexer_state.line_num++;
 			} else if (c == ' ') {
 				lexer_state.fsm_state = START;
 			} else if (c == '\t') {
@@ -292,6 +293,8 @@ token lexer_get_token(void) {
 			} else if (c == 'd' || c == 'D') {
 				// move
 				lexer_state.fsm_state = D_RETURN;
+			} else if (c <= '9' && c >= '0') {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Integer starting with zero");
 			} else {
 				// unget
 				ungetc(c, lexer_state.source_file);
@@ -502,8 +505,20 @@ token lexer_get_token(void) {
 			}
 			break;
 		case EOL_STATE:
+			if (c == '\n') {
+				lexer_state.line_num++;
+			} else if (c == '\t') {
+				lexer_state.fsm_state = TAB_STATE;
+			} else {
+				// unget
+				ungetc(c, lexer_state.source_file);
+				// move
+				lexer_state.fsm_state = HANDLE_INDENT;
+			}
 			break;
 		case EOF_STATE:
+			// return EOF token
+			return (token){.type = TOKEN_EOF, .line_num = lexer_state.line_num};
 			break;
 		case HANDLE_INDENT:
 			ungetc(c, lexer_state.source_file);
@@ -533,6 +548,19 @@ token lexer_get_token(void) {
 			}
 			break;
 		case TAB_STATE:
+			if (c == '\t' || c == ' ') {
+				// stay
+			} else if (c == '\n') {
+				// unget
+				ungetc(c, lexer_state.source_file);
+				// move
+				lexer_state.fsm_state = START;
+			} else if (c == '/') {
+				// move
+				lexer_state.fsm_state = COMMENT_ENTRY;
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after tab");
+			}
 			break;
 		case MAIN_AT:
 			if (c != 'm') {
@@ -564,15 +592,63 @@ token lexer_get_token(void) {
 			return (token){.type = TOKEN_MAIN, .line_num = lexer_state.line_num};
 
 		case O_BRACKET:
+			// unget
+			ungetc(c, lexer_state.source_file);
+			// move
+			lexer_state.fsm_state = START;
+			// increment bracket counter
+			lexer_state.bracket_cnt++;
+			// return open bracket token
+			return (token){.type = TOKEN_LPAREN,
+						   .attribute = (token_attr_t){},
+						   .line_num = lexer_state.line_num};
 			break;
 		case C_BRACKET:
-			break;
+			// unget
+			ungetc(c, lexer_state.source_file);
+			// move
+			lexer_state.fsm_state = START;
+			// decrement bracket counter
+			lexer_state.bracket_cnt--;
+			// return close bracket token
+			return (token){.type = TOKEN_RPAREN,
+						   .attribute = (token_attr_t){},
+						   .line_num = lexer_state.line_num};
 		case B_EOL_STATE:
+			int bracket_space_counter = 0;
+			while (' ' == (c = fgetc(lexer_state.source_file))) {
+				bracket_space_counter++;
+			}
+			ungetc(c, lexer_state.source_file);
+			if ('\t' == (c = fgetc(lexer_state.source_file))) {
+				lexer_state.fsm_state = TAB_STATE;
+				ungetc(c, lexer_state.source_file);
+			} else if (bracket_space_counter > stack_top(lexer_state.indent_stack)) {
+				// move
+				lexer_state.fsm_state = START;
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid indentation inside brackets");
+			}
 			break;
 		case O_SQUARE_BRACKET:
+			// unget
+			ungetc(c, lexer_state.source_file);
+			// move
+			lexer_state.fsm_state = START;
+			// return open square bracket token
+			return (token){.type = TOKEN_LSQUARE,
+						   .attribute = (token_attr_t){},
+						   .line_num = lexer_state.line_num};
 			break;
 		case C_SQUARE_BRACKET:
-			break;
+			// unget
+			ungetc(c, lexer_state.source_file);
+			// move
+			lexer_state.fsm_state = START;
+			// return close square bracket token
+			return (token){.type = TOKEN_RSQUARE,
+						   .attribute = (token_attr_t){},
+						   .line_num = lexer_state.line_num};
 		case STRING:
 			if (c == '\\') {
 				// move
