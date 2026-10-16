@@ -78,10 +78,6 @@ typedef union {
 	double double_val;			 /**< double value */
 	bool bool_literal;			 /**< bool literal value */
 	char *string_val;			 /**< string literal value */
-	struct {					 /**< struct representing error */
-		err_c_t err_code;		 /**< code of the error */
-		const char *err_message; /**< string with the error message */
-	} err_info;
 } token_attr_t;
 
 /**
@@ -106,7 +102,6 @@ typedef enum {
 	TOKEN_LSQUARE,	  /**< left square parenthesis */
 	TOKEN_RSQUARE,	  /**< right square parenthesis */
 	TOKEN_MAIN,		  /**< @main token */
-	TOKEN_INVALID	  /**< token sent if error occured */
 } token_type;
 
 /**
