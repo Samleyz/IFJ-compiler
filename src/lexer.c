@@ -545,7 +545,16 @@ token lexer_get_token(void) {
 			}
 			break;
 		case EOF_STATE:
-			// return EOF token
+			 if (stack_top(lexer_state.indent_stack) != NULL) {
+        		if (!stack_pop(lexer_state.indent_stack)) {
+            		throw_err(ERR_INTERNAL, lexer_state.line_num, "Failed to close indentation at EOF");
+       				 }
+        		return (token){
+					.type = TOKEN_DEDENT,
+					.attribute = (token_attr_t){},
+					.line_num = lexer_state.line_num,
+				};
+    	}
 			return (token){.type = TOKEN_EOF, .line_num = lexer_state.line_num};
 			break;
 		case HANDLE_INDENT:
