@@ -616,7 +616,7 @@ token lexer_get_token(void) {
 						   .line_num = lexer_state.line_num};
 		case B_EOL_STATE:
 			// count spaces
-			int bracket_space_counter = 0;
+			size_t bracket_space_counter = 0;
 			while (' ' == (c = fgetc(lexer_state.source_file))) {
 				bracket_space_counter++;
 			}
@@ -626,7 +626,7 @@ token lexer_get_token(void) {
 			if (c == '\t') {
 				// move
 				lexer_state.fsm_state = TAB_STATE;
-			} else if (bracket_space_counter > stack_top(lexer_state.indent_stack)) {
+			} else if (bracket_space_counter > (size_t)stack_top(lexer_state.indent_stack)) {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
