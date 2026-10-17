@@ -948,6 +948,7 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = ONE_LINE_COM;
 			} else if (c == '*') {
 				lexer_state.comment_depth_cnt = 1;
+				lexer_state.comment_start_line = lexer_state.line_num;
 				lexer_state.fsm_state = BLOCK_COM;
 			} else {
 				ungetc(c, lexer_state.source_file);
@@ -1086,8 +1087,10 @@ token lexer_get_token(void) {
 			if (c == '/') {
 				lexer_state.comment_depth_cnt--;
 				if (lexer_state.comment_depth_cnt == 0) {
-					lexer_state.line_num--;
-					lexer_state.fsm_state = EOL_STATE;
+					lexer_state.fsm_state = AFTER_MULTILINE_COMMENT;
+					return (token){.type = TOKEN_EOL,
+						   .attribute = (token_attr_t){},
+						   .line_num = lexer_state.comment_start_line};
 				} else {
 					lexer_state.fsm_state = NEWLINE_BLOCK_COM;
 				}
@@ -1096,11 +1099,27 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = NEWLINE_BLOCK_COM;
 			}
 			break;
+		case AFTER_MULTILINE_COMMENT:
+			if (c == ' ' || c == '\t') {
+			} else if (c == '\n') {
+				lexer_state.line_num++;
+				lexer_state.fsm_state = EOL_STATE;
+			}
+			else if (c == EOF) {
+				ungetc(c, lexer_state.source_file);
+				lexer_state.fsm_state = START;
+			}
+			else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num,
+						  "Token after multiline block comment");
+			}
+			break;
 		case COMMENT_ENTRY:
 			if (c == '/') {
 				lexer_state.fsm_state = ONE_LINE_COM;
 			} else if (c == '*') {
 				lexer_state.comment_depth_cnt = 1;
+				lexer_state.comment_start_line = lexer_state.line_num;
 				lexer_state.fsm_state = BLOCK_COM;
 			} else {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid comment entry");
