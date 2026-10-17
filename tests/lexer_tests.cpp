@@ -1,5 +1,6 @@
 /**
  * @file lexer_tests.cpp
+ * @author Copilot and Cehlarik Samuel (xcehlas00@vutbr.cz)
  * @brief Specification-focused tests for the lexer.
  */
 
