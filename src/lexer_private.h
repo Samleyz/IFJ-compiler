@@ -98,6 +98,7 @@ typedef struct {
 	int bracket_cnt;	   /**< Brackent depth counter */
 	int comment_depth_cnt; /**< Current depth of the comment */
 
+	int string_start_line; /**< The line number where the string started */
 	dstring_t dynamic_string; /**< Dynamic string used to store lexemes */
 	stack_t indent_stack;	  /**< Stack used to store indentation levels */
 } lexer_state_t;

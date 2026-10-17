@@ -31,6 +31,7 @@ bool lexer_init(FILE *source) {
 	lexer_state.comment_depth_cnt = 0;
 	lexer_state.line_num = 1;
 	lexer_state.source_file = source;
+	lexer_state.string_start_line = 0;
 
 	bool init_status = true;
 	init_status =
@@ -688,6 +689,7 @@ token lexer_get_token(void) {
 			if (c == '"') {
 				// move
 				lexer_state.fsm_state = BLOCK_STRING;
+				lexer_state.string_start_line = lexer_state.line_num;
 			} else {
 				// unget
 				ungetc(c, lexer_state.source_file);
@@ -712,6 +714,9 @@ token lexer_get_token(void) {
 			} else if (c == EOF) {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated block string");
 			} else {
+				if (c == '\n') {
+					lexer_state.line_num++;
+				}
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
@@ -733,7 +738,7 @@ token lexer_get_token(void) {
 			dstring_erase(lexer_state.dynamic_string);
 			return (token){.type = TOKEN_STRING,
 						   .attribute = (token_attr_t){.string_val = str_val},
-						   .line_num = lexer_state.line_num};
+						   .line_num = lexer_state.string_start_line};
 			break;
 		case BLOCK_STRING_EX_1:
 			if (c == '"') {
@@ -746,6 +751,9 @@ token lexer_get_token(void) {
 				if (!dstring_append_char(lexer_state.dynamic_string, '"')) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
 							  "failed to append \" to dynamic string");
+				}
+				if (c == '\n') {
+					lexer_state.line_num++;
 				}
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
@@ -770,6 +778,9 @@ token lexer_get_token(void) {
 				if (!dstring_append_char(lexer_state.dynamic_string, '"')) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
 							  "failed to append \" to dynamic string");
+				}
+				if (c == '\n') {
+					lexer_state.line_num++;
 				}
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
