@@ -602,6 +602,9 @@ token lexer_get_token(void) {
 			} else if (c == '/') {
 				// move
 				lexer_state.fsm_state = COMMENT_ENTRY;
+			} else if (lexer_state.line_has_code) {
+				ungetc(c, lexer_state.source_file);
+				lexer_state.fsm_state = START;
 			} else {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after tab");
 			}
