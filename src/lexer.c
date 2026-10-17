@@ -75,9 +75,8 @@ token lexer_get_token(void) {
 				unsigned ended_line = lexer_state.line_num++;
 				if (lexer_state.line_has_code) {
 					lexer_state.line_has_code = false;
-					return (token){.type = TOKEN_EOL,
-								   .attribute = (token_attr_t){},
-								   .line_num = ended_line};
+					return (token){
+						.type = TOKEN_EOL, .attribute = (token_attr_t){}, .line_num = ended_line};
 				}
 			} else if (c == ' ') {
 				lexer_state.fsm_state = START;
@@ -552,16 +551,17 @@ token lexer_get_token(void) {
 			}
 			break;
 		case EOF_STATE:
-			 if (stack_top(lexer_state.indent_stack) != NULL) {
-        		if (!stack_pop(lexer_state.indent_stack)) {
-            		throw_err(ERR_INTERNAL, lexer_state.line_num, "Failed to close indentation at EOF");
-       				 }
-        		return (token){
+			if (stack_top(lexer_state.indent_stack) != NULL) {
+				if (!stack_pop(lexer_state.indent_stack)) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "Failed to close indentation at EOF");
+				}
+				return (token){
 					.type = TOKEN_DEDENT,
 					.attribute = (token_attr_t){},
 					.line_num = lexer_state.line_num,
 				};
-    	}
+			}
 			return (token){.type = TOKEN_EOF, .line_num = lexer_state.line_num};
 			break;
 		case HANDLE_INDENT:
@@ -713,7 +713,7 @@ token lexer_get_token(void) {
 			} else if (c == '\n') {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");
 			} else {
-				if (c > 0x7F){
+				if (c > 0x7F) {
 					throw_err(ERR_LEXICAL, lexer_state.line_num, "Non-ASCII character in string");
 				}
 				// append
@@ -1128,14 +1128,11 @@ token lexer_get_token(void) {
 			} else if (c == '\n') {
 				lexer_state.line_num++;
 				lexer_state.fsm_state = EOL_STATE;
-			}
-			else if (c == EOF) {
+			} else if (c == EOF) {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
-			}
-			else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num,
-						  "Token after multiline block comment");
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Token after multiline block comment");
 			}
 			break;
 		case COMMENT_ENTRY:
