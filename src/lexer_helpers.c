@@ -29,16 +29,17 @@ int handle_indent(lexer_state_t *lexer_state) {
 	}
 	ungetc(c, lexer_state->source_file);
 	// Choose outcome
-	if (space_counter > stack_top(lexer_state->indent_stack)) {				 // If deeper
+	if (space_counter > (size_t)stack_top(lexer_state->indent_stack)) {		 // If deeper
 		if (!stack_push(lexer_state->indent_stack, (void *)space_counter)) { // Store
 			// FAILED MALLOC
 			return -3;
 		}
 		// INDENT
 		return 1;
-	} else if (space_counter < stack_top(lexer_state->indent_stack)) { // If shallower
-		stack_pop(lexer_state->indent_stack);						   // Remove resolved
-		if (space_counter > stack_top(lexer_state->indent_stack)) { // test for missing indent level
+	} else if (space_counter < (size_t)stack_top(lexer_state->indent_stack)) { // If shallower
+		stack_pop(lexer_state->indent_stack);								   // Remove resolved
+		// test for missing indent level
+		if (space_counter > (size_t)stack_top(lexer_state->indent_stack)) {
 			// INDENTATION ERROR - invalid token (no such level of indent used before)
 			return -2;
 		}
