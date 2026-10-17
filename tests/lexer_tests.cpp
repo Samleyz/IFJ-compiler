@@ -385,26 +385,66 @@ TEST(LexerNumbers, RejectsIncompleteDecimalAndExponentParts) {
 
 TEST(LexerNumbers, RejectsDoubleOverflow) { expectLexicalError("1e9999"); }
 
+TEST(LexerNumbers, RejectsUnsupportedBasesAndSuffixes) {
+	for (const std::string &source : {"1.0f", "1.5F", "1f", "100L", "0x12", "0b101", "0o77"}) {
+		expectLexicalError(source);
+	}
+}
+
+TEST(LexerNumbers, RejectsMisplacedUnderscoresNearDotAndExp) {
+	for (const std::string &source : {"1_.2", "._2", ".2_", "1_e2", "0_123", "0_"}) {
+		expectLexicalError(source);
+	}
+}
+
 TEST(LexerOperators, RecognizesEveryOperatorAndDelimiter) {
-	expectTokens("&& || + + - * / ; , : ! != < <= <- > >= = == => | ( ) [ ]",
-				 {op(OPERATOR_AND),			  op(OPERATOR_OR),
-				  op(OPERATOR_PLUS),		  op(OPERATOR_PLUS),
-				  op(OPERATOR_MINUS),		  op(OPERATOR_STAR),
-				  op(OPERATOR_SLASH),		  op(OPERATOR_SEMICOLON),
-				  op(OPERATOR_COMMA),		  op(OPERATOR_COLON),
-				  op(OPERATOR_EX_MARK),		  op(OPERATOR_NOT_EQUAL),
-				  op(OPERATOR_LESS),		  op(OPERATOR_LESS_EQUAL),
-				  op(OPERATOR_LEFT_ARROW),	  op(OPERATOR_GREATER),
-				  op(OPERATOR_GREATER_EQUAL), op(OPERATOR_ASSIGN),
-				  op(OPERATOR_EQUAL),		  op(OPERATOR_RIGHT_DOUBLE_ARROW),
-				  op(OPERATOR_VERTICAL_BAR),  plain(TOKEN_LPAREN),
-				  plain(TOKEN_RPAREN),		  plain(TOKEN_LSQUARE),
-				  plain(TOKEN_RSQUARE),		  plain(TOKEN_EOF)});
+	expectTokens("&& || + + - * / ; , : ! != < <= <- > >= = == => | . ( ) [ ]",
+				 {op(OPERATOR_AND),
+				  op(OPERATOR_OR),
+				  op(OPERATOR_PLUS),
+				  op(OPERATOR_PLUS),
+				  op(OPERATOR_MINUS),
+				  op(OPERATOR_STAR),
+				  op(OPERATOR_SLASH),
+				  op(OPERATOR_SEMICOLON),
+				  op(OPERATOR_COMMA),
+				  op(OPERATOR_COLON),
+				  op(OPERATOR_EX_MARK),
+				  op(OPERATOR_NOT_EQUAL),
+				  op(OPERATOR_LESS),
+				  op(OPERATOR_LESS_EQUAL),
+				  op(OPERATOR_LEFT_ARROW),
+				  op(OPERATOR_GREATER),
+				  op(OPERATOR_GREATER_EQUAL),
+				  op(OPERATOR_ASSIGN),
+				  op(OPERATOR_EQUAL),
+				  op(OPERATOR_RIGHT_DOUBLE_ARROW),
+				  op(OPERATOR_VERTICAL_BAR),
+				  op(OPERATOR_DOT),
+				  plain(TOKEN_LPAREN),
+				  plain(TOKEN_RPAREN),
+				  plain(TOKEN_LSQUARE),
+				  plain(TOKEN_RSQUARE),
+				  plain(TOKEN_EOF)});
+}
+
+TEST(LexerOperators, RecognizesDotAndProlog) {
+	expectTokens("import ifj26.*", {keyword(KW_IMPORT), identifier("ifj26"), op(OPERATOR_DOT),
+									op(OPERATOR_STAR), plain(TOKEN_EOF)});
+}
+
+TEST(LexerOperators, RecognizesCompoundExpressionsWithoutSpaces) {
+	expectTokens("a+b<=c==d!=e=>f<-g++h",
+				 {identifier("a"), op(OPERATOR_PLUS), identifier("b"), op(OPERATOR_LESS_EQUAL),
+				  identifier("c"), op(OPERATOR_EQUAL), identifier("d"), op(OPERATOR_NOT_EQUAL),
+				  identifier("e"), op(OPERATOR_RIGHT_DOUBLE_ARROW), identifier("f"),
+				  op(OPERATOR_LEFT_ARROW), identifier("g"), op(OPERATOR_PLUS_PLUS), identifier("h"),
+				  plain(TOKEN_EOF)});
 }
 
 TEST(LexerOperators, RecognizesListConcatenationOperator) {
-	expectTokens("++ + +", {op(OPERATOR_PLUS_PLUS), op(OPERATOR_PLUS), op(OPERATOR_PLUS),
-							plain(TOKEN_EOF)});
+	expectTokens("++ + +",
+				 {op(OPERATOR_PLUS_PLUS), op(OPERATOR_PLUS), op(OPERATOR_PLUS), plain(TOKEN_EOF)});
 }
 
 TEST(LexerOperators, RecognizesMainAnnotation) {
@@ -446,6 +486,10 @@ TEST(LexerStrings, PreservesQuotesInsideTripleQuotedStrings) {
 TEST(LexerStrings, DoesNotInterpretEscapesInTripleQuotedStrings) {
 	expectTokens("\"\"\"back\\nslash\\\\\"\"\"",
 				 {stringToken("back\\nslash\\\\"), plain(TOKEN_EOF)});
+}
+
+TEST(LexerStrings, RecognizesEmptyMultilineString) {
+	expectTokens("\"\"\"\"\"\"", {stringToken(""), plain(TOKEN_EOF)});
 }
 
 TEST(LexerStrings, GrowsStorageForLongStrings) {
@@ -495,6 +539,22 @@ TEST(LexerComments, MultilineBlockCommentEndsItsLogicalLine) {
 	expectLexicalError("value /* block\ncomment */ next");
 }
 
+TEST(LexerComments, SingleLineBlockCommentSeparatesTokensWithoutSpaces) {
+	expectTokens("first/*comment*/second",
+				 {identifier("first"), identifier("second"), plain(TOKEN_EOF)});
+}
+
+TEST(LexerComments, MultilineBlockCommentAllowsTrailingSpaces) {
+	expectTokens(
+		"first /* block\ncomment */   \nsecond",
+		{identifier("first"), plain(TOKEN_EOL, 1), identifier("second", 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerComments, OnlyCommentsProduceEof) {
+	expectTokens("// only a line comment\n", {plain(TOKEN_EOF, 2)});
+	expectTokens("/* only a\nblock comment */", {plain(TOKEN_EOF, 2)});
+}
+
 TEST(LexerLines, EmitsEndOfLineForNonblankLinesOnly) {
 	expectTokens("first\n\nsecond\n",
 				 {identifier("first"), plain(TOKEN_EOL, 1), identifier("second", 3),
@@ -534,6 +594,13 @@ TEST(LexerIndentation, ClosesOpenBlocksAtEndOfInput) {
 				  identifier("child", 2), plain(TOKEN_DEDENT, 2), plain(TOKEN_EOF, 2)});
 }
 
+TEST(LexerIndentation, EmitsMultipleDedentsInSingleStep) {
+	expectTokens("a\n        b\nc\n",
+				 {identifier("a"), plain(TOKEN_EOL, 1), plain(TOKEN_INDENT, 2), identifier("b", 2),
+				  plain(TOKEN_EOL, 2), plain(TOKEN_DEDENT, 3), plain(TOKEN_DEDENT, 3),
+				  identifier("c", 3), plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 4)});
+}
+
 TEST(LexerBrackets, RecognizesParenthesesAndSquareBrackets) {
 	expectTokens("f([x])",
 				 {identifier("f"), plain(TOKEN_LPAREN), plain(TOKEN_LSQUARE), identifier("x"),
@@ -545,8 +612,18 @@ TEST(LexerBrackets, AllowsLineBreaksInsideParentheses) {
 									  plain(TOKEN_RPAREN, 3), plain(TOKEN_EOF, 3)});
 }
 
+TEST(LexerBrackets, RejectsInsufficientIndentationInsideBrackets) {
+	expectLexicalError("  foo(\nbar\n  )");
+}
+
 TEST(LexerErrors, RejectsCharactersOutsideTheLanguageAlphabet) {
 	for (const std::string &source : {"#", "$", "\\", "`", "&", "&&&"}) {
+		expectLexicalError(source);
+	}
+}
+
+TEST(LexerErrors, RejectsOtherUnknownAsciiCharacters) {
+	for (const std::string &source : {"?", "~", "^", "%"}) {
 		expectLexicalError(source);
 	}
 }
