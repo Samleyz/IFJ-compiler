@@ -14,6 +14,7 @@
 #include "token.h"
 #include <ctype.h>
 #include <stdlib.h>
+#include <string.h>
 
 static lexer_state_t lexer_state;
 
@@ -69,7 +70,8 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = EOL_STATE;
 				return (token){.type = TOKEN_EOL,
 							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num++};
+							   .line_num = lexer_state.line_num++}; // important to increment line
+																	// number after returning token
 			} else if (c == ' ') {
 				lexer_state.fsm_state = START;
 			} else if (c == '\t') {
@@ -244,7 +246,7 @@ token lexer_get_token(void) {
 			} else if (c == 'd' || c == 'D') {
 				// move
 				lexer_state.fsm_state = D_RETURN;
-			} else {
+			} else if (!isalpha(c)) {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
@@ -266,6 +268,9 @@ token lexer_get_token(void) {
 					free(num_str);
 					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid integer literal");
 				}
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num,
+						  "Invalid character in integer literal");
 			}
 			break;
 		case UND_FOR_NUMS:
@@ -305,7 +310,7 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = D_RETURN;
 			} else if (c <= '9' && c >= '0') {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Integer starting with zero");
-			} else {
+			} else if (!isalpha(c)) {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
@@ -315,6 +320,8 @@ token lexer_get_token(void) {
 				return (token){.type = TOKEN_INTEGER,
 							   .attribute = (token_attr_t){.int_val = 0},
 							   .line_num = lexer_state.line_num};
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character in zero literal");
 			}
 			break;
 		case DOUBLE:
@@ -339,7 +346,7 @@ token lexer_get_token(void) {
 			} else if (c == 'd' || c == 'D') {
 				// move
 				lexer_state.fsm_state = D_RETURN;
-			} else {
+			} else if (!isalpha(c)) {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
@@ -361,6 +368,8 @@ token lexer_get_token(void) {
 					free(num_str);
 					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
 				}
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character in double literal");
 			}
 			break;
 		case EXPONENT:
@@ -398,7 +407,7 @@ token lexer_get_token(void) {
 			} else if (c == 'd' || c == 'D') {
 				// move
 				lexer_state.fsm_state = D_RETURN;
-			} else {
+			} else if (!isalpha(c)) {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
@@ -420,6 +429,8 @@ token lexer_get_token(void) {
 					free(num_str);
 					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
 				}
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character in exponent");
 			}
 			break;
 		case EXP_SIGN:
@@ -457,7 +468,7 @@ token lexer_get_token(void) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
 							  "failed to append char to dynamic string");
 				}
-			} else{
+			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
 				return (token){.type = TOKEN_OPERATOR,
