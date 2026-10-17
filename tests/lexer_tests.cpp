@@ -595,10 +595,12 @@ TEST(LexerIndentation, ClosesOpenBlocksAtEndOfInput) {
 }
 
 TEST(LexerIndentation, EmitsMultipleDedentsInSingleStep) {
-	expectTokens("a\n        b\nc\n",
-				 {identifier("a"), plain(TOKEN_EOL, 1), plain(TOKEN_INDENT, 2), identifier("b", 2),
-				  plain(TOKEN_EOL, 2), plain(TOKEN_DEDENT, 3), plain(TOKEN_DEDENT, 3),
-				  identifier("c", 3), plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 4)});
+	expectTokens("a\n    b\n        c\nd\n",
+				 {identifier("a"), plain(TOKEN_EOL, 1), plain(TOKEN_INDENT, 2),
+				  identifier("b", 2), plain(TOKEN_EOL, 2), plain(TOKEN_INDENT, 3),
+				  identifier("c", 3), plain(TOKEN_EOL, 3), plain(TOKEN_DEDENT, 4),
+				  plain(TOKEN_DEDENT, 4), identifier("d", 4), plain(TOKEN_EOL, 4),
+				  plain(TOKEN_EOF, 5)});
 }
 
 TEST(LexerBrackets, RecognizesParenthesesAndSquareBrackets) {
