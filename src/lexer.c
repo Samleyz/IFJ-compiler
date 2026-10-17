@@ -31,6 +31,7 @@ bool lexer_init(FILE *source) {
 	lexer_state.bracket_cnt = 0;
 	lexer_state.comment_depth_cnt = 0;
 	lexer_state.line_num = 1;
+	lexer_state.line_has_code = false;
 	lexer_state.source_file = source;
 	lexer_state.string_start_line = 0;
 
@@ -59,6 +60,9 @@ token lexer_get_token(void) {
 
 		switch (lexer_state.fsm_state) {
 		case START:
+			if (c != EOF && c != '\n' && c != ' ' && c != '\t' && c != '/') {
+				lexer_state.line_has_code = true;
+			}
 			if (c == EOF) {
 				lexer_state.fsm_state = EOF_STATE;
 			} else if (c == '\n' && lexer_state.bracket_cnt > 0) {
@@ -68,10 +72,13 @@ token lexer_get_token(void) {
 			} else if (c == '\n' && lexer_state.bracket_cnt == 0) {
 				// move
 				lexer_state.fsm_state = EOL_STATE;
-				return (token){.type = TOKEN_EOL,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num++}; // important to increment line
-																	// number after returning token
+				unsigned ended_line = lexer_state.line_num++;
+				if (lexer_state.line_has_code) {
+					lexer_state.line_has_code = false;
+					return (token){.type = TOKEN_EOL,
+								   .attribute = (token_attr_t){},
+								   .line_num = ended_line};
+				}
 			} else if (c == ' ') {
 				lexer_state.fsm_state = START;
 			} else if (c == '\t') {
@@ -963,6 +970,7 @@ token lexer_get_token(void) {
 				lexer_state.comment_start_line = lexer_state.line_num;
 				lexer_state.fsm_state = BLOCK_COM;
 			} else {
+				lexer_state.line_has_code = true;
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
 				return (token){.type = TOKEN_OPERATOR,
@@ -1098,9 +1106,12 @@ token lexer_get_token(void) {
 				lexer_state.comment_depth_cnt--;
 				if (lexer_state.comment_depth_cnt == 0) {
 					lexer_state.fsm_state = AFTER_MULTILINE_COMMENT;
-					return (token){.type = TOKEN_EOL,
-						   .attribute = (token_attr_t){},
-						   .line_num = lexer_state.comment_start_line};
+					if (lexer_state.line_has_code) {
+						lexer_state.line_has_code = false;
+						return (token){.type = TOKEN_EOL,
+									   .attribute = (token_attr_t){},
+									   .line_num = lexer_state.comment_start_line};
+					}
 				} else {
 					lexer_state.fsm_state = NEWLINE_BLOCK_COM;
 				}

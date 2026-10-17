@@ -98,6 +98,7 @@ typedef struct {
 
 	int bracket_cnt;	   /**< Brackent depth counter */
 	int comment_depth_cnt; /**< Current depth of the comment */
+	bool line_has_code; /**< Whether the current logical line contains a code token */
 	unsigned comment_start_line; /**< Line where the outermost block comment started */
 
 	int string_start_line; /**< The line number where the string started */
