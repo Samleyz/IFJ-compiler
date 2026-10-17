@@ -59,9 +59,16 @@ token lexer_get_token(void) {
 		case START:
 			if (c == EOF) {
 				lexer_state.fsm_state = EOF_STATE;
-			} else if (c == '\n') {
-				lexer_state.fsm_state = lexer_state.bracket_cnt == 0 ? EOL_STATE : B_EOL_STATE;
+			} else if (c == '\n' && lexer_state.bracket_cnt > 0) {
+				// move
+				lexer_state.fsm_state = B_EOL_STATE;
 				lexer_state.line_num++;
+			} else if (c == '\n' && lexer_state.bracket_cnt == 0) {
+				// move
+				lexer_state.fsm_state = EOL_STATE;
+				return (token){.type = TOKEN_EOL,
+							   .attribute = (token_attr_t){},
+							   .line_num = lexer_state.line_num++};
 			} else if (c == ' ') {
 				lexer_state.fsm_state = START;
 			} else if (c == '\t') {
