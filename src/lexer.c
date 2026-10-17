@@ -456,8 +456,12 @@ token lexer_get_token(void) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
 							  "failed to append char to dynamic string");
 				}
-			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Expected digit after decimal point");
+			} else{
+				ungetc(c, lexer_state.source_file);
+				lexer_state.fsm_state = START;
+				return (token){.type = TOKEN_OPERATOR,
+							   .attribute = (token_attr_t){.operator_type = OPERATOR_DOT},
+							   .line_num = lexer_state.line_num};
 			}
 			break;
 		case D_RETURN:
