@@ -199,6 +199,8 @@ token lexer_get_token(void) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
 							  "failed to append char to dynamic string");
 				}
+				// move
+				lexer_state.fsm_state = IDENTIFIER;
 			} else {
 				// unget
 				ungetc(c, lexer_state.source_file);
