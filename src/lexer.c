@@ -703,6 +703,9 @@ token lexer_get_token(void) {
 			} else if (c == '\n') {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");
 			} else {
+				if (c > 0x7F){
+					throw_err(ERR_LEXICAL, lexer_state.line_num, "Non-ASCII character in string");
+				}
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
