@@ -1026,9 +1026,7 @@ token lexer_get_token(void) {
 						   .attribute.operator_type = OPERATOR_EQUAL,
 						   .line_num = lexer_state.line_num};
 		case ONE_LINE_COM:
-			if (c == EOF) {
-				lexer_state.fsm_state = EOF_STATE;
-			} else if (c == '\n') {
+			if (c == '\n' || c == EOF) {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
 			}
