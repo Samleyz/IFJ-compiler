@@ -86,6 +86,7 @@ typedef enum state {
 	ALERT_COM_IN_2,
 	ALERT_COM_OUT_1,
 	ALERT_COM_OUT2,
+	AFTER_MULTILINE_COMMENT,
 	COMMENT_ENTRY,
 	STATE_CNT
 } state_t;
@@ -97,6 +98,7 @@ typedef struct {
 
 	int bracket_cnt;	   /**< Brackent depth counter */
 	int comment_depth_cnt; /**< Current depth of the comment */
+	unsigned comment_start_line; /**< Line where the outermost block comment started */
 
 	int string_start_line; /**< The line number where the string started */
 	dstring_t dynamic_string; /**< Dynamic string used to store lexemes */
