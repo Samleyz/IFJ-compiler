@@ -310,7 +310,7 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = D_RETURN;
 			} else if (c <= '9' && c >= '0') {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Integer starting with zero");
-			} else if (!isalpha(c)) {
+			} else if (!isalpha(c) && c != '_') {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
@@ -468,12 +468,15 @@ token lexer_get_token(void) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
 							  "failed to append char to dynamic string");
 				}
-			} else {
+			} else if (!isalpha(c) && c != '_') {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
 				return (token){.type = TOKEN_OPERATOR,
 							   .attribute = (token_attr_t){.operator_type = OPERATOR_DOT},
 							   .line_num = lexer_state.line_num};
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num,
+						  "Invalid character after decimal point");
 			}
 			break;
 		case D_RETURN:
@@ -689,7 +692,7 @@ token lexer_get_token(void) {
 			} else if (c == EOF) {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");
 			} else if (c == '\n') {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");	
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");
 			} else {
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
