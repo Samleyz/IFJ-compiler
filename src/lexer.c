@@ -688,6 +688,8 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = STRING_END;
 			} else if (c == EOF) {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");
+			} else if (c == '\n') {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");	
 			} else {
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
