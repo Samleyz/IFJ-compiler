@@ -56,7 +56,7 @@ void *htable_read(htable_t htab, const char *key);
  * @brief Clears a record under specified key
  *
  * @param htab Hash table where to clear it
- * @param key Creared item key
+ * @param key Key of item to clear
  * @return true Item was cleared
  * @return false There already wasn't anything
  */

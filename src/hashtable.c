@@ -5,6 +5,7 @@
  */
 
 #include "hashtable_private.h"
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -40,9 +41,13 @@ htable_t htable_init(void htable_value_dtor(void *item)) {
 	}
 }
 
-size_t htable_record_count(htable_t htab) { return htab->used; }
+size_t htable_record_count(htable_t htab) {
+	assert(htab && "Called htable_record_count on nullptr.");
+	return htab->used;
+}
 
 bool htable_write(htable_t htab, const char *key, void *data) {
+	assert(htab && "Called htable_write on nullptr.");
 	if (htab->used + 1 > htab->size * 3 / 4) { // Will occupancy be over 75%
 		// Try to make the table larger
 		bool successful_resize = upscale_htab(htab);
@@ -80,6 +85,7 @@ bool htable_write(htable_t htab, const char *key, void *data) {
 }
 
 void *htable_read(htable_t htab, const char *key) {
+	assert(htab && "Called htable_read on nullptr.");
 	// Search boxes
 	size_t current_idx = get_index(hash_function(key), htab->size);
 	for (size_t i = 0; i < htab->size; i++) {
@@ -97,6 +103,7 @@ void *htable_read(htable_t htab, const char *key) {
 }
 
 bool htable_remove(htable_t htab, const char *key) {
+	assert(htab && "Called htable_remove on nullptr.");
 	// Search boxes
 	size_t current_idx = get_index(hash_function(key), htab->size);
 	for (size_t i = 0; i < htab->size; i++) {
