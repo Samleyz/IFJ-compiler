@@ -25,7 +25,8 @@ export default {
             'setup',     // Repository configuration
             'test',      // Test scripts and test cases
 			'utils',     // Shared utilities
-			'core'       // Main orchestration and entry point
+			'core',      // Main orchestration and entry point
+			'ast'        // Abstract syntax tree
             ]
         ]
     }
