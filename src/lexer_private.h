@@ -86,6 +86,7 @@ typedef enum state {
 	ALERT_COM_IN_2,
 	ALERT_COM_OUT_1,
 	ALERT_COM_OUT2,
+	AFTER_MULTILINE_COMMENT,
 	COMMENT_ENTRY,
 	STATE_CNT
 } state_t;
@@ -95,11 +96,14 @@ typedef struct {
 	state_t fsm_state; /**< Current state a the fsm */
 	unsigned line_num; /**< The number of the line currently beeíng read */
 
-	int bracket_cnt;	   /**< Brackent depth counter */
-	int comment_depth_cnt; /**< Current depth of the comment */
+	int bracket_cnt;			 /**< Brackent depth counter */
+	int comment_depth_cnt;		 /**< Current depth of the comment */
+	bool line_has_code;			 /**< Whether the current logical line contains a code token */
+	unsigned comment_start_line; /**< Line where the outermost block comment started */
 
-	dstring_t dynamic_string; /**< Dynamic string used to store lexemes */
-	stack_t indent_stack;	  /**< Stack used to store indentation levels */
+	unsigned string_start_line; /**< The line number where the string started */
+	dstring_t dynamic_string;	/**< Dynamic string used to store lexemes */
+	stack_t indent_stack;		/**< Stack used to store indentation levels */
 } lexer_state_t;
 
 /**
