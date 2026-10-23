@@ -54,12 +54,22 @@ TEST_F(Dynamic_string_test, empty_getstring) {
 }
 
 TEST_F(Dynamic_string_test, long_getstring) {
-	for (int i = 0; i < 100; i++) {
+	for (int i = 0; i < 4096; i++) {
 		EXPECT_TRUE(dstring_append_char(dstr, 'a'));
 	}
-	std::string s(100, 'a');
+	std::string s(4096, 'a');
 	char *tmp_str = dstring_get_string(dstr);
 	EXPECT_STREQ(tmp_str, s.c_str());
+	free(tmp_str);
+}
+
+TEST_F(Dynamic_string_test, returned_string_is_an_independent_copy) {
+	EXPECT_TRUE(dstring_append_char(dstr, 'a'));
+	char *tmp_str = dstring_get_string(dstr);
+	ASSERT_NE(tmp_str, nullptr);
+
+	EXPECT_TRUE(dstring_append_char(dstr, 'b'));
+	EXPECT_STREQ(tmp_str, "a");
 	free(tmp_str);
 }
 
@@ -72,5 +82,11 @@ TEST_F(Dynamic_string_test, erase_string) {
 	EXPECT_EQ(dstring_get_len(dstr), 0);
 	char *tmp_str = dstring_get_string(dstr);
 	EXPECT_STREQ(tmp_str, "");
+	free(tmp_str);
+
+	EXPECT_TRUE(dstring_append_char(dstr, 'b'));
+	EXPECT_EQ(dstring_get_len(dstr), 1);
+	tmp_str = dstring_get_string(dstr);
+	EXPECT_STREQ(tmp_str, "b");
 	free(tmp_str);
 }

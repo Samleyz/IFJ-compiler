@@ -34,18 +34,18 @@ typedef enum {
  * @brief Throws an error message to stderr and terminates the program
  *
  * @param[in] code Error code with which the program will be terminated
- * @param[in] line_num Number of the line where the error is located
+ * @param[in] line_num Number of the line where the error is located, 0 will not print line num
  * @param[in] fmt Formatted error string to be printed to stderr
  */
 __attribute__((noreturn)) __attribute__((format(printf, 3, 4))) void
-throw_err(err_c_t code, int line_num, const char *fmt, ...);
+throw_err(err_c_t code, unsigned line_num, const char *fmt, ...);
 
 /**
  * @brief Throws a warning message to stderr and continues running
  *
- * @param[in] line_num Number of the line where the warning is located
+ * @param[in] line_num Number of the line where the warning is located, 0 will not print line num
  * @param[in] fmt Formatted warning string to be printed to stderr
  */
-__attribute__((format(printf, 2, 3))) void throw_warning(int line_num, const char *fmt, ...);
+__attribute__((format(printf, 2, 3))) void throw_warning(unsigned line_num, const char *fmt, ...);
 
 #endif

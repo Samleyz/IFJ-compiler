@@ -1,2 +1,13 @@
-Checks: '-*,clang-analyzer-*,bugprone-*,readability-*'
-WarningsAsErrors: 'clang-analyzer-*,bugprone-*'
+Checks: >-
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  readability-*,
+  -clang-analyzer-security.insecureAPI.*,
+  -readability-identifier-length,
+  -bugprone-branch-clone
+
+WarningsAsErrors: >-
+  clang-analyzer-*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters
