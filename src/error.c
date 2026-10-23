@@ -30,7 +30,7 @@ void error_exit(void) {
 	if (cleanup_func != NULL) {
 		cleanup_func();
 	}
-	exit(error_code != ERR_OK ? error_code
+	exit(error_code != ERR_OK ? (int)error_code
 							  : ERR_INTERNAL); // ternary is saftey fuse, if somebody called
 											   // error_exit without sending error message
 }
@@ -55,7 +55,7 @@ void throw_warning(unsigned line_num, const char *fmt, ...) {
 
 	va_list args;
 	va_start(args, fmt);
-	vfprintf(stderr, fmt, args); // NOLINT(clang-analyzer-security.VAList)
+	vfprintf(stderr, fmt, args);
 	va_end(args);
 
 	fputc('\n', stderr);
@@ -74,8 +74,7 @@ void vprint_error(err_c_t code, unsigned line_num, const char *fmt, va_list args
 
 	fprintf(stderr, ": ");
 
-	vfprintf(stderr, fmt, args); // NOLINT(clang-analyzer-security.VAList)
-	va_end(args);
+	vfprintf(stderr, fmt, args);
 
 	fputc('\n', stderr);
 }
