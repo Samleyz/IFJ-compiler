@@ -48,4 +48,19 @@ throw_err(err_c_t code, unsigned line_num, const char *fmt, ...);
  */
 __attribute__((format(printf, 2, 3))) void throw_warning(unsigned line_num, const char *fmt, ...);
 
+/**
+ * @brief Prints an error message to stderr without terminating the program and saves the first error code
+ *
+ * @param[in] code Error code to be stored for exit
+ * @param[in] line_num Number of the line where the error is located, 0 will not print line num
+ * @param[in] fmt Formatted error string to be printed to stderr
+ */
+__attribute__((format(printf, 3, 4))) void
+print_error(err_c_t code, unsigned line_num, const char *fmt, ...);
+
+/**
+ * @brief Terminates the program with the first recorded error code
+ */
+__attribute__((noreturn)) void error_exit(void);
+
 #endif
