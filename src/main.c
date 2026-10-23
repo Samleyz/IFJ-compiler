@@ -10,7 +10,14 @@
 #include "lexer.h"
 #include "parser.h"
 
+void compiler_cleanup(void) {
+	lexer_cleanup();
+	parser_cleanup();
+}
+
 int main(void) {
+	error_set_cleanup(compiler_cleanup);
+
 	if (!lexer_init(stdin)) {
 		throw_err(ERR_INTERNAL, 0, "Lexer initialization failed!");
 	}
@@ -22,13 +29,16 @@ int main(void) {
 
 	ast_root = parse_program();
 
+	if (!ast_root) {
+		error_exit();
+	}
+
 	(void *)ast_root;
 
 	// TODO semantic analysis
 	// TODO code generation
 
-	parser_cleanup();
-	lexer_cleanup();
+	compiler_cleanup();
 
 	return 0;
 }
