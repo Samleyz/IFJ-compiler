@@ -12,6 +12,7 @@
 #include <stdlib.h>
 
 static err_c_t error_code;
+static error_cleanup_func cleanup_func = NULL;
 
 /**
  * @brief Prints a formatted error message using va_list and saves the first error code
@@ -23,7 +24,12 @@ static err_c_t error_code;
  */
 void vprint_error(err_c_t code, unsigned line_num, const char *fmt, va_list args);
 
+void error_set_cleanup(error_cleanup_func in_cleanup_func) { cleanup_func = in_cleanup_func; }
+
 void error_exit(void) {
+	if (cleanup_func != NULL) {
+		cleanup_func();
+	}
 	exit(error_code != ERR_OK ? error_code
 							  : ERR_INTERNAL); // ternary is saftey fuse, if somebody called
 											   // error_exit without sending error message
