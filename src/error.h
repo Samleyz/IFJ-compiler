@@ -76,4 +76,11 @@ __attribute__((noreturn)) void error_exit(void);
  */
 void error_set_cleanup(error_cleanup_func in_cleanup_func);
 
+/**
+ * @brief Checks if any error has been recorded
+ *
+ * @return true if an error has occurred, false otherwise
+ */
+bool error_is_set(void);
+
 #endif

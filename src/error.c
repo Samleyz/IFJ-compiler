@@ -24,6 +24,8 @@ static error_cleanup_func cleanup_func = NULL;
  */
 void vprint_error(err_c_t code, unsigned line_num, const char *fmt, va_list args);
 
+bool error_is_set(void) { return error_code != ERR_OK; }
+
 void error_set_cleanup(error_cleanup_func in_cleanup_func) { cleanup_func = in_cleanup_func; }
 
 void error_exit(void) {
