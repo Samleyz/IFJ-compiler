@@ -29,7 +29,7 @@ int main(void) {
 
 	ast_root = parse_program();
 
-	if (!ast_root) {
+	if (!ast_root || error_is_set()) {
 		error_exit();
 	}
 
