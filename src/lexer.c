@@ -23,10 +23,6 @@ bool lexer_init(FILE *source) {
 		return false;
 	}
 
-	if (atexit(lexer_cleanup) != 0) {
-		return false;
-	}
-
 	lexer_state.fsm_state = START;
 	lexer_state.bracket_cnt = 0;
 	lexer_state.comment_depth_cnt = 0;
