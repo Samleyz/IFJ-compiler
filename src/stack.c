@@ -18,20 +18,26 @@ static stack_item_t s_item_ctor(void) {
 	return itm;
 }
 
-static bool s_item_dtor(stack_item_t itm) {
+static bool s_item_dtor(stack_item_t itm, void (*dstr_data_cb)(void *)) {
 	if (!itm) {
 		return false;
 	}
+
+	if (dstr_data_cb != NULL && itm->data != NULL) {
+		dstr_data_cb(itm->data); // destorying the data stored in item using CallBack
+	}
+
 	free(itm);
 	return true;
 }
 
-stack_t stack_init(void) {
+stack_t stack_init(void (*dstr_data_cb)(void *)) {
 	stack_t stck = malloc(sizeof(stack));
 	if (!stck) {
 		return NULL;
 	}
 	stck->top = NULL;
+	stck->dstr_data_cb = dstr_data_cb;
 	return stck;
 }
 
@@ -80,8 +86,8 @@ bool stack_pop(stack_t stk) {
 	}
 
 	stack_item_t top_temp = stk->top;
-	stk->top = stk->top->next;	  // popping
-	return s_item_dtor(top_temp); // cleaning
+	stk->top = stk->top->next;						 // popping
+	return s_item_dtor(top_temp, stk->dstr_data_cb); // cleaning
 }
 
 bool stack_dtor(stack_t stk) {
