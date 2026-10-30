@@ -50,9 +50,9 @@ typedef struct ast_node {
 		char *string_val;		 // string literal value
 	} data;
 
-	ast_node *child_node_1;
-	ast_node *child_node_2;
-	ast_node *child_node_3; // if...else...then...
+	ast_node_t child_node_1;
+	ast_node_t child_node_2;
+	ast_node_t child_node_3; // if...else...then...
 
 } ast_node;
 
