@@ -51,6 +51,8 @@ void lexer_cleanup(void) {
 	dstring_dtor(lexer_state.dynamic_string);
 }
 
+// Co-implemented with GitHub Copilot according to exact user specification based on the designed
+// state diagram
 token lexer_get_token(void) {
 	int c;
 
