@@ -1,7 +1,7 @@
 /**
  * @file ast.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
- * @author Michal Sobek (xsobekm0000@vutbr.cz)
+ * @author Michal Sobek (xsobekm00@vutbr.cz)
  * @brief Abstract syntax tree interface
  * @date 2026-10-20
  */
