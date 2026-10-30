@@ -5,12 +5,14 @@
  * @date 2026-10-20
  */
 
+#include "error.h"
 #include "lexer.h"
 #include "parser_private.h"
 #include "token.h"
 #include <string.h>
 
 void parser_advance(parser_t *parser) {
+	free_token_attr(&parser->curr_tkn);
 	parser->curr_tkn = parser->look_ahead_tkn;
 	parser->look_ahead_tkn = lexer_get_token();
 }
@@ -90,54 +92,67 @@ bool peek_next_keyword(const parser_t *parser, kw_type_t kw_type) {
 				  parser->look_ahead_tkn.attribute.keyword == kw_type);
 }
 
-bool match_token_type(parser_t *p, token_type type) {
-	// TODO: implementation
-	(void)p;
-	(void)type;
+bool match_token_type(parser_t *parser, token_type type) {
+	if (peek_token_type(parser, type)) {
+		parser_advance(parser);
+		return true;
+	}
 	return false;
 }
 
-bool match_operator(parser_t *p, op_type_t op_type) {
-	// TODO: implementation
-	(void)p;
-	(void)op_type;
+bool match_operator(parser_t *parser, op_type_t op_type) {
+	if (peek_operator(parser, op_type)) {
+		parser_advance(parser);
+		return true;
+	}
 	return false;
 }
 
-bool match_keyword(parser_t *p, kw_type_t kw_type) {
-	// TODO: implementation
-	(void)p;
-	(void)kw_type;
+bool match_keyword(parser_t *parser, kw_type_t kw_type) {
+	if (peek_keyword(parser, kw_type)) {
+		parser_advance(parser);
+		return true;
+	}
 	return false;
 }
 
-bool match_specific_id(parser_t *p, const char *identifier) {
-	// TODO: implementation
-	(void)p;
-	(void)identifier;
+bool match_specific_id(parser_t *parser, const char *identifier) {
+	if (peek_specific_id(parser, identifier)) {
+		parser_advance(parser);
+		return true;
+	}
 	return false;
 }
 
-void expect_token_type(parser_t *p, token_type type) {
-	// TODO: implementation
-	(void)p;
-	(void)type;
+bool expect_token_type(parser_t *parser, token_type type) {
+	if (match_token_type(parser, type)) {
+		return true;
+	}
+	print_error(ERR_SYNTACTIC, parser->curr_tkn.line_num, "Unexpected token");
+	return false;
 }
 
-void expect_operator(parser_t *p, op_type_t op_type) {
-	// TODO: implementation
-	(void)p;
-	(void)op_type;
+bool expect_operator(parser_t *parser, op_type_t op_type) {
+	if (match_operator(parser, op_type)) {
+		return true;
+	}
+	print_error(ERR_SYNTACTIC, parser->curr_tkn.line_num, "Unexpected operator");
+	return false;
 }
 
-void expect_keyword(parser_t *p, kw_type_t kw_type) {
-	// TODO: implementation
-	(void)p;
-	(void)kw_type;
+bool expect_keyword(parser_t *parser, kw_type_t kw_type) {
+	if (match_keyword(parser, kw_type)) {
+		return true;
+	}
+	print_error(ERR_SYNTACTIC, parser->curr_tkn.line_num, "Unexpected keyword");
+	return false;
 }
 
-void expect_specific_id(parser_t *p, const char *identifier) {
-	// TODO: implementation
-	(void)p;
-	(void)identifier;
+bool expect_specific_id(parser_t *parser, const char *identifier) {
+	if (match_specific_id(parser, identifier)) {
+		return true;
+	}
+	print_error(ERR_SYNTACTIC, parser->curr_tkn.line_num, "Expected identifier '%s'",
+				identifier != NULL ? identifier : "");
+	return false;
 }
