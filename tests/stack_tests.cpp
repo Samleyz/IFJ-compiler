@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #define stack_t my_stack_t
 extern "C" {
+#include "error.h"
 #include "stack.h"
 }
 #undef stack_t
@@ -53,9 +54,12 @@ TEST_F(StackTest, Pop) {
 }
 
 TEST_F(StackTest, NullPointers) {
-	EXPECT_TRUE(stack_is_empty(nullptr));
-	EXPECT_FALSE(stack_push(nullptr, nullptr));
-	EXPECT_FALSE(stack_pop(nullptr));
+	EXPECT_EXIT(stack_is_empty(nullptr), ::testing::ExitedWithCode(ERR_INTERNAL),
+				"Called stack_is_empty on NULL");
+	EXPECT_EXIT(stack_push(nullptr, nullptr), ::testing::ExitedWithCode(ERR_INTERNAL),
+				"Called stack_push on NULL");
+	EXPECT_EXIT(stack_pop(nullptr), ::testing::ExitedWithCode(ERR_INTERNAL),
+				"Called stack_pop on NULL");
 	EXPECT_FALSE(stack_dtor(nullptr));
 }
 

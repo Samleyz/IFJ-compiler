@@ -1,15 +1,15 @@
 # IFJ-compiler
 
-## Run lexer tests
+## Build and run tests
 
-The lexer tests use CMake and GoogleTest. CMake will use an installed GoogleTest package or
-download GoogleTest on the first configure. A C23/C++20 compiler and CMake 3.21 or newer are
-required on a POSIX-compatible system (Linux or macOS).
+The Makefile builds and runs the unit tests for the implemented modules. CMake uses an installed
+GoogleTest package or downloads GoogleTest on the first configure. A C23/C++20 compiler, GNU Make,
+and CMake 3.21 or newer are required on a POSIX-compatible system (Linux or macOS).
 
 ```sh
-cmake -S . -B build
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
+make          # Configure and build all test executables
+make test     # Run all tests
+make valgrind # Run all tests under Valgrind
 ```
 
 ## Developer Setup
