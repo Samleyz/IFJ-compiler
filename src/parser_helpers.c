@@ -5,83 +5,89 @@
  * @date 2026-10-20
  */
 
+#include "lexer.h"
 #include "parser_private.h"
+#include "token.h"
+#include <string.h>
 
 void parser_advance(parser_t *parser) {
-	// TODO: implementation
+	parser->curr_tkn = parser->look_ahead_tkn;
+	parser->look_ahead_tkn = lexer_get_token();
 }
 
-bool peek_token_type(const parser_t *p, token_type type) {
-	// TODO: implementation
-	(void)p;
-	(void)type;
+bool peek_token_type(const parser_t *parser, token_type type) {
+	return (bool)(parser->curr_tkn.type == type);
+}
+
+bool peek_operator(const parser_t *parser, op_type_t op_type) {
+	return (bool)(parser->curr_tkn.type == TOKEN_OPERATOR &&
+				  parser->curr_tkn.attribute.operator_type == op_type);
+}
+
+bool peek_keyword(const parser_t *parser, kw_type_t kw_type) {
+	return (bool)(parser->curr_tkn.type == TOKEN_KEYWORD &&
+				  parser->curr_tkn.attribute.keyword == kw_type);
+}
+
+bool peek_specific_id(const parser_t *parser, const char *identifier) {
+	if (identifier != NULL && parser->curr_tkn.type == TOKEN_IDENTIFIER &&
+		parser->curr_tkn.attribute.string_val != NULL) {
+		return (bool)(strcmp(parser->curr_tkn.attribute.string_val, identifier) == 0);
+	}
 	return false;
 }
 
-bool peek_operator(const parser_t *p, op_type_t op_type) {
-	// TODO: implementation
-	(void)p;
-	(void)op_type;
+bool peek_data_type(const parser_t *parser) {
+	if (parser->curr_tkn.type != TOKEN_KEYWORD) {
+		return false;
+	}
+	kw_type_t kw = parser->curr_tkn.attribute.keyword;
+	return (bool)(kw == KW_INT || kw == KW_DOUBLE || kw == KW_STRING || kw == KW_BOOLEAN ||
+				  kw == KW_UNIT || kw == KW_LIST);
+}
+
+bool peek_is_literal(const parser_t *parser) {
+	token_type type = parser->curr_tkn.type;
+	return (bool)(type == TOKEN_INTEGER || type == TOKEN_DOUBLE || type == TOKEN_STRING ||
+				  type == TOKEN_BOOLEAN);
+}
+
+bool peek_is_rel_op(const parser_t *parser) {
+	if (parser->curr_tkn.type != TOKEN_OPERATOR) {
+		return false;
+	}
+	op_type_t op = parser->curr_tkn.attribute.operator_type;
+	return (bool)(op == OPERATOR_LESS || op == OPERATOR_LESS_EQUAL || op == OPERATOR_GREATER ||
+				  op == OPERATOR_GREATER_EQUAL || op == OPERATOR_EQUAL || op == OPERATOR_NOT_EQUAL);
+}
+
+bool peek_is_expr_beg(const parser_t *parser) {
+	if (peek_is_literal(parser)) {
+		return true;
+	}
+	if (parser->curr_tkn.type == TOKEN_IDENTIFIER || parser->curr_tkn.type == TOKEN_LPAREN ||
+		parser->curr_tkn.type == TOKEN_LSQUARE) {
+		return true;
+	}
+	if (parser->curr_tkn.type == TOKEN_OPERATOR) {
+		op_type_t op = parser->curr_tkn.attribute.operator_type;
+		return (bool)(op == OPERATOR_PLUS || op == OPERATOR_MINUS || op == OPERATOR_EX_MARK);
+	}
 	return false;
 }
 
-bool peek_keyword(const parser_t *p, kw_type_t kw_type) {
-	// TODO: implementation
-	(void)p;
-	(void)kw_type;
-	return false;
+bool peek_next_token_type(const parser_t *parser, token_type type) {
+	return (bool)(parser->look_ahead_tkn.type == type);
 }
 
-bool peek_specific_id(const parser_t *p, const char *identifier) {
-	// TODO: implementation
-	(void)p;
-	(void)identifier;
-	return false;
+bool peek_next_operator(const parser_t *parser, op_type_t op_type) {
+	return (bool)(parser->look_ahead_tkn.type == TOKEN_OPERATOR &&
+				  parser->look_ahead_tkn.attribute.operator_type == op_type);
 }
 
-bool peek_data_type(const parser_t *p) {
-	// TODO: implementation
-	(void)p;
-	return false;
-}
-
-bool peek_is_literal(const parser_t *p) {
-	// TODO: implementation
-	(void)p;
-	return false;
-}
-
-bool peek_is_rel_op(const parser_t *p) {
-	// TODO: implementation
-	(void)p;
-	return false;
-}
-
-bool peek_is_expr_beg(const parser_t *p) {
-	// TODO: implementation
-	(void)p;
-	return false;
-}
-
-bool peek_next_token_type(const parser_t *p, token_type type) {
-	// TODO: implementation
-	(void)p;
-	(void)type;
-	return false;
-}
-
-bool peek_next_operator(const parser_t *p, op_type_t op_type) {
-	// TODO: implementation
-	(void)p;
-	(void)op_type;
-	return false;
-}
-
-bool peek_next_keyword(const parser_t *p, kw_type_t kw_type) {
-	// TODO: implementation
-	(void)p;
-	(void)kw_type;
-	return false;
+bool peek_next_keyword(const parser_t *parser, kw_type_t kw_type) {
+	return (bool)(parser->look_ahead_tkn.type == TOKEN_KEYWORD &&
+				  parser->look_ahead_tkn.attribute.keyword == kw_type);
 }
 
 bool match_token_type(parser_t *p, token_type type) {
