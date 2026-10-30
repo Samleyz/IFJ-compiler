@@ -16,7 +16,11 @@ void parser_init(void) {
 	parser_advance(&parser);
 }
 
-void parser_cleanup(void) {}
+void parser_cleanup(void) {
+	parser.root = ast_dtor(parser.root);
+	free_token_attr(&parser.curr_tkn);
+	free_token_attr(&parser.look_ahead_tkn);
+}
 
 ast_node_t parse_program(void) {
 	// TODO parse program rule implementation
