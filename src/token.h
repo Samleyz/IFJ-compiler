@@ -128,4 +128,11 @@ token *create_token(token_type tkn_type, token_attr_t attribute, unsigned line_n
  */
 void free_token(token *tkn);
 
+/**
+ * @brief Frees dynamically allocated attribute memory of a token (string_val)
+ *
+ * @param[in,out] tkn Pointer to token whose attribute memory will be freed
+ */
+void free_token_attr(token *tkn);
+
 #endif

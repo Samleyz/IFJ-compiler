@@ -30,6 +30,7 @@ if(BUILD_TESTING)
 		src/lexer.c
 		src/lexer_helpers.c
 		src/stack.c
+		src/token.c
 	)
 	target_include_directories(lexer_tests PRIVATE src)
 	target_link_libraries(lexer_tests PRIVATE GTest::gtest_main)

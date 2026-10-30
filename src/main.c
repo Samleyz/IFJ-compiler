@@ -21,9 +21,7 @@ int main(void) {
 	if (!lexer_init(stdin)) {
 		throw_err(ERR_INTERNAL, 0, "Lexer initialization failed!");
 	}
-	if (!parser_init()) {
-		throw_err(ERR_INTERNAL, 0, "Parser initialization failed!");
-	}
+	parser_init();
 
 	ast_node_t ast_root;
 
