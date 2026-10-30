@@ -12,10 +12,8 @@
 
 /**
  * @brief Performs parser intialization
- *
- * @return true if the init was successful, otherwise false
  */
-bool parser_init(void);
+void parser_init(void);
 
 /**
  * @brief Performs parser cleanup, deletes ast

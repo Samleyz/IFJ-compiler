@@ -10,14 +10,13 @@
 
 static parser_t parser;
 
-bool parser_init(void) {
-	// TODO parser intialization implementation
-	return true;
+void parser_init(void) {
+	parser.root = nullptr;
+	parser_advance(&parser);
+	parser_advance(&parser);
 }
 
-void parser_cleanup(void) {
-	// TODO parser cleanup implementation
-}
+void parser_cleanup(void) {}
 
 ast_node_t parse_program(void) {
 	// TODO parse program rule implementation
