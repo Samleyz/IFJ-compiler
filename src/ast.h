@@ -9,63 +9,238 @@
 #ifndef AST_H
 #define AST_H
 
+// Tool: Gemini
+// AST node definitions and interface designed with AI assistant support.
+// Prompt: Design AST node structures for IFJ26 grammar rules, expressions, and selected
+// extensions using a tagged union and linked-list chaining.
+// Note: The architecture, memory representation, and node fields were interactively
+// verified and refined to match project specifications.
+
 #include "token.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 typedef struct ast_node *ast_node_t;
 
+/**
+ * @brief Final data types (used in semantic analysis and code generation)
+ */
 typedef enum {
+	TYPE_UNKNOWN, // Initial / unresolved type
+	TYPE_INT,
+	TYPE_DOUBLE,
+	TYPE_STRING,
+	TYPE_BOOL,
+	TYPE_UNIT,
+} data_type_t;
 
-	NODE_BINARY_OP,
-	NODE_UNARY_OP,
+/**
+ * @brief AST node types
+ */
+typedef enum {
+	// Program structure
+	NODE_PROGRAM,
+	NODE_BLOCK,
+	NODE_EXTENSION, // extension definition
 
-	NODE_INT_LITERAL,
-	NODE_DOUBLE_LITERAL,
-	NODE_STRING_LITERAL,
-	NODE_IDENTIFIER,
-
-	NODE_IF,
-	NODE_CASE,
-
+	// Statements
 	NODE_FUNC_DEF,
-	NODE_FUNC_CALL,
-	NODE_RETURN,
-
+	NODE_VAR_DEF,
+	NODE_ASSIGN,
+	NODE_IF,
 	NODE_WHILE,
 	NODE_FOR,
+	NODE_RETURN,
+	NODE_EXPR_STMT, // expression used as statement
 
-	// many more to go right? :(
-	// will be added continously as we do the grammar
+	// Expressions
+	NODE_BINARY_OP,
+	NODE_UNARY_OP,
+	NODE_FUNC_CALL,
+	NODE_MEMBER_ACCESS, // member access or method call
+	NODE_STRING_INTERP, // interpolated string
+	NODE_TYPE_CAST,		// implicit / explicit conversion (this node adds semantic analysis)
 
-} node_type;
+	// Parameter lists and formal parameters
+	NODE_PARAM_LIST, // group of parameters
+	NODE_PARAM,		 // formal parameter (name: Type)
 
-typedef struct ast_node {
-	node_type type;
+	// Leaves (atoms)
+	NODE_IDENTIFIER,
+	NODE_LIT_INT,
+	NODE_LIT_DOUBLE,
+	NODE_LIT_STRING,
+	NODE_LIT_BOOL,
+} node_type_t;
+
+struct ast_node {
+	node_type_t type;
+	ast_node_t next;	   // Chaining for sequences
+	unsigned line_num;	   // Source line number for error reporting
+	data_type_t eval_type; // Evaluated expression type
+	void *sym_entry;	   // Pointer to symbol table entry
 
 	union {
-		op_type_t operator_type; // operator type
-		kw_type_t keyword;		 // keyword type
-		int32_t int_val;		 // integer value
-		double double_val;		 // double value
-		bool bool_literal;		 // bool literal value
-		char *string_val;		 // string literal value
-	} data;
+		// NODE_PROGRAM
+		struct {
+			ast_node_t first_item;
+		} program;
 
-	ast_node_t child_node_1;
-	ast_node_t child_node_2;
-	ast_node_t child_node_3; // if...else...then...
+		// NODE_BLOCK
+		struct {
+			ast_node_t first_stmt;
+		} block;
 
-} ast_node;
+		// NODE_EXTENSION
+		struct {
+			char *receiver_name;
+			char *receiver_type;
+			ast_node_t methods; // Linked list of NODE_FUNC_DEF
+		} extension;
+
+		// NODE_FUNC_DEF
+		struct {
+			char *name;
+			bool is_main;			// Annotated with @main
+			bool has_parens;		// False for parameterless def foo: Int = ...
+			ast_node_t param_lists; // List of NODE_PARAM_LIST
+			char *return_type;		// Explicit return type or NULL
+			ast_node_t body;		// NODE_BLOCK or expression
+		} func_def;
+
+		// NODE_PARAM_LIST
+		struct {
+			ast_node_t first_param; // Linked list of NODE_PARAM
+		} param_list;
+
+		// NODE_PARAM
+		struct {
+			char *name;
+			char *type_name;
+		} param;
+
+		// NODE_VAR_DEF
+		struct {
+			char *name;
+			bool is_val;		  // true = val, false = var
+			char *type_name;	  // Explicit type name or NULL
+			ast_node_t init_expr; // Initializing expression
+		} var_def;
+
+		// NODE_ASSIGN
+		struct {
+			char *target_id;
+			ast_node_t expr;
+		} assign;
+
+		// NODE_IF
+		struct {
+			ast_node_t condition;
+			ast_node_t then_branch; // NODE_BLOCK or expression
+			ast_node_t else_branch; // NODE_BLOCK, expression, nested NODE_IF or NULL
+		} if_stmt;
+
+		// NODE_WHILE
+		struct {
+			ast_node_t condition;
+			ast_node_t body; // NODE_BLOCK or expression
+		} while_stmt;
+
+		// NODE_FOR
+		struct {
+			char *var_name;
+			bool is_inclusive; // true for 'to' (inclusive), false for 'until' (exclusive)
+			ast_node_t from_expr;
+			ast_node_t to_expr;
+			ast_node_t step_expr; // NULL for default step
+			ast_node_t guards;	  // Linked list of guard expressions
+			ast_node_t body;	  // NODE_BLOCK or expression
+		} for_stmt;
+
+		// NODE_RETURN
+		struct {
+			ast_node_t expr; // Return expression or NULL
+		} return_stmt;
+
+		// NODE_EXPR_STMT
+		struct {
+			ast_node_t expr;
+		} expr_stmt;
+
+		// NODE_FUNC_CALL
+		struct {
+			char *name;
+			bool has_parens; // False for parameterless calls without parens
+			ast_node_t args; // Linked list of argument expressions
+		} func_call;
+
+		// NODE_MEMBER_ACCESS
+		struct {
+			ast_node_t target;
+			char *member_name;
+			bool is_call;	 // True if followed by parentheses
+			ast_node_t args; // Argument expressions if is_call
+		} member_access;
+
+		// NODE_STRING_INTERP
+		struct {
+			ast_node_t parts; // Linked list of string literals and expressions
+		} string_interp;
+
+		// NODE_TYPE_CAST
+		struct {
+			data_type_t target_type;
+			ast_node_t operand;
+		} type_cast;
+
+		// NODE_BINARY_OP
+		struct {
+			op_type_t operator_type;
+			ast_node_t left;
+			ast_node_t right;
+		} binary_op;
+
+		// NODE_UNARY_OP
+		struct {
+			op_type_t operator_type;
+			ast_node_t operand;
+		} unary_op;
+
+		// NODE_IDENTIFIER
+		struct {
+			char *name;
+		} id;
+
+		// Literals
+		int32_t int_val;
+		double double_val;
+		char *string_val;
+		bool bool_val;
+	} as;
+};
 
 /**
- * @brief Creates and allocates a new AST node
- * @param n_type type of node, check node_type for full list
- * @return Pointer to newly allocated AST node, or NULL on failure
+ * @brief Allocates and initializes a new AST node of the specified type
+ * @param type Type of node to create
+ * @param line_num Line number in source code where node begins
+ * @return Pointer to newly allocated AST node, or NULL on allocation failure
  */
-ast_node_t create_node(node_type n_type);
+ast_node_t ast_create_node(node_type_t type, unsigned line_num);
 
 /**
- * @brief Destroys the abstract syntax tree
+ * @brief Appends an AST node to the end of a linked list (chaining via next pointer)
+ * @param list Head of the list (can be NULL)
+ * @param item Node to append
+ * @return Head of the updated list
  */
-ast_node_t ast_dtor(void);
+ast_node_t ast_append(ast_node_t list, ast_node_t item);
+
+/**
+ * @brief Recursively frees an AST subtree and all its allocated resources
+ * @param root Root node of the subtree to be freed
+ * @return NULL (useful for resetting caller's pointer)
+ */
+ast_node_t ast_dtor(ast_node_t root);
 
 #endif
