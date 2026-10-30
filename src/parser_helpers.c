@@ -39,6 +39,7 @@ bool peek_specific_id(const parser_t *parser, const char *identifier) {
 	return false;
 }
 
+// Implemented using Gemini according to exact user specification
 bool peek_data_type(const parser_t *parser) {
 	if (parser->curr_tkn.type != TOKEN_KEYWORD) {
 		return false;
