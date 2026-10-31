@@ -1,25 +1,184 @@
 /**
  * @file ast.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
+ * @author Michal Sobek (xsobekm00@vutbr.cz)
  * @brief Implementation of abstract syntax tree operations
  * @date 2026-10-20
  */
 
 #include "ast.h"
-#include "ast_private.h"
+#include <stdlib.h>
 
-ast_node_t create_node(void) {
-	// TODO: implement node creation
-	return nullptr;
+ast_node_t ast_create_node(node_type_t type, unsigned line_num) {
+	ast_node_t node = calloc(1, sizeof(struct ast_node));
+	if (!node) {
+		return NULL;
+	}
+
+	node->type = type;
+	node->line_num = line_num;
+	node->eval_type = TYPE_UNKNOWN;
+
+	return node;
 }
 
-void free_node(ast_node_t node) {
-	// TODO: implement single node cleanup
-	(void)node;
+// Tool: Gemini
+// AST operations implementation (list appending, and recursive tree destruction).
+// Prompt: Implement AST operations for list appending, and recursive destruction
+// for all node types.
+// Note: Memory cleanup and recursive traversal verified and changed according to project
+// requirements.
+
+void ast_list_init(ast_list_t *list) {
+	if (!list) {
+		return;
+	}
+	list->head = NULL;
+	list->tail = NULL;
+	list->count = 0;
+}
+
+bool ast_list_append(ast_list_t *list, ast_node_t item) {
+	if (!list || !item) {
+		return false;
+	}
+
+	if (!list->head) {
+		list->head = item;
+		list->tail = item;
+	} else {
+		list->tail->next = item;
+		list->tail = item;
+	}
+
+	list->count++;
+	while (list->tail->next) {
+		list->tail = list->tail->next;
+		list->count++;
+	}
+
+	return true;
 }
 
 ast_node_t ast_dtor(ast_node_t root) {
-	// TODO: implement AST destruction
-	(void)root;
-	return nullptr;
+	while (root) {
+		switch (root->type) {
+		case NODE_PROGRAM:
+			ast_dtor(root->as.program.items.head);
+			break;
+
+		case NODE_BLOCK:
+			ast_dtor(root->as.block.statements.head);
+			break;
+
+		case NODE_EXTENSION:
+			free(root->as.extension.receiver_name);
+			free(root->as.extension.receiver_type);
+			ast_dtor(root->as.extension.methods.head);
+			break;
+
+		case NODE_FUNC_DEF:
+			free(root->as.func_def.name);
+			free(root->as.func_def.return_type);
+			ast_dtor(root->as.func_def.param_lists.head);
+			ast_dtor(root->as.func_def.body);
+			break;
+
+		case NODE_PARAM_LIST:
+			ast_dtor(root->as.param_list.params.head);
+			break;
+
+		case NODE_PARAM:
+			free(root->as.param.name);
+			free(root->as.param.type_name);
+			break;
+
+		case NODE_VAR_DEF:
+			free(root->as.var_def.name);
+			free(root->as.var_def.type_name);
+			ast_dtor(root->as.var_def.init_expr);
+			break;
+
+		case NODE_ASSIGN:
+			free(root->as.assign.target_id);
+			ast_dtor(root->as.assign.expr);
+			break;
+
+		case NODE_IF:
+			ast_dtor(root->as.if_stmt.condition);
+			ast_dtor(root->as.if_stmt.then_branch);
+			ast_dtor(root->as.if_stmt.else_branch);
+			break;
+
+		case NODE_WHILE:
+			ast_dtor(root->as.while_stmt.condition);
+			ast_dtor(root->as.while_stmt.body);
+			break;
+
+		case NODE_FOR:
+			free(root->as.for_stmt.var_name);
+			ast_dtor(root->as.for_stmt.from_expr);
+			ast_dtor(root->as.for_stmt.to_expr);
+			ast_dtor(root->as.for_stmt.step_expr);
+			ast_dtor(root->as.for_stmt.guards.head);
+			ast_dtor(root->as.for_stmt.body);
+			break;
+
+		case NODE_RETURN:
+			ast_dtor(root->as.return_stmt.expr);
+			break;
+
+		case NODE_EXPR_STMT:
+			ast_dtor(root->as.expr_stmt.expr);
+			break;
+
+		case NODE_FUNC_CALL:
+			ast_dtor(root->as.func_call.callee);
+			ast_dtor(root->as.func_call.args.head);
+			break;
+
+		case NODE_MEMBER_ACCESS:
+			ast_dtor(root->as.member_access.target);
+			free(root->as.member_access.member_name);
+			ast_dtor(root->as.member_access.args.head);
+			break;
+
+		case NODE_STRING_INTERP:
+			ast_dtor(root->as.string_interp.parts.head);
+			break;
+
+		case NODE_TYPE_CAST:
+			ast_dtor(root->as.type_cast.operand);
+			break;
+
+		case NODE_BINARY_OP:
+			ast_dtor(root->as.binary_op.left);
+			ast_dtor(root->as.binary_op.right);
+			break;
+
+		case NODE_UNARY_OP:
+			ast_dtor(root->as.unary_op.operand);
+			break;
+
+		case NODE_IDENTIFIER:
+			free(root->as.id.name);
+			break;
+
+		case NODE_LIT_STRING:
+			free(root->as.string_val);
+			break;
+
+		case NODE_LIT_INT:
+		case NODE_LIT_DOUBLE:
+		case NODE_LIT_BOOL:
+		case NODE_LIT_UNIT:
+			break;
+		}
+
+		ast_node_t next = root->next;
+		free(root);
+		root = next;
+	}
+
+	return NULL;
 }
