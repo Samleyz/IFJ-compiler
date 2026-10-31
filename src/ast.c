@@ -153,6 +153,7 @@ ast_node_t ast_dtor(ast_node_t root) {
 		case NODE_LIT_INT:
 		case NODE_LIT_DOUBLE:
 		case NODE_LIT_BOOL:
+		case NODE_LIT_UNIT:
 			break;
 		}
 

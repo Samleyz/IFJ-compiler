@@ -72,6 +72,7 @@ typedef enum {
 	NODE_LIT_DOUBLE,
 	NODE_LIT_STRING,
 	NODE_LIT_BOOL,
+	NODE_LIT_UNIT,
 } node_type_t;
 
 struct ast_node {
@@ -139,6 +140,7 @@ struct ast_node {
 			ast_node_t condition;
 			ast_node_t then_branch; // NODE_BLOCK or expression
 			ast_node_t else_branch; // NODE_BLOCK, expression, nested NODE_IF or NULL
+			bool is_expr;			// true if ternary, false otherwise
 		} if_stmt;
 
 		// NODE_WHILE
