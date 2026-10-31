@@ -51,6 +51,12 @@ void lexer_cleanup(void) {
 	dstring_dtor(lexer_state.dynamic_string);
 }
 
+// Tool: GitHub Copilot
+// Initial FSM switch skeleton generated using an AI agent based on our hand-designed state diagram.
+// Prompt (paraphrase): Generate the lexer FSM switch structure from the provided state transition
+// diagram.
+// Note: Only the basic switch skeleton was kept; complex logic, indentation tracking, and
+// edge cases were manually rewritten.
 token lexer_get_token(void) {
 	int c;
 
