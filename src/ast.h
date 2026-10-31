@@ -170,9 +170,9 @@ struct ast_node {
 
 		// NODE_FUNC_CALL
 		struct {
-			char *name;
-			bool has_parens; // False for parameterless calls without parens
-			ast_node_t args; // Linked list of argument expressions
+			ast_node_t callee; // Expression being called (e.g. IDENTIFIER, FUNC_CALL, LAMBDA)
+			bool has_parens;   // False for parameterless calls without parens
+			ast_node_t args;   // Linked list of argument expressions
 		} func_call;
 
 		// NODE_MEMBER_ACCESS
