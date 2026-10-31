@@ -26,48 +26,66 @@ ast_node_t ast_create_node(node_type_t type, unsigned line_num) {
 // AST operations implementation (list appending, and recursive tree destruction).
 // Prompt: Implement AST operations for list appending, and recursive destruction
 // for all node types.
-// Note: Memory cleanup and recursive traversal verified according to project requirements.
+// Note: Memory cleanup and recursive traversal verified and changed according to project
+// requirements.
 
-ast_node_t ast_append(ast_node_t list, ast_node_t item) {
+void ast_list_init(ast_list_t *list) {
 	if (!list) {
-		return item;
+		return;
+	}
+	list->head = NULL;
+	list->tail = NULL;
+	list->count = 0;
+}
+
+bool ast_list_append(ast_list_t *list, ast_node_t item) {
+	if (!list || !item) {
+		return false;
 	}
 
-	ast_node_t current = list;
-	while (current->next) {
-		current = current->next;
+	if (!list->head) {
+		list->head = item;
+		list->tail = item;
+	} else {
+		list->tail->next = item;
+		list->tail = item;
 	}
-	current->next = item;
 
-	return list;
+	list->count++;
+	while (list->tail->next) {
+		list->tail = list->tail->next;
+		list->count++;
+	}
+
+	return true;
 }
 
 ast_node_t ast_dtor(ast_node_t root) {
 	while (root) {
 		switch (root->type) {
 		case NODE_PROGRAM:
-			ast_dtor(root->as.program.first_item);
+			ast_dtor(root->as.program.items.head);
 			break;
 
 		case NODE_BLOCK:
-			ast_dtor(root->as.block.first_stmt);
+			ast_dtor(root->as.block.statements.head);
 			break;
 
 		case NODE_EXTENSION:
 			free(root->as.extension.receiver_name);
 			free(root->as.extension.receiver_type);
-			ast_dtor(root->as.extension.methods);
+			ast_dtor(root->as.extension.methods.head);
 			break;
 
 		case NODE_FUNC_DEF:
 			free(root->as.func_def.name);
 			free(root->as.func_def.return_type);
-			ast_dtor(root->as.func_def.param_lists);
+			ast_dtor(root->as.func_def.param_lists.head);
 			ast_dtor(root->as.func_def.body);
 			break;
 
 		case NODE_PARAM_LIST:
-			ast_dtor(root->as.param_list.first_param);
+			ast_dtor(root->as.param_list.params.head);
 			break;
 
 		case NODE_PARAM:
@@ -102,7 +120,7 @@ ast_node_t ast_dtor(ast_node_t root) {
 			ast_dtor(root->as.for_stmt.from_expr);
 			ast_dtor(root->as.for_stmt.to_expr);
 			ast_dtor(root->as.for_stmt.step_expr);
-			ast_dtor(root->as.for_stmt.guards);
+			ast_dtor(root->as.for_stmt.guards.head);
 			ast_dtor(root->as.for_stmt.body);
 			break;
 
@@ -116,17 +134,17 @@ ast_node_t ast_dtor(ast_node_t root) {
 
 		case NODE_FUNC_CALL:
 			ast_dtor(root->as.func_call.callee);
-			ast_dtor(root->as.func_call.args);
+			ast_dtor(root->as.func_call.args.head);
 			break;
 
 		case NODE_MEMBER_ACCESS:
 			ast_dtor(root->as.member_access.target);
 			free(root->as.member_access.member_name);
-			ast_dtor(root->as.member_access.args);
+			ast_dtor(root->as.member_access.args.head);
 			break;
 
 		case NODE_STRING_INTERP:
-			ast_dtor(root->as.string_interp.parts);
+			ast_dtor(root->as.string_interp.parts.head);
 			break;
 
 		case NODE_TYPE_CAST:
