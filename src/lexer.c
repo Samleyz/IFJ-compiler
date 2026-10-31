@@ -48,7 +48,9 @@ bool lexer_init(FILE *source) {
 
 void lexer_cleanup(void) {
 	stack_dtor(lexer_state.indent_stack); // isn't memory leak-nothing allocated stored in the stack
+	lexer_state.indent_stack = nullptr;
 	dstring_dtor(lexer_state.dynamic_string);
+	lexer_state.dynamic_string = nullptr;
 }
 
 token lexer_get_token(void) {
