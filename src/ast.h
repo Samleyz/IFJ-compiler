@@ -17,11 +17,19 @@
 // verified and refined to match project specifications.
 
 #include "token.h"
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 typedef struct ast_node *ast_node_t;
+
+/**
+ * @brief linked list of ast nodes
+ */
+typedef struct ast_list {
+	ast_node_t head; // first element of the linked list
+	ast_node_t tail; // last element of the linked list
+	size_t count;	 // count of the elements in the list
+} ast_list_t;
 
 /**
  * @brief Final data types (used in semantic analysis and code generation)
@@ -85,19 +93,19 @@ struct ast_node {
 	union {
 		// NODE_PROGRAM
 		struct {
-			ast_node_t first_item;
+			ast_list_t items;
 		} program;
 
 		// NODE_BLOCK
 		struct {
-			ast_node_t first_stmt;
+			ast_list_t statements;
 		} block;
 
 		// NODE_EXTENSION
 		struct {
 			char *receiver_name;
 			char *receiver_type;
-			ast_node_t methods; // Linked list of NODE_FUNC_DEF
+			ast_list_t methods; // Linked list of NODE_FUNC_DEF
 		} extension;
 
 		// NODE_FUNC_DEF
@@ -105,14 +113,14 @@ struct ast_node {
 			char *name;
 			bool is_main;			// Annotated with @main
 			bool has_parens;		// False for parameterless def foo: Int = ...
-			ast_node_t param_lists; // List of NODE_PARAM_LIST
+			ast_list_t param_lists; // List of NODE_PARAM_LIST
 			char *return_type;		// Explicit return type or NULL
 			ast_node_t body;		// NODE_BLOCK or expression
 		} func_def;
 
 		// NODE_PARAM_LIST
 		struct {
-			ast_node_t first_param; // Linked list of NODE_PARAM
+			ast_list_t params; // Linked list of NODE_PARAM
 		} param_list;
 
 		// NODE_PARAM
@@ -156,7 +164,7 @@ struct ast_node {
 			ast_node_t from_expr;
 			ast_node_t to_expr;
 			ast_node_t step_expr; // NULL for default step
-			ast_node_t guards;	  // Linked list of guard expressions
+			ast_list_t guards;	  // Linked list of guard expressions
 			ast_node_t body;	  // NODE_BLOCK or expression
 		} for_stmt;
 
@@ -174,7 +182,7 @@ struct ast_node {
 		struct {
 			ast_node_t callee; // Expression being called (e.g. IDENTIFIER, FUNC_CALL, LAMBDA)
 			bool has_parens;   // False for parameterless calls without parens
-			ast_node_t args;   // Linked list of argument expressions
+			ast_list_t args;   // Linked list of argument expressions
 		} func_call;
 
 		// NODE_MEMBER_ACCESS
@@ -182,12 +190,12 @@ struct ast_node {
 			ast_node_t target;
 			char *member_name;
 			bool is_call;	 // True if followed by parentheses
-			ast_node_t args; // Argument expressions if is_call
+			ast_list_t args; // Argument expressions if is_call
 		} member_access;
 
 		// NODE_STRING_INTERP
 		struct {
-			ast_node_t parts; // Linked list of string literals and expressions
+			ast_list_t parts; // Linked list of string literals and expressions
 		} string_interp;
 
 		// NODE_TYPE_CAST
@@ -231,12 +239,18 @@ struct ast_node {
 ast_node_t ast_create_node(node_type_t type, unsigned line_num);
 
 /**
- * @brief Appends an AST node to the end of a linked list (chaining via next pointer)
- * @param list Head of the list (can be NULL)
- * @param item Node to append
- * @return Head of the updated list
+ * @brief Initializes an empty AST list
+ * @param list Pointer to list to initialize
  */
-ast_node_t ast_append(ast_node_t list, ast_node_t item);
+void ast_list_init(ast_list_t *list);
+
+/**
+ * @brief Appends an AST node to the list in O(1) time
+ * @param list Pointer to list
+ * @param item Node to append
+ * @return true on success, false if list or item is NULL
+ */
+bool ast_list_append(ast_list_t *list, ast_node_t item);
 
 /**
  * @brief Recursively frees an AST subtree and all its allocated resources
