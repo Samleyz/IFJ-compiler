@@ -115,7 +115,7 @@ ast_node_t ast_dtor(ast_node_t root) {
 			break;
 
 		case NODE_FUNC_CALL:
-			free(root->as.func_call.name);
+			ast_dtor(root->as.func_call.callee);
 			ast_dtor(root->as.func_call.args);
 			break;
 
