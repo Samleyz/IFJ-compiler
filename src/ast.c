@@ -52,10 +52,6 @@ bool ast_list_append(ast_list_t *list, ast_node_t item) {
 	}
 
 	list->count++;
-	while (list->tail->next) {
-		list->tail = list->tail->next;
-		list->count++;
-	}
 
 	return true;
 }
