@@ -27,13 +27,20 @@ bool lexer_init(FILE *source) {
 		return false;
 	}
 
-	lexer_state.fsm_state = START;
+	lexer_state.source_file = source;
+	lexer_state.fsm_state = EOL_STATE;
+	lexer_state.line_num = 1;
+
 	lexer_state.bracket_cnt = 0;
 	lexer_state.comment_depth_cnt = 0;
-	lexer_state.line_num = 1;
+
+	lexer_state.leading_space_counter = 0;
 	lexer_state.line_has_code = false;
-	lexer_state.source_file = source;
+	lexer_state.line_cant_have_code = false;
+	lexer_state.indentation_token_value = 0;
+
 	lexer_state.string_start_line = 0;
+	lexer_state.comment_start_line = 0;
 
 	bool init_status = true;
 	init_status =
@@ -54,6 +61,20 @@ void lexer_cleanup(void) {
 }
 
 token lexer_get_token(void) {
+	if (lexer_state.line_has_code) {
+		if (lexer_state.indentation_token_value > 0) {
+			lexer_state.indentation_token_value--;
+			return (token){.type = TOKEN_INDENT,
+						   .attribute = (token_attr_t){},
+						   .line_num = lexer_state.line_num};
+		} else if (lexer_state.indentation_token_value < 0) {
+			lexer_state.indentation_token_value++;
+			return (token){.type = TOKEN_DEDENT,
+						   .attribute = (token_attr_t){},
+						   .line_num = lexer_state.line_num};
+		}
+	}
+
 	int c;
 
 	while (true) {
@@ -62,28 +83,55 @@ token lexer_get_token(void) {
 
 		switch (lexer_state.fsm_state) {
 		case START:
-			if (c != EOF && c != '\n' && c != ' ' && c != '\t' && c != '/') {
-				lexer_state.line_has_code = true;
+			if (c != EOF && c != '\n' && c != ' ' && c != '\t' && c != '/') { // Will be code token
+				// Check if can be code token on this line
+				if (lexer_state.line_cant_have_code) {
+					throw_err(ERR_LEXICAL, lexer_state.line_num,
+							  "Tab indent folowed by token on same line");
+				}
+				// Handle indent for first code token on line
+				if (!lexer_state.line_has_code) {
+					lexer_state.line_has_code = true;
+					handle_indent(&lexer_state);
+					if (lexer_state.indentation_token_value > 0) {
+						ungetc(c, lexer_state.source_file);
+						lexer_state.indentation_token_value--;
+						return (token){.type = TOKEN_INDENT,
+									   .attribute = (token_attr_t){},
+									   .line_num = lexer_state.line_num};
+					} else if (lexer_state.indentation_token_value < 0) {
+						ungetc(c, lexer_state.source_file);
+						lexer_state.indentation_token_value++;
+						return (token){.type = TOKEN_DEDENT,
+									   .attribute = (token_attr_t){},
+									   .line_num = lexer_state.line_num};
+					}
+				}
 			}
 			if (c == EOF) {
 				lexer_state.fsm_state = EOF_STATE;
 			} else if (c == '\n' && lexer_state.bracket_cnt > 0) {
 				// move
 				lexer_state.fsm_state = B_EOL_STATE;
+				lexer_state.line_cant_have_code = false;
 				lexer_state.line_num++;
 			} else if (c == '\n' && lexer_state.bracket_cnt == 0) {
 				// move
 				lexer_state.fsm_state = EOL_STATE;
+				// reset flags
 				unsigned ended_line = lexer_state.line_num++;
-				if (lexer_state.line_has_code) {
+				lexer_state.line_cant_have_code = false;
+				if (lexer_state.line_has_code) { // Check whether this line isnt ignored
 					lexer_state.line_has_code = false;
 					return (token){
 						.type = TOKEN_EOL, .attribute = (token_attr_t){}, .line_num = ended_line};
 				}
 			} else if (c == ' ') {
+				// stay
 				lexer_state.fsm_state = START;
 			} else if (c == '\t') {
-				lexer_state.fsm_state = TAB_STATE;
+				// stay
+				lexer_state.fsm_state = START;
 			} else if (c == '/') {
 				lexer_state.fsm_state = OP_SLASH;
 			} else if (c == '"') {
@@ -549,11 +597,11 @@ token lexer_get_token(void) {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
-				lexer_state.fsm_state = HANDLE_INDENT;
+				lexer_state.fsm_state = INDENT;
 			}
 			break;
 		case EOF_STATE:
-			if (stack_top(lexer_state.indent_stack) != NULL) {
+			if (stack_top(lexer_state.indent_stack) != (void *)0) {
 				if (!stack_pop(lexer_state.indent_stack)) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
 							  "Failed to close indentation at EOF");
@@ -566,50 +614,25 @@ token lexer_get_token(void) {
 			}
 			return (token){.type = TOKEN_EOF, .line_num = lexer_state.line_num};
 			break;
-		case HANDLE_INDENT:
+		case INDENT:
 			ungetc(c, lexer_state.source_file);
-			int hi_status = handle_indent(&lexer_state);
-			if (hi_status == 0) {
-				// Continue in FSM
-				c = fgetc(lexer_state.source_file);
-				if (c == '\t') {
-					lexer_state.fsm_state = TAB_STATE;
-				} else {
-					ungetc(c, lexer_state.source_file);
-					lexer_state.fsm_state = START;
-				}
-			} else if (hi_status == 1) {
-				return (token){.type = TOKEN_INDENT,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
-			} else if (hi_status == -1) {
-				return (token){.type = TOKEN_DEDENT,
-							   .attribute = (token_attr_t){},
-							   .line_num = lexer_state.line_num};
-			} else if (hi_status == -2) {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid indentation");
-			} else if (hi_status == -3) {
-				throw_err(ERR_INTERNAL, lexer_state.line_num,
-						  "failed stack push inside handle indent");
+			check_indent(&lexer_state);
+			// Continue in FSM
+			c = fgetc(lexer_state.source_file);
+			if (c == '\t') {
+				lexer_state.fsm_state = TAB_STATE;
+			} else {
+				ungetc(c, lexer_state.source_file);
+				lexer_state.fsm_state = START;
 			}
 			break;
 		case TAB_STATE:
-			if (c == '\t' || c == ' ') {
-				// stay
-			} else if (c == '\n') {
-				// unget
-				ungetc(c, lexer_state.source_file);
-				// move
-				lexer_state.fsm_state = START;
-			} else if (c == '/') {
-				// move
-				lexer_state.fsm_state = COMMENT_ENTRY;
-			} else if (lexer_state.line_has_code) {
-				ungetc(c, lexer_state.source_file);
-				lexer_state.fsm_state = START;
-			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after tab");
-			}
+			// unget
+			ungetc(c, lexer_state.source_file);
+			// move
+			lexer_state.fsm_state = START;
+			// such line must be checked for emptyness
+			lexer_state.line_cant_have_code = true;
 			break;
 		case MAIN_AT:
 			if (c != 'm') {
@@ -666,6 +689,7 @@ token lexer_get_token(void) {
 		case B_EOL_STATE:
 			// count spaces
 			size_t bracket_space_counter = 0;
+			ungetc(c, lexer_state.source_file);
 			while (' ' == (c = fgetc(lexer_state.source_file))) {
 				bracket_space_counter++;
 			}
@@ -675,7 +699,19 @@ token lexer_get_token(void) {
 			if (c == '\t') {
 				// move
 				lexer_state.fsm_state = TAB_STATE;
+			} else if (c == '\n') {
+				lexer_state.line_num++;
+				// unget
+				ungetc(c, lexer_state.source_file);
+				// move
+				lexer_state.fsm_state = START;
 			} else if (bracket_space_counter > (size_t)stack_top(lexer_state.indent_stack)) {
+				// unget
+				ungetc(c, lexer_state.source_file);
+				// move
+				lexer_state.fsm_state = START;
+			} else if (c == ')' &&
+					   bracket_space_counter >= (size_t)stack_top(lexer_state.indent_stack)) {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
@@ -969,14 +1005,38 @@ token lexer_get_token(void) {
 						   .line_num = lexer_state.line_num};
 		case OP_SLASH:
 			if (c == '/') {
+				// move
 				lexer_state.fsm_state = ONE_LINE_COM;
 			} else if (c == '*') {
+				// move
+				lexer_state.fsm_state = BLOCK_COM;
 				lexer_state.comment_depth_cnt = 1;
 				lexer_state.comment_start_line = lexer_state.line_num;
-				lexer_state.fsm_state = BLOCK_COM;
 			} else {
-				lexer_state.line_has_code = true;
+				// unget
 				ungetc(c, lexer_state.source_file);
+				// Indentation handling before first token on line
+				if (lexer_state.line_cant_have_code) {
+					throw_err(ERR_LEXICAL, lexer_state.line_num,
+							  "Tab indent folowed by token on same line");
+				} else {
+					lexer_state.line_has_code = true;
+				}
+				if (lexer_state.leading_space_counter) { // If not already done
+					handle_indent(&lexer_state);
+				}
+				if (lexer_state.indentation_token_value > 0) {
+					lexer_state.indentation_token_value--;
+					return (token){.type = TOKEN_INDENT,
+								   .attribute = (token_attr_t){},
+								   .line_num = lexer_state.line_num};
+				} else if (lexer_state.indentation_token_value < 0) {
+					lexer_state.indentation_token_value++;
+					return (token){.type = TOKEN_DEDENT,
+								   .attribute = (token_attr_t){},
+								   .line_num = lexer_state.line_num};
+				}
+				// Move and resolve slash token
 				lexer_state.fsm_state = START;
 				return (token){.type = TOKEN_OPERATOR,
 							   .attribute.operator_type = OPERATOR_SLASH,
@@ -1113,6 +1173,7 @@ token lexer_get_token(void) {
 					lexer_state.fsm_state = AFTER_MULTILINE_COMMENT;
 					if (lexer_state.line_has_code) {
 						lexer_state.line_has_code = false;
+						lexer_state.line_cant_have_code = false;
 						return (token){.type = TOKEN_EOL,
 									   .attribute = (token_attr_t){},
 									   .line_num = lexer_state.comment_start_line};
@@ -1127,6 +1188,7 @@ token lexer_get_token(void) {
 			break;
 		case AFTER_MULTILINE_COMMENT:
 			if (c == ' ' || c == '\t') {
+				// stay
 			} else if (c == '\n') {
 				lexer_state.line_num++;
 				lexer_state.fsm_state = EOL_STATE;
@@ -1135,17 +1197,6 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = START;
 			} else {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Token after multiline block comment");
-			}
-			break;
-		case COMMENT_ENTRY:
-			if (c == '/') {
-				lexer_state.fsm_state = ONE_LINE_COM;
-			} else if (c == '*') {
-				lexer_state.comment_depth_cnt = 1;
-				lexer_state.comment_start_line = lexer_state.line_num;
-				lexer_state.fsm_state = BLOCK_COM;
-			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid comment entry");
 			}
 			break;
 		default:
