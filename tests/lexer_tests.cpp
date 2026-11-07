@@ -634,3 +634,160 @@ TEST(LexerErrors, RejectsNonAsciiSourceAndStringCharacters) {
 	expectLexicalError(non_ascii);
 	expectLexicalError("\"" + non_ascii + "\"");
 }
+
+// Tests batch after indent fix
+
+TEST(LexerAdditional, MultipleStatementsWithNewlines) {
+	expectTokens("val x = 1\nval y = 2",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), keyword(KW_VAL, 2), identifier("y", 2),
+				  op(OPERATOR_ASSIGN, 2), integer(2, 2), plain(TOKEN_EOF, 2)});
+}
+
+TEST(LexerAdditional, IndentedBlockAfterColon) {
+	expectTokens("def foo():\n  val x = 1",
+				 {keyword(KW_DEF, 1), identifier("foo", 1), plain(TOKEN_LPAREN, 1),
+				  plain(TOKEN_RPAREN, 1), op(OPERATOR_COLON, 1), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_INDENT, 2), keyword(KW_VAL, 2), identifier("x", 2),
+				  op(OPERATOR_ASSIGN, 2), integer(1, 2), plain(TOKEN_DEDENT, 2),
+				  plain(TOKEN_EOF, 2)});
+}
+
+TEST(LexerAdditional, IndentedBlockWithBlankLines) {
+	expectTokens("def foo():\n\n  val x = 1\n\n",
+				 {keyword(KW_DEF, 1), identifier("foo", 1), plain(TOKEN_LPAREN, 1),
+				  plain(TOKEN_RPAREN, 1), op(OPERATOR_COLON, 1), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_INDENT, 3), keyword(KW_VAL, 3), identifier("x", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(1, 3), plain(TOKEN_EOL, 3),
+				  plain(TOKEN_DEDENT, 5), plain(TOKEN_EOF, 5)});
+}
+
+TEST(LexerAdditional, IgnoresBlankLinesWithWhitespace) {
+	expectTokens("val x = 1\n  \t \nval y = 2",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), keyword(KW_VAL, 3), identifier("y", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(2, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, RejectsTabsInIndentation) { expectLexicalError("val x = 1\n  \t val y = 2"); }
+
+TEST(LexerAdditional, BlockCommentBeforeIndentedCode) {
+	expectTokens("  /*ahoj*/\tval x = 1",
+				 {plain(TOKEN_INDENT, 1), keyword(KW_VAL, 1), identifier("x", 1),
+				  op(OPERATOR_ASSIGN, 1), integer(1, 1), plain(TOKEN_DEDENT, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerAdditional, IgnoresLineCommentAsBlankLine) {
+	expectTokens("val x = 1\n    // Toto je jen komentar\nval y = 2",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), keyword(KW_VAL, 3), identifier("y", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(2, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, SingleIndentedOperatorAndOperand) {
+	expectTokens("  / 2", {plain(TOKEN_INDENT, 1), op(OPERATOR_SLASH, 1), integer(2, 1),
+						   plain(TOKEN_DEDENT, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerAdditional, MultilineBlockCommentActsAsLineEnd) {
+	expectTokens("val x = 1 /* koment \n radek2 */\nval y = 2",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), keyword(KW_VAL, 3), identifier("y", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(2, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, TokensAfterMultilineBlockCommentCauseError) {
+	expectLexicalError("val x = 1 /* koment \n radek2 */ val y = 2");
+}
+
+TEST(LexerAdditional, IgnoresNewlinesAndIndentationInsideParentheses) {
+	expectTokens("val x = (\n 1\n)", {keyword(KW_VAL, 1), identifier("x", 1),
+									  op(OPERATOR_ASSIGN, 1), plain(TOKEN_LPAREN, 1), integer(1, 2),
+									  plain(TOKEN_RPAREN, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, NestedIndentationWithMultipleLevels) {
+	expectTokens("  def foo():\n    val x = 1\n    val y = 2",
+				 {plain(TOKEN_INDENT, 1), keyword(KW_DEF, 1),	  identifier("foo", 1),
+				  plain(TOKEN_LPAREN, 1), plain(TOKEN_RPAREN, 1), op(OPERATOR_COLON, 1),
+				  plain(TOKEN_EOL, 1),	  plain(TOKEN_INDENT, 2), keyword(KW_VAL, 2),
+				  identifier("x", 2),	  op(OPERATOR_ASSIGN, 2), integer(1, 2),
+				  plain(TOKEN_EOL, 2),	  keyword(KW_VAL, 3),	  identifier("y", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(2, 3),		  plain(TOKEN_DEDENT, 3),
+				  plain(TOKEN_DEDENT, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, IgnoresLeadingBlankLinesWithWhitespaceAndTabs) {
+	expectTokens("\n  \n  \t \nval x = 1",
+				 {keyword(KW_VAL, 4), identifier("x", 4), op(OPERATOR_ASSIGN, 4), integer(1, 4),
+				  plain(TOKEN_EOF, 4)});
+}
+
+TEST(LexerAdditional, IgnoresNewlinesInsideParenthesesAndReadsOperators) {
+	expectTokens("val x = (\n 1 +\n 2\n)",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1),
+				  plain(TOKEN_LPAREN, 1), integer(1, 2), op(OPERATOR_PLUS, 2), integer(2, 3),
+				  plain(TOKEN_RPAREN, 4), plain(TOKEN_EOF, 4)});
+}
+
+TEST(LexerAdditional, ValidIndentationInsideParentheses) {
+	expectTokens("  val x = (\n   1\n  )",
+				 {plain(TOKEN_INDENT, 1), keyword(KW_VAL, 1), identifier("x", 1),
+				  op(OPERATOR_ASSIGN, 1), plain(TOKEN_LPAREN, 1), integer(1, 2),
+				  plain(TOKEN_RPAREN, 3), plain(TOKEN_DEDENT, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, RejectsInsufficientIndentationInsideParentheses) {
+	expectLexicalError("  val x = (\n 1\n  )");
+}
+
+TEST(LexerAdditional, RejectsTabsInsideParenthesesIndentation) {
+	expectLexicalError("val x = (\n  \t1\n)");
+}
+
+TEST(LexerAdditional, NestedParenthesesWithComplexIndentation) {
+	expectTokens("  val x = (\n   1 +\n    (\n     2\n    )\n  )",
+				 {plain(TOKEN_INDENT, 1), keyword(KW_VAL, 1), identifier("x", 1),
+				  op(OPERATOR_ASSIGN, 1), plain(TOKEN_LPAREN, 1), integer(1, 2),
+				  op(OPERATOR_PLUS, 2), plain(TOKEN_LPAREN, 3), integer(2, 4),
+				  plain(TOKEN_RPAREN, 5), plain(TOKEN_RPAREN, 6), plain(TOKEN_DEDENT, 6),
+				  plain(TOKEN_EOF, 6)});
+}
+
+TEST(LexerAdditional, MainAnnotationOnSeparateLineWithIndentation) {
+	expectTokens("  @main\n  def run():\n    val x = 1",
+				 {plain(TOKEN_INDENT, 1), plain(TOKEN_MAIN, 1), plain(TOKEN_EOL, 1),
+				  keyword(KW_DEF, 2), identifier("run", 2), plain(TOKEN_LPAREN, 2),
+				  plain(TOKEN_RPAREN, 2), op(OPERATOR_COLON, 2), plain(TOKEN_EOL, 2),
+				  plain(TOKEN_INDENT, 3), keyword(KW_VAL, 3), identifier("x", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(1, 3), plain(TOKEN_DEDENT, 3),
+				  plain(TOKEN_DEDENT, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, MultilineBlockCommentSkipsCorrectlyBeforeIndentedCode) {
+	expectTokens("def foo(): /*\nkomentar \n*/\n  x = 1",
+				 {keyword(KW_DEF, 1), identifier("foo", 1), plain(TOKEN_LPAREN, 1),
+				  plain(TOKEN_RPAREN, 1), op(OPERATOR_COLON, 1), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_INDENT, 4), identifier("x", 4), op(OPERATOR_ASSIGN, 4), integer(1, 4),
+				  plain(TOKEN_DEDENT, 4), plain(TOKEN_EOF, 4)});
+}
+
+TEST(LexerAdditional, IgnoresTabsInsideLineComment) {
+	expectTokens("  x = 1 // \t ignorovany tabulatar v komentari\n  y = 2",
+				 {plain(TOKEN_INDENT, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), identifier("y", 2), op(OPERATOR_ASSIGN, 2), integer(2, 2),
+				  plain(TOKEN_DEDENT, 2), plain(TOKEN_EOF, 2)});
+}
+
+TEST(LexerAdditional, MultilineStringRetainsLiteralContentsIncludingWhitespace) {
+	expectTokens("x = \"\"\"\n\tmulti\n  line\n\"\"\"",
+				 {identifier("x", 1), op(OPERATOR_ASSIGN, 1), stringToken("\n\tmulti\n  line\n", 1),
+				  plain(TOKEN_EOF, 4)});
+}
+
+TEST(LexerAdditional, BlockCommentWithNewlineCreatesLogicalLineEnd) {
+	expectTokens("  x = 1 /* koment s \n novym radkem */",
+				 {plain(TOKEN_INDENT, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_DEDENT, 2), plain(TOKEN_EOF, 2)});
+}
