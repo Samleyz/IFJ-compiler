@@ -591,8 +591,6 @@ token lexer_get_token(void) {
 		case EOL_STATE:
 			if (c == '\n') {
 				lexer_state.line_num++;
-			} else if (c == '\t') {
-				lexer_state.fsm_state = TAB_STATE;
 			} else {
 				// unget
 				ungetc(c, lexer_state.source_file);
