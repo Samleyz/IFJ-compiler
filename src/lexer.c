@@ -536,6 +536,9 @@ token lexer_get_token(void) {
 			}
 			break;
 		case D_RETURN:
+			if (isalpha(c)) {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after double");
+			}
 			// unget
 			ungetc(c, lexer_state.source_file);
 			// move
