@@ -722,6 +722,11 @@ token lexer_get_token(void) {
 				ungetc(c, lexer_state.source_file);
 				// move
 				lexer_state.fsm_state = START;
+			} else if (c == EOF) {
+				// unget
+				ungetc(c, lexer_state.source_file);
+				// move
+				lexer_state.fsm_state = START;
 			} else {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid indentation inside brackets");
 			}
