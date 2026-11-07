@@ -1029,22 +1029,23 @@ token lexer_get_token(void) {
 				if (lexer_state.line_cant_have_code) {
 					throw_err(ERR_LEXICAL, lexer_state.line_num,
 							  "Tab indent folowed by token on same line");
-				} else {
+				}
+				if (!lexer_state.line_has_code) {
 					lexer_state.line_has_code = true;
-				}
-				if (lexer_state.leading_space_counter) { // If not already done
-					handle_indent(&lexer_state);
-				}
-				if (lexer_state.indentation_token_value > 0) {
-					lexer_state.indentation_token_value--;
-					return (token){.type = TOKEN_INDENT,
-								   .attribute = (token_attr_t){},
-								   .line_num = lexer_state.line_num};
-				} else if (lexer_state.indentation_token_value < 0) {
-					lexer_state.indentation_token_value++;
-					return (token){.type = TOKEN_DEDENT,
-								   .attribute = (token_attr_t){},
-								   .line_num = lexer_state.line_num};
+					if (lexer_state.leading_space_counter) { // If not already done
+						handle_indent(&lexer_state);
+					}
+					if (lexer_state.indentation_token_value > 0) {
+						lexer_state.indentation_token_value--;
+						return (token){.type = TOKEN_INDENT,
+									   .attribute = (token_attr_t){},
+									   .line_num = lexer_state.line_num};
+					} else if (lexer_state.indentation_token_value < 0) {
+						lexer_state.indentation_token_value++;
+						return (token){.type = TOKEN_DEDENT,
+									   .attribute = (token_attr_t){},
+									   .line_num = lexer_state.line_num};
+					}
 				}
 				// Move and resolve slash token
 				lexer_state.fsm_state = START;
