@@ -39,7 +39,11 @@ bool peek_specific_id(const parser_t *parser, const char *identifier) {
 	return false;
 }
 
-// Implemented using Gemini according to exact user specification
+// Tool: Google Gemini
+// The following helper functions (peek_*, match_*, expect_*) were ai generated.
+// Prompt (paraphrase): Implement parser helper functions in C: peek_* - non-consuming token
+// inspection, match_* - advance parser on match, expect_* to log ERR_SYNTACTIC on mismatch. Note:
+// Generated functions were verified and adapted to our token model and error handling.
 bool peek_data_type(const parser_t *parser) {
 	if (parser->curr_tkn.type != TOKEN_KEYWORD) {
 		return false;
