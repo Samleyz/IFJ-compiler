@@ -115,7 +115,7 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = B_EOL_STATE;
 				lexer_state.line_cant_have_code = false;
 				lexer_state.line_num++;
-			} else if (c == '\n' && lexer_state.bracket_cnt == 0) {
+			} else if (c == '\n' && lexer_state.bracket_cnt <= 0) {
 				// move
 				lexer_state.fsm_state = EOL_STATE;
 				// reset flags
