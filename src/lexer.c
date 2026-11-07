@@ -601,6 +601,14 @@ token lexer_get_token(void) {
 			}
 			break;
 		case EOF_STATE:
+			// End unended line with EOL
+			if (lexer_state.line_has_code) {
+				lexer_state.line_has_code = false;
+				return (token){.type = TOKEN_EOL,
+							   .attribute = (token_attr_t){},
+							   .line_num = lexer_state.line_num};
+			}
+			// Send dedents for all unended indent blocks
 			if (stack_top(lexer_state.indent_stack) != (void *)0) {
 				if (!stack_pop(lexer_state.indent_stack)) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
@@ -817,7 +825,9 @@ token lexer_get_token(void) {
 						   .line_num = lexer_state.string_start_line};
 			break;
 		case BLOCK_STRING_EX_1:
-			if (c == '"') {
+			if (c == EOF) {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unended block string");
+			} else if (c == '"') {
 				// move
 				lexer_state.fsm_state = BLOCK_STRING_EX_2;
 			} else {
@@ -839,7 +849,9 @@ token lexer_get_token(void) {
 			}
 			break;
 		case BLOCK_STRING_EX_2:
-			if (c == '"') {
+			if (c == EOF) {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unended block string");
+			} else if (c == '"') {
 				// move
 				lexer_state.fsm_state = BLOCK_STRING_END;
 			} else {
