@@ -801,6 +801,9 @@ token lexer_get_token(void) {
 				if (c == '\n') {
 					lexer_state.line_num++;
 				}
+				if (c > 0x7F) {
+					throw_err(ERR_LEXICAL, lexer_state.line_num, "Non-ASCII character in string");
+				}
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
