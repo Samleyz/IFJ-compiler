@@ -437,8 +437,8 @@ TEST(LexerOperators, RecognizesListConcatenationOperator) {
 }
 
 TEST(LexerOperators, RecognizesMainAnnotation) {
-	expectTokens("@main @main()", {plain(TOKEN_MAIN), plain(TOKEN_MAIN), plain(TOKEN_LPAREN),
-								   plain(TOKEN_RPAREN), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
+	expectTokens("@main @main",
+				 {plain(TOKEN_MAIN), plain(TOKEN_MAIN), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerOperators, RejectsMalformedMainAnnotation) {

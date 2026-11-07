@@ -665,6 +665,9 @@ token lexer_get_token(void) {
 			lexer_state.fsm_state = MAIN_N;
 			break;
 		case MAIN_N:
+			if (c != EOF && c != '\n' && c != ' ' && c != '\t') {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after @main");
+			}
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
 			return (token){.type = TOKEN_MAIN, .line_num = lexer_state.line_num};
