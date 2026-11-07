@@ -716,12 +716,6 @@ token lexer_get_token(void) {
 				ungetc(c, lexer_state.source_file);
 				// move
 				lexer_state.fsm_state = START;
-			} else if (c == ')' &&
-					   bracket_space_counter >= (size_t)stack_top(lexer_state.indent_stack)) {
-				// unget
-				ungetc(c, lexer_state.source_file);
-				// move
-				lexer_state.fsm_state = START;
 			} else if (c == EOF) {
 				// unget
 				ungetc(c, lexer_state.source_file);

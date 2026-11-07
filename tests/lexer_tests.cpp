@@ -701,7 +701,7 @@ TEST(LexerAdditional, TokensAfterMultilineBlockCommentCauseError) {
 }
 
 TEST(LexerAdditional, IgnoresNewlinesAndIndentationInsideParentheses) {
-	expectTokens("val x = (\n 1\n)",
+	expectTokens("val x = (\n 1\n )",
 				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1),
 				  plain(TOKEN_LPAREN, 1), integer(1, 2), plain(TOKEN_RPAREN, 3),
 				  plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 3)});
@@ -725,14 +725,14 @@ TEST(LexerAdditional, IgnoresLeadingBlankLinesWithWhitespaceAndTabs) {
 }
 
 TEST(LexerAdditional, IgnoresNewlinesInsideParenthesesAndReadsOperators) {
-	expectTokens("val x = (\n 1 +\n 2\n)",
+	expectTokens("val x = (\n 1 +\n 2\n )",
 				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1),
 				  plain(TOKEN_LPAREN, 1), integer(1, 2), op(OPERATOR_PLUS, 2), integer(2, 3),
 				  plain(TOKEN_RPAREN, 4), plain(TOKEN_EOL, 4), plain(TOKEN_EOF, 4)});
 }
 
 TEST(LexerAdditional, ValidIndentationInsideParentheses) {
-	expectTokens("  val x = (\n   1\n  )",
+	expectTokens("  val x = (\n   1\n   )",
 				 {plain(TOKEN_INDENT, 1), keyword(KW_VAL, 1), identifier("x", 1),
 				  op(OPERATOR_ASSIGN, 1), plain(TOKEN_LPAREN, 1), integer(1, 2),
 				  plain(TOKEN_RPAREN, 3), plain(TOKEN_EOL, 3), plain(TOKEN_DEDENT, 3),
@@ -748,7 +748,7 @@ TEST(LexerAdditional, RejectsTabsInsideParenthesesIndentation) {
 }
 
 TEST(LexerAdditional, NestedParenthesesWithComplexIndentation) {
-	expectTokens("  val x = (\n   1 +\n    (\n     2\n    )\n  )",
+	expectTokens("  val x = (\n   1 +\n    (\n     2\n     )\n   )",
 				 {plain(TOKEN_INDENT, 1), keyword(KW_VAL, 1), identifier("x", 1),
 				  op(OPERATOR_ASSIGN, 1), plain(TOKEN_LPAREN, 1), integer(1, 2),
 				  op(OPERATOR_PLUS, 2), plain(TOKEN_LPAREN, 3), integer(2, 4),
