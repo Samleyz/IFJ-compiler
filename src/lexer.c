@@ -774,10 +774,14 @@ token lexer_get_token(void) {
 			break;
 		case STRING_END:
 			if (c == '"') {
-				// move
-				lexer_state.fsm_state = BLOCK_STRING;
-				lexer_state.string_start_line = lexer_state.line_num;
-			} else {
+				if (dstring_get_len(lexer_state.dynamic_string) == 0) {
+					// move
+					lexer_state.fsm_state = BLOCK_STRING;
+					lexer_state.string_start_line = lexer_state.line_num;
+				} else {
+					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after string");
+				}
+			} else if (!isalpha(c) && !isdigit(c)) {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
@@ -792,6 +796,8 @@ token lexer_get_token(void) {
 				return (token){.type = TOKEN_STRING,
 							   .attribute = (token_attr_t){.string_val = str_val},
 							   .line_num = lexer_state.line_num};
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after string");
 			}
 			break;
 		case BLOCK_STRING:
