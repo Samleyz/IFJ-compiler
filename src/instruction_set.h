@@ -135,18 +135,16 @@ operand_t create_operand(operand_type_t operand_type, value_t value, frame_type_
  * @brief Prints an instruction with 0 operands
  *
  * @param[in] instruction_type Opcode of the instruction
- * @return true if successful, otherwise false
  */
-bool print_inst_0(instruction_t instruction_type);
+void print_inst_0(instruction_t instruction_type);
 
 /**
  * @brief Prints an instruction with 1 operand
  *
  * @param[in] instruction_type Opcode of the instruction
  * @param[in] operand First operand
- * @return true if successful, otherwise false
  */
-bool print_inst_1(instruction_t instruction_type, operand_t operand);
+void print_inst_1(instruction_t instruction_type, operand_t operand);
 
 /**
  * @brief Prints an instruction with 2 operands
@@ -154,9 +152,8 @@ bool print_inst_1(instruction_t instruction_type, operand_t operand);
  * @param[in] instruction_type Opcode of the instruction
  * @param[in] operand_1 First operand
  * @param[in] operand_2 Second operand
- * @return true if successful, otherwise false
  */
-bool print_inst_2(instruction_t instruction_type, operand_t operand_1, operand_t operand_2);
+void print_inst_2(instruction_t instruction_type, operand_t operand_1, operand_t operand_2);
 
 /**
  * @brief Prints an instruction with 3 operands
@@ -165,9 +162,8 @@ bool print_inst_2(instruction_t instruction_type, operand_t operand_1, operand_t
  * @param[in] operand_1 First operand
  * @param[in] operand_2 Second operand
  * @param[in] operand_3 Third operand
- * @return true if successful, otherwise false
  */
-bool print_inst_3(instruction_t instruction_type, operand_t operand_1, operand_t operand_2,
+void print_inst_3(instruction_t instruction_type, operand_t operand_1, operand_t operand_2,
 				  operand_t operand_3);
 
 #endif

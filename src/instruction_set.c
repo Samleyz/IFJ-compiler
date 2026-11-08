@@ -151,62 +151,38 @@ operand_t create_operand(operand_type_t operand_type, value_t value, frame_type_
 	return operand;
 }
 
-bool print_inst_0(instruction_t instruction_type) {
-	if (instruction_table[instruction_type].arity != 0) {
-		return false;
-	}
-
+void print_inst_0(instruction_t instruction_type) {
 	fprintf(output_file, "%s", instruction_table[instruction_type].name);
 	fputc('\n', output_file);
-
-	return true;
 }
 
-bool print_inst_1(instruction_t instruction_type, operand_t operand) {
-	if (instruction_table[instruction_type].arity != 1) {
-		return false;
-	}
-
+void print_inst_1(instruction_t instruction_type, operand_t operand) {
 	fprintf(output_file, "%s", instruction_table[instruction_type].name);
 	fputc(' ', output_file);
 
 	print_operand(operand);
 	fputc('\n', output_file);
-
-	return true;
 }
 
-bool print_inst_2(instruction_t instruction_type, operand_t operand_1, operand_t operand_2) {
-	if (instruction_table[instruction_type].arity != 2) {
-		return false;
-	}
-
+void print_inst_2(instruction_t instruction_type, operand_t operand_1, operand_t operand_2) {
 	fprintf(output_file, "%s", instruction_table[instruction_type].name);
-
 	fputc(' ', output_file);
+
 	print_operand(operand_1);
 	fputc(' ', output_file);
 	print_operand(operand_2);
 	fputc('\n', output_file);
-
-	return true;
 }
 
-bool print_inst_3(instruction_t instruction_type, operand_t operand_1, operand_t operand_2,
+void print_inst_3(instruction_t instruction_type, operand_t operand_1, operand_t operand_2,
 				  operand_t operand_3) {
-	if (instruction_table[instruction_type].arity != 3) {
-		return false;
-	}
-
 	fprintf(output_file, "%s", instruction_table[instruction_type].name);
-
 	fputc(' ', output_file);
+
 	print_operand(operand_1);
 	fputc(' ', output_file);
 	print_operand(operand_2);
 	fputc(' ', output_file);
 	print_operand(operand_3);
 	fputc('\n', output_file);
-
-	return true;
 }

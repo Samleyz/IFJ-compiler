@@ -129,13 +129,8 @@ static bool generate_reverse_params(ast_node_t param) {
 		.frame = FT_LOCAL,
 		.value = {.var_name = param->as.param.name}}; // TODO: switch to sym_entry unique name
 
-	if (!print_inst_1(INST_DEFVAR, parameter)) {
-		return false;
-	}
-
-	if (!print_inst_1(INST_POPS, parameter)) {
-		return false;
-	}
+	print_inst_1(INST_DEFVAR, parameter);
+	print_inst_1(INST_POPS, parameter);
 
 	return true;
 }
@@ -159,24 +154,19 @@ static bool generate_reverse_paramlists(ast_node_t param_list) {
 bool generate_function_def(ast_node_t current_node) {
 	// Function label
 	char *function_name = get_prefixed_name("$$", current_node->as.func_def.name);
+	if (!function_name) {
+		return false;
+	}
 
 	operand_t label_operand = {.operand_type = OP_TYPE_LABEL,
 							   .frame = FT_NO_FRAME,
 							   .value = {.label_name = function_name}};
-	if (!print_inst_1(INST_LABEL, label_operand)) {
-		free(function_name);
-		return false;
-	}
+	print_inst_1(INST_LABEL, label_operand);
 	free(function_name);
 
 	// Frame setup
-	if (!print_inst_0(INST_CREATEFRAME)) {
-		return false;
-	}
-
-	if (!print_inst_0(INST_PUSHFRAME)) {
-		return false;
-	}
+	print_inst_0(INST_CREATEFRAME);
+	print_inst_0(INST_PUSHFRAME);
 
 	// Retrieve arguments from stack into local variables
 	if (current_node->as.func_def.has_parens) {
@@ -194,13 +184,8 @@ bool generate_function_def(ast_node_t current_node) {
 	}
 
 	// Epilogue
-	if (!print_inst_0(INST_POPFRAME)) {
-		return false;
-	}
-
-	if (!print_inst_0(INST_RETURN)) {
-		return false;
-	}
+	print_inst_0(INST_POPFRAME);
+	print_inst_0(INST_RETURN);
 
 	putc('\n', code_generator.output_file);
 
@@ -237,21 +222,14 @@ bool generate_prologue(ast_node_t root) {
 							  .value = {.label_name = pref_main_label}};
 
 	// call main function
-	if (!print_inst_1(INST_CALL, call_operand)) {
-		free(pref_main_label);
-		return false;
-	}
+	print_inst_1(INST_CALL, call_operand);
+	free(pref_main_label);
 
 	operand_t exit_operand = {
 		.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 0}};
 
 	// exit program with return code 0
-	if (!print_inst_1(INST_EXIT, exit_operand)) {
-		free(pref_main_label);
-		return false;
-	}
-
-	free(pref_main_label);
+	print_inst_1(INST_EXIT, exit_operand);
 
 	fputc('\n', code_generator.output_file);
 
