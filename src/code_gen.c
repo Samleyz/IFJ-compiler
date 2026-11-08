@@ -102,8 +102,44 @@ static void generate_builtin_strlength(void) {
 	generate_function_epilogue();
 }
 
+// Tool: Gemini
+// Built-in print function code generation implemented with AI assistance.
+// Prompt: Implement generate_builtin_print function emitting IFJcode26 for print.
+// Note: Generated WRITE instructions and Unit () handling verified against IFJ26 specification.
 static void generate_builtin_print(void) {
-	// TODO
+	generate_function_prologue("$$print");
+
+	operand_t value_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "value"}};
+	operand_t nil_operand = {
+		.operand_type = OP_TYPE_NIL, .frame = FT_NO_FRAME, .value = {0}};
+	operand_t unit_string = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = "()"}};
+
+	operand_t unit_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$print$unit"}};
+	operand_t end_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$print$end"}};
+
+	print_inst_1(INST_DEFVAR, value_operand);
+	print_inst_1(INST_POPS, value_operand);
+
+	// If value is nil (Unit), print "()"
+	print_inst_3(INST_JUMPIFEQ, unit_label, value_operand, nil_operand);
+
+	// Otherwise print standard value directly via WRITE
+	print_inst_1(INST_WRITE, value_operand);
+	print_inst_1(INST_JUMP, end_label);
+
+	// Unit branch
+	print_inst_1(INST_LABEL, unit_label);
+	print_inst_1(INST_WRITE, unit_string);
+
+	// Epilogue & return Unit (nil)
+	print_inst_1(INST_LABEL, end_label);
+	print_inst_1(INST_PUSHS, nil_operand);
+
+	generate_function_epilogue();
 }
 
 // Tool: Gemini
