@@ -254,8 +254,99 @@ static void generate_builtin_readBoolean(void) {
 	generate_function_epilogue();
 }
 
+// Tool: Gemini
+// Built-in toStr function code generation implemented with AI assistance.
+// Prompt: Implement generate_builtin_toStr function emitting IFJcode26 for toStr.
+// Note: Generated TYPE inspection and conversion branches for int, float, bool, nil, and string verified against IFJ26 specification.
 static void generate_builtin_toStr(void) {
-	// TODO
+	generate_function_prologue("$$toStr");
+
+	operand_t value_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "value"}};
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
+	operand_t type_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "type"}};
+
+	operand_t type_int_operand = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = "int"}};
+	operand_t type_float_operand = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = "float"}};
+	operand_t type_bool_operand = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = "bool"}};
+	operand_t type_nil_operand = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = "nil"}};
+
+	operand_t unit_str_operand = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = "()"}};
+	operand_t str_true_operand = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = "true"}};
+	operand_t str_false_operand = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = "false"}};
+
+	operand_t true_operand = {
+		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
+
+	operand_t int_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$toStr$int"}};
+	operand_t float_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$toStr$float"}};
+	operand_t bool_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$toStr$bool"}};
+	operand_t bool_true_label = {
+		.operand_type = OP_TYPE_LABEL,
+		.frame = FT_NO_FRAME,
+		.value = {.label_name = "$toStr$bool_true"}};
+	operand_t nil_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$toStr$nil"}};
+	operand_t end_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$toStr$end"}};
+
+	print_inst_1(INST_DEFVAR, value_operand);
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_1(INST_DEFVAR, type_operand);
+	print_inst_1(INST_POPS, value_operand);
+
+	// Inspect dynamic type of argument
+	print_inst_2(INST_TYPE, type_operand, value_operand);
+
+	print_inst_3(INST_JUMPIFEQ, int_label, type_operand, type_int_operand);
+	print_inst_3(INST_JUMPIFEQ, float_label, type_operand, type_float_operand);
+	print_inst_3(INST_JUMPIFEQ, bool_label, type_operand, type_bool_operand);
+	print_inst_3(INST_JUMPIFEQ, nil_label, type_operand, type_nil_operand);
+
+	// String / default branch: copy directly
+	print_inst_2(INST_MOVE, result_operand, value_operand);
+	print_inst_1(INST_JUMP, end_label);
+
+	// Int branch
+	print_inst_1(INST_LABEL, int_label);
+	print_inst_2(INST_INT2STR, result_operand, value_operand);
+	print_inst_1(INST_JUMP, end_label);
+
+	// Float branch
+	print_inst_1(INST_LABEL, float_label);
+	print_inst_2(INST_FLOAT2STR, result_operand, value_operand);
+	print_inst_1(INST_JUMP, end_label);
+
+	// Bool branch
+	print_inst_1(INST_LABEL, bool_label);
+	print_inst_3(INST_JUMPIFEQ, bool_true_label, value_operand, true_operand);
+	print_inst_2(INST_MOVE, result_operand, str_false_operand);
+	print_inst_1(INST_JUMP, end_label);
+	print_inst_1(INST_LABEL, bool_true_label);
+	print_inst_2(INST_MOVE, result_operand, str_true_operand);
+	print_inst_1(INST_JUMP, end_label);
+
+	// Nil / Unit branch
+	print_inst_1(INST_LABEL, nil_label);
+	print_inst_2(INST_MOVE, result_operand, unit_str_operand);
+
+	// Normal return
+	print_inst_1(INST_LABEL, end_label);
+	print_inst_1(INST_PUSHS, result_operand);
+
+	generate_function_epilogue();
 }
 
 static void generate_builtin_toInt(void) {
