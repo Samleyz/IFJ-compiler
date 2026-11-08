@@ -17,10 +17,13 @@ typedef struct stack_item *stack_item_t;
 
 /**
  * @brief Initialises the stack
+ * @param dstr_data_cb callback function for destroying stored data
+ * @note call: stack_init(free) - storing data on heap
+ * @note call: stack_init(NULL) - otherwise
  * @return pointer to initialised stack
  * @return nullptr init failed
  */
-stack_t stack_init(void);
+stack_t stack_init(void (*dstr_data_cb)(void *));
 
 /**
  * @brief Checks if the stack is empty
