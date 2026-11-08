@@ -60,10 +60,8 @@ static bool generate_reverse_paramlists(ast_node_t param_list);
 
 /**
  * @brief Generates definitions of IFJcode26 built-in functions
- *
- * @return true on success, false otherwise
  */
-static bool generate_builtins_definitions(void);
+static void generate_builtins_definitions(void);
 
 void code_gen_setup(FILE *output_file) {
 	instruction_set_init(output_file);
@@ -71,77 +69,93 @@ void code_gen_setup(FILE *output_file) {
 	code_generator.output_file = output_file;
 }
 
-static bool generate_builtin_strlength(void) {
-	// TODO
-	return true;
+static void generate_builtin_strlength(void) {
+	operand_t label_operand = {.operand_type = OP_TYPE_LABEL,
+							   .frame = FT_NO_FRAME,
+							   .value = {.label_name = "$$strLength"}};
+	print_inst_1(INST_LABEL, label_operand);
+	print_inst_0(INST_CREATEFRAME);
+	print_inst_0(INST_PUSHFRAME);
+
+	operand_t param_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "$$string"}};
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "$$result"}};
+
+	print_inst_1(INST_DEFVAR, param_operand);
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_1(INST_POPS, param_operand);
+
+	print_inst_2(INST_STRLEN, result_operand, param_operand);
+
+	print_inst_1(INST_PUSHS, result_operand);
+
+	print_inst_0(INST_POPFRAME);
+
+	print_inst_0(INST_RETURN);
+
+	putc('\n', code_generator.output_file);
 }
 
-static bool generate_builtin_print(void) {
+static void generate_builtin_print(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtin_readLine(void) {
+static void generate_builtin_readLine(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtin_readInt(void) {
+static void generate_builtin_readInt(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtin_readDouble(void) {
+static void generate_builtin_readDouble(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtin_readBoolean(void) {
+static void generate_builtin_readBoolean(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtin_toStr(void) {
+static void generate_builtin_toStr(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtin_toInt(void) {
+static void generate_builtin_toInt(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtin_subStr(void) {
+static void generate_builtin_subStr(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtin_ord(void) {
+static void generate_builtin_ord(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtin_chr(void) {
+static void generate_builtin_chr(void) {
 	// TODO
-	return true;
 }
 
-static bool generate_builtins_definitions(void) {
-	return (bool)(generate_builtin_strlength() && generate_builtin_print() &&
-				  generate_builtin_readLine() && generate_builtin_readInt() &&
-				  generate_builtin_readDouble() && generate_builtin_readBoolean() &&
-				  generate_builtin_toStr() && generate_builtin_toInt() &&
-				  generate_builtin_subStr() && generate_builtin_ord() &&
-				  generate_builtin_chr());
+static void generate_builtins_definitions(void) {
+	generate_builtin_strlength();
+	generate_builtin_print();
+	generate_builtin_readLine();
+	generate_builtin_readInt();
+	generate_builtin_readDouble();
+	generate_builtin_readBoolean();
+	generate_builtin_toStr();
+	generate_builtin_toInt();
+	generate_builtin_subStr();
+	generate_builtin_ord();
+	generate_builtin_chr();
 }
 
 bool generate_program(ast_node_t root) {
 	if (!generate_prologue(root)) {
 		return false;
 	}
-	if (!generate_builtins_definitions()) {
-		return false;
-	}
+	generate_builtins_definitions();
 
 	ast_node_t current_node = root->as.program.items.head;
 	while (current_node) { // cycle over all items in the program
