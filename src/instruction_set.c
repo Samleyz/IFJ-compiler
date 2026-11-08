@@ -64,6 +64,7 @@ static const inst_info_t instruction_table[] = {
 	[INST_INT2STR] = {"INT2STR", 2},
 	[INST_READ] = {"READ", 2},
 	[INST_STRLEN] = {"STRLEN", 2},
+	[INST_TYPE] = {"TYPE", 2},
 
 	// Arity 3
 	[INST_ADD] = {"ADD", 3},

@@ -87,6 +87,7 @@ typedef enum instruction_type {
 	INST_CONCAT,
 	INST_STRLEN,
 	INST_GETCHAR,
+	INST_TYPE,
 	INST_LABEL,
 	INST_JUMP,
 	INST_JUMPIFEQ,
