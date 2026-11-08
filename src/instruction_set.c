@@ -100,6 +100,8 @@ static void print_operand(operand_t operand) {
 		case FT_TEMP:
 			fprintf(output_file, "TF@%s", operand.value.var_name);
 			break;
+		case FT_NO_FRAME:
+			break;
 		}
 		break;
 

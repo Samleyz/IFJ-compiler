@@ -15,9 +15,10 @@
  * @brief Memory frame types supported in IFJcode26
  */
 typedef enum {
-	FT_GLOBAL, /**< Global frame (GF@) */
-	FT_LOCAL,  /**< Local frame (LF@) */
-	FT_TEMP,   /**< Temporary frame (TF@) */
+	FT_NO_FRAME, /**< No frame (for literals and labels) */
+	FT_GLOBAL,	 /**< Global frame (GF@) */
+	FT_LOCAL,	 /**< Local frame (LF@) */
+	FT_TEMP,	 /**< Temporary frame (TF@) */
 } frame_type_t;
 
 /**
