@@ -37,7 +37,7 @@ bool lexer_init(FILE *source) {
 
 	bool init_status = true;
 	init_status =
-		init_status && (lexer_state.indent_stack = stack_init()) && // Stack init
+		init_status && (lexer_state.indent_stack = stack_init(NULL)) && // Stack init
 		stack_push(lexer_state.indent_stack, (size_t)0); // Set initial indent level to be zero
 
 	init_status =
