@@ -70,9 +70,8 @@ void code_gen_setup(FILE *output_file) {
 }
 
 static void generate_function_prologue(const char *label_name) {
-	operand_t label = {.operand_type = OP_TYPE_LABEL,
-					   .frame = FT_NO_FRAME,
-					   .value = {.label_name = label_name}};
+	operand_t label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = label_name}};
 	print_inst_1(INST_LABEL, label);
 	print_inst_0(INST_CREATEFRAME);
 	print_inst_0(INST_PUSHFRAME);
@@ -107,8 +106,32 @@ static void generate_builtin_print(void) {
 	// TODO
 }
 
+// Tool: Gemini
+// Built-in readLine function code generation implemented with AI assistance.
+// Prompt: Implement generate_builtin_readLine function emitting IFJcode26 for readLine.
+// Note: Generated instructions and EOF handling verified against IFJ26 specification.
 static void generate_builtin_readLine(void) {
-	// TODO
+	generate_function_prologue("$$readLine");
+
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
+	operand_t type_operand = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "string"}};
+	operand_t nil_operand = {.operand_type = OP_TYPE_NIL, .frame = FT_NO_FRAME, .value = {0}};
+	operand_t ok_label = {.operand_type = OP_TYPE_LABEL,
+						  .frame = FT_NO_FRAME,
+						  .value = {.label_name = "$readLine$ok"}};
+	operand_t empty_string = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = ""}};
+
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_2(INST_READ, result_operand, type_operand);
+	print_inst_3(INST_JUMPIFNEQ, ok_label, result_operand, nil_operand);
+	print_inst_2(INST_MOVE, result_operand, empty_string);
+	print_inst_1(INST_LABEL, ok_label);
+	print_inst_1(INST_PUSHS, result_operand);
+
+	generate_function_epilogue();
 }
 
 static void generate_builtin_readInt(void) {
@@ -291,7 +314,7 @@ bool generate_function_def(ast_node_t current_node) {
 	return true;
 }
 
-bool generate_prologue(ast_node_t root) {
+static bool generate_prologue(ast_node_t root) {
 	fprintf(code_generator.output_file, ".IFJcode26\n\n");
 
 	// find the @main entry function
