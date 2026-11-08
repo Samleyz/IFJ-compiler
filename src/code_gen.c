@@ -69,13 +69,23 @@ void code_gen_setup(FILE *output_file) {
 	code_generator.output_file = output_file;
 }
 
-static void generate_builtin_strlength(void) {
-	operand_t label_operand = {.operand_type = OP_TYPE_LABEL,
-							   .frame = FT_NO_FRAME,
-							   .value = {.label_name = "$$strLength"}};
-	print_inst_1(INST_LABEL, label_operand);
+static void generate_function_prologue(const char *label_name) {
+	operand_t label = {.operand_type = OP_TYPE_LABEL,
+					   .frame = FT_NO_FRAME,
+					   .value = {.label_name = label_name}};
+	print_inst_1(INST_LABEL, label);
 	print_inst_0(INST_CREATEFRAME);
 	print_inst_0(INST_PUSHFRAME);
+}
+
+static void generate_function_epilogue(void) {
+	print_inst_0(INST_POPFRAME);
+	print_inst_0(INST_RETURN);
+	putc('\n', code_generator.output_file);
+}
+
+static void generate_builtin_strlength(void) {
+	generate_function_prologue("$$strLength");
 
 	operand_t param_operand = {
 		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "string"}};
@@ -90,11 +100,7 @@ static void generate_builtin_strlength(void) {
 
 	print_inst_1(INST_PUSHS, result_operand);
 
-	print_inst_0(INST_POPFRAME);
-
-	print_inst_0(INST_RETURN);
-
-	putc('\n', code_generator.output_file);
+	generate_function_epilogue();
 }
 
 static void generate_builtin_print(void) {
@@ -122,11 +128,7 @@ static void generate_builtin_toStr(void) {
 }
 
 static void generate_builtin_toInt(void) {
-	operand_t label_operand = {
-		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$$toInt"}};
-	print_inst_1(INST_LABEL, label_operand);
-	print_inst_0(INST_CREATEFRAME);
-	print_inst_0(INST_PUSHFRAME);
+	generate_function_prologue("$$toInt");
 
 	operand_t param_operand = {
 		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "double_num"}};
@@ -141,11 +143,7 @@ static void generate_builtin_toInt(void) {
 
 	print_inst_1(INST_PUSHS, result_operand);
 
-	print_inst_0(INST_POPFRAME);
-
-	print_inst_0(INST_RETURN);
-
-	putc('\n', code_generator.output_file);
+	generate_function_epilogue();
 }
 
 static void generate_builtin_subStr(void) {
@@ -157,7 +155,22 @@ static void generate_builtin_ord(void) {
 }
 
 static void generate_builtin_chr(void) {
-	// TODO
+	generate_function_prologue("$$chr");
+
+	operand_t param_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "int_num"}};
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
+
+	print_inst_1(INST_DEFVAR, param_operand);
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_1(INST_POPS, param_operand);
+
+	print_inst_2(INST_INT2CHAR, result_operand, param_operand);
+
+	print_inst_1(INST_PUSHS, result_operand);
+
+	generate_function_epilogue();
 }
 
 static void generate_builtins_definitions(void) {
@@ -254,15 +267,8 @@ bool generate_function_def(ast_node_t current_node) {
 		return false;
 	}
 
-	operand_t label_operand = {.operand_type = OP_TYPE_LABEL,
-							   .frame = FT_NO_FRAME,
-							   .value = {.label_name = function_name}};
-	print_inst_1(INST_LABEL, label_operand);
+	generate_function_prologue(function_name);
 	free(function_name);
-
-	// Frame setup
-	print_inst_0(INST_CREATEFRAME);
-	print_inst_0(INST_PUSHFRAME);
 
 	// Retrieve arguments from stack into local variables
 	if (current_node->as.func_def.has_parens) {
@@ -280,10 +286,7 @@ bool generate_function_def(ast_node_t current_node) {
 	}
 
 	// Epilogue
-	print_inst_0(INST_POPFRAME);
-	print_inst_0(INST_RETURN);
-
-	putc('\n', code_generator.output_file);
+	generate_function_epilogue();
 
 	return true;
 }
