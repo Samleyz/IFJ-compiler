@@ -162,8 +162,32 @@ static void generate_builtin_readInt(void) {
 	generate_function_epilogue();
 }
 
+// Tool: Gemini
+// Built-in readDouble function code generation implemented with AI assistance.
+// Prompt: Implement generate_builtin_readDouble function emitting IFJcode26 for readDouble.
+// Note: Generated instructions and EOF/error fallback to 0.0 verified against IFJ26 specification.
 static void generate_builtin_readDouble(void) {
-	// TODO
+	generate_function_prologue("$$readDouble");
+
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
+	operand_t type_operand = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "float"}};
+	operand_t nil_operand = {
+		.operand_type = OP_TYPE_NIL, .frame = FT_NO_FRAME, .value = {0}};
+	operand_t ok_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$readDouble$ok"}};
+	operand_t zero_operand = {
+		.operand_type = OP_TYPE_FLOAT, .frame = FT_NO_FRAME, .value = {.double_val = 0.0}};
+
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_2(INST_READ, result_operand, type_operand);
+	print_inst_3(INST_JUMPIFNEQ, ok_label, result_operand, nil_operand);
+	print_inst_2(INST_MOVE, result_operand, zero_operand);
+	print_inst_1(INST_LABEL, ok_label);
+	print_inst_1(INST_PUSHS, result_operand);
+
+	generate_function_epilogue();
 }
 
 static void generate_builtin_readBoolean(void) {
