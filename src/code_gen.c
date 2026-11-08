@@ -78,9 +78,9 @@ static void generate_builtin_strlength(void) {
 	print_inst_0(INST_PUSHFRAME);
 
 	operand_t param_operand = {
-		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "$$string"}};
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "string"}};
 	operand_t result_operand = {
-		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "$$result"}};
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
 
 	print_inst_1(INST_DEFVAR, param_operand);
 	print_inst_1(INST_DEFVAR, result_operand);
@@ -122,7 +122,30 @@ static void generate_builtin_toStr(void) {
 }
 
 static void generate_builtin_toInt(void) {
-	// TODO
+	operand_t label_operand = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$$toInt"}};
+	print_inst_1(INST_LABEL, label_operand);
+	print_inst_0(INST_CREATEFRAME);
+	print_inst_0(INST_PUSHFRAME);
+
+	operand_t param_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "double_num"}};
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
+
+	print_inst_1(INST_DEFVAR, param_operand);
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_1(INST_POPS, param_operand);
+
+	print_inst_2(INST_FLOAT2INT, result_operand, param_operand);
+
+	print_inst_1(INST_PUSHS, result_operand);
+
+	print_inst_0(INST_POPFRAME);
+
+	print_inst_0(INST_RETURN);
+
+	putc('\n', code_generator.output_file);
 }
 
 static void generate_builtin_subStr(void) {
