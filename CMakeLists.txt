@@ -22,8 +22,27 @@ if(BUILD_TESTING)
 		FetchContent_MakeAvailable(googletest)
 	endif()
 
-	add_executable(
-		lexer_tests
+	function(add_unit_test target)
+		add_executable(${target} ${ARGN})
+		target_include_directories(${target} PRIVATE src)
+		target_link_libraries(${target} PRIVATE GTest::gtest_main)
+		add_test(NAME ${target} COMMAND ${target})
+	endfunction()
+
+	add_unit_test(dynamic_string_tests
+		tests/dynamic_string_tests.cpp
+		src/dynamic_string.c
+	)
+	add_unit_test(hashtable_tests
+		tests/hashtable_tests.cpp
+		src/hashtable.c
+	)
+	add_unit_test(stack_tests
+		tests/stack_tests.cpp
+		src/stack.c
+		src/error.c
+	)
+	add_unit_test(lexer_tests
 		tests/lexer_tests.cpp
 		src/dynamic_string.c
 		src/error.c
@@ -32,8 +51,4 @@ if(BUILD_TESTING)
 		src/stack.c
 		src/token.c
 	)
-	target_include_directories(lexer_tests PRIVATE src)
-	target_link_libraries(lexer_tests PRIVATE GTest::gtest_main)
-
-	add_test(NAME lexer_tests COMMAND lexer_tests)
 endif()
