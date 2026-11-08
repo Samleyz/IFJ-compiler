@@ -9,6 +9,7 @@
 #define INSTRUCTION_SET_H
 
 #include <stdint.h>
+#include <stdio.h>
 
 /**
  * @brief Memory frame types supported in IFJcode26
@@ -111,6 +112,13 @@ typedef struct operand {
 	frame_type_t frame;			 /**< Memory frame */
 	value_t value;
 } operand_t;
+
+/**
+ * @brief Set the instruction set output_file
+ *
+ * @param[in] output_file output file to be set
+ */
+void instruction_set_init(FILE *out_file);
 
 /**
  * @brief Creates an instruction operand structure

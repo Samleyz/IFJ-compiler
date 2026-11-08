@@ -15,6 +15,8 @@ typedef struct {
 
 static void print_operand(operand_t operand);
 
+static FILE *output_file;
+
 static const inst_info_t instruction_table[] = {
 	// Arity 0
 	[INST_CREATEFRAME] = {"CREATEFRAME", 0},
@@ -81,6 +83,8 @@ static const inst_info_t instruction_table[] = {
 	[INST_JUMPIFNEQ] = {"JUMPIFNEQ", 3},
 };
 
+void instruction_set_init(FILE *out_file) { output_file = out_file ? out_file : stdout; }
+
 static void print_operand(operand_t operand) {
 	switch (operand.operand_type) {
 
@@ -88,50 +92,50 @@ static void print_operand(operand_t operand) {
 		switch (operand.frame) { // prints the right frame
 
 		case FT_GLOBAL:
-			printf("GF@%s", operand.value.var_name);
+			fprintf(output_file, "GF@%s", operand.value.var_name);
 			break;
 		case FT_LOCAL:
-			printf("LF@%s", operand.value.var_name);
+			fprintf(output_file, "LF@%s", operand.value.var_name);
 			break;
 		case FT_TEMP:
-			printf("TF@%s", operand.value.var_name);
+			fprintf(output_file, "TF@%s", operand.value.var_name);
 			break;
 		}
 		break;
 
 	case OP_TYPE_INT: // print int literal operand
-		printf("int@%d", operand.value.int_val);
+		fprintf(output_file, "int@%d", operand.value.int_val);
 		break;
 
 	case OP_TYPE_FLOAT: // print float literal operand
-		printf("float@%a", operand.value.double_val);
+		fprintf(output_file, "float@%a", operand.value.double_val);
 		break;
 
 	case OP_TYPE_STRING: // print string literal operand
-		printf("string@");
+		fprintf(output_file, "string@");
 
 		for (int i = 0; operand.value.string_val[i] != '\0'; i++) {
 			unsigned char character = operand.value.string_val[i];
 
 			if (character <= ' ' || character == '#' ||
 				character == '\\') { // if the character has to be escaped
-				printf("\\%03d", character);
+				fprintf(output_file, "\\%03d", character);
 			} else {
-				putc(character, stdout);
+				putc(character, output_file);
 			}
 		}
 		break;
 
 	case OP_TYPE_BOOL: // print bool literal operand
-		printf("bool@%s", (int)operand.value.bool_val ? "true" : "false");
+		fprintf(output_file, "bool@%s", (int)operand.value.bool_val ? "true" : "false");
 		break;
 
 	case OP_TYPE_LABEL: // print label operand
-		printf("%s", operand.value.label_name);
+		fprintf(output_file, "%s", operand.value.label_name);
 		break;
 
 	case OP_TYPE_NIL: // print nil operand
-		printf("nil@nil");
+		fprintf(output_file, "nil@nil");
 		break;
 	}
 }
@@ -150,8 +154,8 @@ bool print_inst_0(instruction_t instruction_type) {
 		return false;
 	}
 
-	printf("%s", instruction_table[instruction_type].name);
-	fputc('\n', stdout);
+	fprintf(output_file, "%s", instruction_table[instruction_type].name);
+	fputc('\n', output_file);
 
 	return true;
 }
@@ -161,11 +165,11 @@ bool print_inst_1(instruction_t instruction_type, operand_t operand) {
 		return false;
 	}
 
-	printf("%s", instruction_table[instruction_type].name);
-	fputc(' ', stdout);
+	fprintf(output_file, "%s", instruction_table[instruction_type].name);
+	fputc(' ', output_file);
 
 	print_operand(operand);
-	fputc('\n', stdout);
+	fputc('\n', output_file);
 
 	return true;
 }
@@ -175,13 +179,13 @@ bool print_inst_2(instruction_t instruction_type, operand_t operand_1, operand_t
 		return false;
 	}
 
-	printf("%s", instruction_table[instruction_type].name);
+	fprintf(output_file, "%s", instruction_table[instruction_type].name);
 
-	fputc(' ', stdout);
+	fputc(' ', output_file);
 	print_operand(operand_1);
-	fputc(' ', stdout);
+	fputc(' ', output_file);
 	print_operand(operand_2);
-	fputc('\n', stdout);
+	fputc('\n', output_file);
 
 	return true;
 }
@@ -192,15 +196,15 @@ bool print_inst_3(instruction_t instruction_type, operand_t operand_1, operand_t
 		return false;
 	}
 
-	printf("%s", instruction_table[instruction_type].name);
+	fprintf(output_file, "%s", instruction_table[instruction_type].name);
 
-	fputc(' ', stdout);
+	fputc(' ', output_file);
 	print_operand(operand_1);
-	fputc(' ', stdout);
+	fputc(' ', output_file);
 	print_operand(operand_2);
-	fputc(' ', stdout);
+	fputc(' ', output_file);
 	print_operand(operand_3);
-	fputc('\n', stdout);
+	fputc('\n', output_file);
 
 	return true;
 }
