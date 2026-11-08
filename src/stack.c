@@ -43,7 +43,7 @@ stack_t stack_init(void (*dstr_data_cb)(void *)) {
 
 bool stack_is_empty(stack_t stk) {
 	if (!stk) {
-		throw_err(ERR_INTERNAL, -1, "Called stack_is_empty on NULL");
+		throw_err(ERR_INTERNAL, 0, "Called stack_is_empty on NULL");
 	}
 	if (stk->top == NULL) {
 		return true;
@@ -53,7 +53,7 @@ bool stack_is_empty(stack_t stk) {
 
 bool stack_push(stack_t stk, void *data) {
 	if (!stk) {
-		throw_err(ERR_INTERNAL, -1, "Called stack_push on NULL");
+		throw_err(ERR_INTERNAL, 0, "Called stack_push on NULL");
 	}
 
 	stack_item_t item = s_item_ctor(); // initialising the stack item
@@ -69,17 +69,17 @@ bool stack_push(stack_t stk, void *data) {
 
 void *stack_top(stack_t stk) {
 	if (!stk) {
-		throw_err(ERR_INTERNAL, -1, "Called stack_top on NULL");
+		throw_err(ERR_INTERNAL, 0, "Called stack_top on NULL");
 	}
 	if (stack_is_empty(stk)) {
-		throw_err(ERR_INTERNAL, -1, "Called stack_top on empty stack");
+		throw_err(ERR_INTERNAL, 0, "Called stack_top on empty stack");
 	}
 	return stk->top->data;
 }
 
 bool stack_pop(stack_t stk) {
 	if (!stk) {
-		throw_err(ERR_INTERNAL, -1, "Called stack_pop on NULL");
+		throw_err(ERR_INTERNAL, 0, "Called stack_pop on NULL");
 	}
 	if (stack_is_empty(stk)) {
 		return false;
