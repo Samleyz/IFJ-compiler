@@ -8,7 +8,6 @@
 #ifndef INSTRUCTION_SET_H
 #define INSTRUCTION_SET_H
 
-#include "token.h"
 #include <stdint.h>
 
 /**
@@ -30,7 +29,7 @@ typedef enum operand_type {
 	OP_TYPE_STRING, /**< String literal */
 	OP_TYPE_BOOL,	/**< Boolean literal */
 	OP_TYPE_LABEL,	/**< Jump or call target label */
-	OP_NIL,			/**< Nil constant */
+	OP_TYPE_NIL,	/**< Nil constant */
 } operand_type_t;
 
 /**

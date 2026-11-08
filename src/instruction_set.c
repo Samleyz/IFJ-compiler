@@ -13,7 +13,7 @@ typedef struct {
 	int arity;
 } inst_info_t;
 
-static bool print_operand(operand_t operand);
+static void print_operand(operand_t operand);
 
 static const inst_info_t instruction_table[] = {
 	// Arity 0
@@ -81,13 +81,63 @@ static const inst_info_t instruction_table[] = {
 	[INST_JUMPIFNEQ] = {"JUMPIFNEQ", 3},
 };
 
-static bool print_operand(operand_t operand) {
-	// TODO
-	return true;
+static void print_operand(operand_t operand) {
+	switch (operand.operand_type) {
+
+	case OP_TYPE_VAR:			 // print variable operand
+		switch (operand.frame) { // prints the right frame
+
+		case FT_GLOBAL:
+			printf("GF@%s", operand.value.var_name);
+			break;
+		case FT_LOCAL:
+			printf("LF@%s", operand.value.var_name);
+			break;
+		case FT_TEMP:
+			printf("TF@%s", operand.value.var_name);
+			break;
+		}
+		break;
+
+	case OP_TYPE_INT: // print int literal operand
+		printf("int@%d", operand.value.int_val);
+		break;
+
+	case OP_TYPE_FLOAT: // print float literal operand
+		printf("float@%a", operand.value.double_val);
+		break;
+
+	case OP_TYPE_STRING: // print string literal operand
+		printf("string@");
+
+		for (int i = 0; operand.value.string_val[i] != '\0'; i++) {
+			unsigned char character = operand.value.string_val[i];
+
+			if (character <= ' ' || character == '#' ||
+				character == '\\') { // if the character has to be escaped
+				printf("\\%03d", character);
+			} else {
+				putc(character, stdout);
+			}
+		}
+		break;
+
+	case OP_TYPE_BOOL: // print bool literal operand
+		printf("bool@%s", (int)operand.value.bool_val ? "true" : "false");
+		break;
+
+	case OP_TYPE_LABEL: // print label operand
+		printf("%s", operand.value.label_name);
+		break;
+
+	case OP_TYPE_NIL: // print nil operand
+		printf("nil@nil");
+		break;
+	}
 }
 
 operand_t create_operand(operand_type_t operand_type, value_t value, frame_type_t frame) {
-	operand_t operand; // Fill in the operand structure
+	operand_t operand;
 	operand.operand_type = operand_type;
 	operand.value = value;
 	operand.frame = frame;
