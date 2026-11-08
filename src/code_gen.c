@@ -190,8 +190,32 @@ static void generate_builtin_readDouble(void) {
 	generate_function_epilogue();
 }
 
+// Tool: Gemini
+// Built-in readBoolean function code generation implemented with AI assistance.
+// Prompt: Implement generate_builtin_readBoolean function emitting IFJcode26 for readBoolean.
+// Note: Generated instructions and EOF/error fallback to false verified against IFJ26 specification.
 static void generate_builtin_readBoolean(void) {
-	// TODO
+	generate_function_prologue("$$readBoolean");
+
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
+	operand_t type_operand = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "bool"}};
+	operand_t nil_operand = {
+		.operand_type = OP_TYPE_NIL, .frame = FT_NO_FRAME, .value = {0}};
+	operand_t ok_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$readBoolean$ok"}};
+	operand_t false_operand = {
+		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = false}};
+
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_2(INST_READ, result_operand, type_operand);
+	print_inst_3(INST_JUMPIFNEQ, ok_label, result_operand, nil_operand);
+	print_inst_2(INST_MOVE, result_operand, false_operand);
+	print_inst_1(INST_LABEL, ok_label);
+	print_inst_1(INST_PUSHS, result_operand);
+
+	generate_function_epilogue();
 }
 
 static void generate_builtin_toStr(void) {
@@ -221,8 +245,64 @@ static void generate_builtin_subStr(void) {
 	// TODO
 }
 
+// Tool: Gemini
+// Built-in ord function code generation implemented with AI assistance.
+// Prompt: Implement generate_builtin_ord function emitting IFJcode26 for ord.
+// Note: Generated bounds checks (0 <= index < length) and STRI2INT verified against IFJ26 specification.
 static void generate_builtin_ord(void) {
-	// TODO
+	generate_function_prologue("$$ord");
+
+	operand_t index_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "index"}};
+	operand_t string_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "string"}};
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
+	operand_t cond_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "cond"}};
+	operand_t len_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "len"}};
+
+	operand_t neg_one_operand = {
+		.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = -1}};
+	operand_t zero_operand = {
+		.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 0}};
+	operand_t true_operand = {
+		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
+	operand_t false_operand = {
+		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = false}};
+	operand_t end_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$ord$end"}};
+
+	print_inst_1(INST_DEFVAR, index_operand);
+	print_inst_1(INST_DEFVAR, string_operand);
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_1(INST_DEFVAR, cond_operand);
+	print_inst_1(INST_DEFVAR, len_operand);
+
+	// Arguments are popped in LIFO order (index was pushed last)
+	print_inst_1(INST_POPS, index_operand);
+	print_inst_1(INST_POPS, string_operand);
+
+	// Default result is -1 for out-of-bounds or empty string
+	print_inst_2(INST_MOVE, result_operand, neg_one_operand);
+
+	// Check if index < 0
+	print_inst_3(INST_LT, cond_operand, index_operand, zero_operand);
+	print_inst_3(INST_JUMPIFEQ, end_label, cond_operand, true_operand);
+
+	// Check if index < length
+	print_inst_2(INST_STRLEN, len_operand, string_operand);
+	print_inst_3(INST_LT, cond_operand, index_operand, len_operand);
+	print_inst_3(INST_JUMPIFEQ, end_label, cond_operand, false_operand);
+
+	// Valid index: get ASCII value
+	print_inst_3(INST_STRI2INT, result_operand, string_operand, index_operand);
+
+	print_inst_1(INST_LABEL, end_label);
+	print_inst_1(INST_PUSHS, result_operand);
+
+	generate_function_epilogue();
 }
 
 static void generate_builtin_chr(void) {
