@@ -40,7 +40,7 @@ static bool generate_extension(ast_node_t current_node);
  * @param[in] current_node AST node of the function definition
  * @return true on success, false otherwise
  */
-static bool generate_function(ast_node_t current_node);
+static bool generate_function_def(ast_node_t current_node);
 
 /**
  * @brief Generates definitions of IFJcode26 built-in functions
@@ -55,12 +55,35 @@ void code_gen_setup(FILE *output_file) {
 	code_generator.output_file = output_file;
 }
 
+bool generate_builtins_definitions(void) {
+	// TODO: implement built-in functions
+	return true;
+}
+
 bool generate_program(ast_node_t root) {
 	if (!generate_prologue(root)) {
 		return false;
 	}
-	generate_builtins_definitions();
-	return false;
+	if (!generate_builtins_definitions()) {
+		return false;
+	}
+
+	ast_node_t current_node = root->as.program.items.head;
+	while (current_node) { // cycle over all items in the program
+		if (current_node->type == NODE_FUNC_DEF) {
+			if (!generate_function_def(current_node)) {
+				return false;
+			}
+		} else if (current_node->type == NODE_EXTENSION) {
+			if (!generate_extension(current_node)) {
+				return false;
+			}
+		}
+
+		current_node = current_node->next;
+	}
+
+	return true;
 }
 
 bool generate_extension(ast_node_t current_node) {
@@ -69,7 +92,7 @@ bool generate_extension(ast_node_t current_node) {
 	return false;
 }
 
-bool generate_function(ast_node_t current_node) {
+bool generate_function_def(ast_node_t current_node) {
 	// TODO
 	(void)current_node;
 	return false;
