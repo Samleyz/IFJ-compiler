@@ -1,6 +1,6 @@
 /**
  * @file parse_expr_private.h
- * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz) , Samuel Cehlarik (xcehlas00@vutbr.cz)
  * @brief Internal declarations for precedence syntactic analysis of expressions
  * @date 2026-10-22
  */
