@@ -241,8 +241,109 @@ static void generate_builtin_toInt(void) {
 	generate_function_epilogue();
 }
 
+// Tool: Gemini
+// Built-in subStr function code generation implemented with AI assistance.
+// Prompt: Implement generate_builtin_subStr function emitting IFJcode26 for subStr.
+// Note: Generated runtime error 40 checks and loop-based substring extraction verified against IFJ26 specification.
 static void generate_builtin_subStr(void) {
-	// TODO
+	generate_function_prologue("$$subStr");
+
+	operand_t end_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "end"}};
+	operand_t start_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "start"}};
+	operand_t string_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "string"}};
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
+	operand_t len_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "len"}};
+	operand_t cond_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "cond"}};
+	operand_t i_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "i"}};
+	operand_t char_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "char"}};
+
+	operand_t zero_operand = {
+		.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 0}};
+	operand_t one_operand = {
+		.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 1}};
+	operand_t err_code_operand = {
+		.operand_type = OP_TYPE_INT,
+		.frame = FT_NO_FRAME,
+		.value = {.int_val = ERR_RUNTIME_SEMANTICS}};
+	operand_t true_operand = {
+		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
+	operand_t false_operand = {
+		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = false}};
+	operand_t empty_string = {
+		.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = ""}};
+
+	operand_t err_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$subStr$err"}};
+	operand_t loop_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$subStr$loop"}};
+	operand_t end_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$subStr$end"}};
+
+	print_inst_1(INST_DEFVAR, end_operand);
+	print_inst_1(INST_DEFVAR, start_operand);
+	print_inst_1(INST_DEFVAR, string_operand);
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_1(INST_DEFVAR, len_operand);
+	print_inst_1(INST_DEFVAR, cond_operand);
+	print_inst_1(INST_DEFVAR, i_operand);
+	print_inst_1(INST_DEFVAR, char_operand);
+
+	// Arguments are popped in LIFO order (end, start, string)
+	print_inst_1(INST_POPS, end_operand);
+	print_inst_1(INST_POPS, start_operand);
+	print_inst_1(INST_POPS, string_operand);
+
+	// Check: start < 0
+	print_inst_3(INST_LT, cond_operand, start_operand, zero_operand);
+	print_inst_3(INST_JUMPIFEQ, err_label, cond_operand, true_operand);
+
+	// Check: end < 0
+	print_inst_3(INST_LT, cond_operand, end_operand, zero_operand);
+	print_inst_3(INST_JUMPIFEQ, err_label, cond_operand, true_operand);
+
+	// Check: start > end
+	print_inst_3(INST_GT, cond_operand, start_operand, end_operand);
+	print_inst_3(INST_JUMPIFEQ, err_label, cond_operand, true_operand);
+
+	// Check: start >= length (i.e. NOT start < length)
+	print_inst_2(INST_STRLEN, len_operand, string_operand);
+	print_inst_3(INST_LT, cond_operand, start_operand, len_operand);
+	print_inst_3(INST_JUMPIFEQ, err_label, cond_operand, false_operand);
+
+	// Check: end > length
+	print_inst_3(INST_GT, cond_operand, end_operand, len_operand);
+	print_inst_3(INST_JUMPIFEQ, err_label, cond_operand, true_operand);
+
+	// Extraction loop
+	print_inst_2(INST_MOVE, result_operand, empty_string);
+	print_inst_2(INST_MOVE, i_operand, start_operand);
+
+	print_inst_1(INST_LABEL, loop_label);
+	print_inst_3(INST_LT, cond_operand, i_operand, end_operand);
+	print_inst_3(INST_JUMPIFEQ, end_label, cond_operand, false_operand);
+
+	print_inst_3(INST_GETCHAR, char_operand, string_operand, i_operand);
+	print_inst_3(INST_CONCAT, result_operand, result_operand, char_operand);
+	print_inst_3(INST_ADD, i_operand, i_operand, one_operand);
+	print_inst_1(INST_JUMP, loop_label);
+
+	// Normal return
+	print_inst_1(INST_LABEL, end_label);
+	print_inst_1(INST_PUSHS, result_operand);
+	generate_function_epilogue();
+
+	// Error 40 exit path
+	print_inst_1(INST_LABEL, err_label);
+	print_inst_1(INST_EXIT, err_code_operand);
+	putc('\n', code_generator.output_file);
 }
 
 // Tool: Gemini

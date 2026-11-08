@@ -11,6 +11,8 @@
 #include "ast.h"
 #include <stdio.h>
 
+#define ERR_RUNTIME_SEMANTICS 40
+
 typedef struct code_generator {
 	FILE *output_file;
 	int label_counter;
