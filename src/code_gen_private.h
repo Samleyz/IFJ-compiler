@@ -9,21 +9,26 @@
 #define CODE_GEN_PRIVATE_H
 
 #include "ast.h"
+#include <stdio.h>
 
-void generate_prologue(void);
-
-bool generate_extension(ast_node_t current_node);
-
-bool generate_function(ast_node_t current_node);
+typedef struct code_generator {
+	FILE *output_file;
+	int label_counter;
+} code_gen_t;
 
 bool generate_expression(ast_node_t current_node);
 
 bool generate_statement(ast_node_t current_node);
 
-// TODO all other generate functions for expample for block, var_def, assign etc.
+/**
+ * @brief Creates a dynamically allocated string prefixed with given prefix
+ *
+ * @param[in] prefix Prefix string (e.g. "$$")
+ * @param[in] name Base identifier name
+ * @return Allocated string (caller is responsible for free()), or nullptr on error
+ */
+char *get_prefixed_name(const char *prefix, const char *name);
 
 bool get_unique_label();
-
-bool generate_builtin_function(ast_node_t current_node);
 
 #endif
