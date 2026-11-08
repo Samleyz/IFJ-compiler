@@ -63,7 +63,7 @@ static bool generate_reverse_paramlists(ast_node_t param_list);
  *
  * @return true on success, false otherwise
  */
-bool generate_builtins_definitions(void);
+static bool generate_builtins_definitions(void);
 
 void code_gen_setup(FILE *output_file) {
 	instruction_set_init(output_file);
@@ -71,9 +71,68 @@ void code_gen_setup(FILE *output_file) {
 	code_generator.output_file = output_file;
 }
 
-bool generate_builtins_definitions(void) {
-	// TODO: implement built-in functions
+static bool generate_builtin_strlength(void) {
+	// TODO
 	return true;
+}
+
+static bool generate_builtin_print(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtin_readLine(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtin_readInt(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtin_readDouble(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtin_readBoolean(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtin_toStr(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtin_toInt(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtin_subStr(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtin_ord(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtin_chr(void) {
+	// TODO
+	return true;
+}
+
+static bool generate_builtins_definitions(void) {
+	return (bool)(generate_builtin_strlength() && generate_builtin_print() &&
+				  generate_builtin_readLine() && generate_builtin_readInt() &&
+				  generate_builtin_readDouble() && generate_builtin_readBoolean() &&
+				  generate_builtin_toStr() && generate_builtin_toInt() &&
+				  generate_builtin_subStr() && generate_builtin_ord() &&
+				  generate_builtin_chr());
 }
 
 bool generate_program(ast_node_t root) {
