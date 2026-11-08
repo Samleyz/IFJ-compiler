@@ -87,9 +87,15 @@ bool generate_program(ast_node_t root) {
 }
 
 bool generate_extension(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
-	return false;
+	ast_node_t curr_node = current_node->as.extension.methods.head;
+	while (curr_node) { // cycle over all extension methods
+		if (!generate_function_def(curr_node)) {
+			return false;
+		}
+		curr_node = curr_node->next;
+	}
+
+	return true;
 }
 
 bool generate_function_def(ast_node_t current_node) {
