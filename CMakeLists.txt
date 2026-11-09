@@ -51,4 +51,30 @@ if(BUILD_TESTING)
 		src/stack.c
 		src/token.c
 	)
+	set(PARSE_EXPR_SOURCES
+		src/parse_expr.c
+		src/parser_helpers.c
+		src/ast.c
+		src/dynamic_string.c
+		src/error.c
+		src/lexer.c
+		src/lexer_helpers.c
+		src/stack.c
+		src/token.c
+	)
+	add_unit_test(parse_expr_table_tests
+		tests/parse_expr_table_tests.cpp
+		${PARSE_EXPR_SOURCES}
+		src/parser_grammar.c
+	)
+	add_unit_test(parse_expr_stack_tests
+		tests/parse_expr_stack_tests.cpp
+		${PARSE_EXPR_SOURCES}
+		src/parser_grammar.c
+	)
+	# parse_expr_tests does not link parser_grammar.c: it defines its own stand-in for the if rule.
+	add_unit_test(parse_expr_tests
+		tests/parse_expr_tests.cpp
+		${PARSE_EXPR_SOURCES}
+	)
 endif()
