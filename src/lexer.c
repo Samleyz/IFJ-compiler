@@ -50,6 +50,10 @@ bool lexer_init(FILE *source) {
 	init_status =
 		init_status && (lexer_state.dynamic_string = dstring_init()); // Dynamic string init
 
+	// Cleanup if init fails
+	if (!init_status) {
+		lexer_cleanup();
+	}
 	return init_status;
 }
 
