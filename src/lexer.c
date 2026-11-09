@@ -920,11 +920,8 @@ token lexer_get_token(void) {
 				if (c == '\n') {
 					lexer_state.line_num++;
 				}
-				// append
-				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
-					throw_err(ERR_INTERNAL, lexer_state.line_num,
-							  "failed to append char to dynamic string");
-				}
+				// unget
+				ungetc(c, lexer_state.source_file);
 			}
 			break;
 		case BLOCK_STRING_EX_2:
@@ -949,11 +946,8 @@ token lexer_get_token(void) {
 				if (c == '\n') {
 					lexer_state.line_num++;
 				}
-				// append
-				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
-					throw_err(ERR_INTERNAL, lexer_state.line_num,
-							  "failed to append char to dynamic string");
-				}
+				// unget
+				ungetc(c, lexer_state.source_file);
 			}
 			break;
 		case ALERT_ESC:
