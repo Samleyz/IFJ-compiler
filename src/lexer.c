@@ -49,6 +49,9 @@ bool lexer_init(FILE *source) {
 		stack_push(lexer_state.indent_stack, (size_t)0); // Set initial indent level to be zero
 
 	init_status =
+		init_status && (lexer_state.interpolateds_substate_stack = stack_init()); // Stack init
+
+	init_status =
 		init_status && (lexer_state.dynamic_string = dstring_init()); // Dynamic string init
 
 	// Cleanup if init fails
@@ -63,6 +66,8 @@ void lexer_cleanup(void) {
 	lexer_state.indent_stack = nullptr;
 	dstring_dtor(lexer_state.dynamic_string);
 	lexer_state.dynamic_string = nullptr;
+	stack_dtor(lexer_state.interpolateds_substate_stack);
+	lexer_state.interpolateds_substate_stack = nullptr;
 }
 
 token lexer_get_token(void) {
@@ -843,7 +848,7 @@ token lexer_get_token(void) {
 				lexer_state.fsm_state = BLOCK_STRING_EX_1;
 			} else if (c == EOF) {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated block string");
-			} else if (c == '$' && lexer_state.interpolateds_substate == 0) {
+			} else if (c == '$' && lexer_state.interpolateds_substate == 2) {
 				// move
 				lexer_state.fsm_state = DOLLAR;
 			} else {
@@ -1324,6 +1329,14 @@ token lexer_get_token(void) {
 			}
 			break;
 		case C_CURLY_BRACKET:
+			// pop interpolateds state
+			if (stack_is_empty(lexer_state.interpolateds_substate_stack)) {
+				throw_err(ERR_INTERNAL, lexer_state.line_num,
+						  "ending interpolated expression that didn't start");
+			}
+			lexer_state.interpolateds_substate =
+				(int)stack_top(lexer_state.interpolateds_substate_stack);
+			stack_pop(lexer_state.interpolateds_substate_stack);
 			// move
 			if (lexer_state.interpolateds_substate == 1) {
 				lexer_state.fsm_state = STRING;
@@ -1422,6 +1435,9 @@ token lexer_get_token(void) {
 				return (token){.type = TOKEN_STRING,
 							   .attribute = (token_attr_t){.string_val = str_val},
 							   .line_num = lexer_state.line_num};
+			} else {
+				throw_err(ERR_LEXICAL, lexer_state.line_num,
+						  "Invalid character after $ in interpolated string");
 			}
 			break;
 		case INTRPLTDS_IDENTIFIER:
@@ -1495,6 +1511,14 @@ token lexer_get_token(void) {
 			ungetc(c, lexer_state.source_file);
 			// move
 			lexer_state.fsm_state = START;
+			// push interpolateds state
+			if (!stack_push(lexer_state.interpolateds_substate_stack,
+							(void *)lexer_state.interpolateds_substate)) {
+				throw_err(ERR_INTERNAL, lexer_state.line_num,
+						  "failed to push interpolateds state to stack");
+			}
+			// reset interpolateds state for interpolated subexpression
+			lexer_state.interpolateds_substate = 0;
 			// send interpolated espression start
 			return (token){.type = TOKEN_INTRPLTDS_EXP_START,
 						   .attribute = (token_attr_t){},

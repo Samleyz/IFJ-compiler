@@ -116,6 +116,8 @@ typedef struct {
 									 interpolated string (1),
 									 interpolated block string (2) or in
 									 normal function (0) */
+	stack_t interpolateds_substate_stack; /**< Stack to store the interpolated substates in nested
+													  interpolated strings */
 
 	unsigned comment_start_line; /**< Line where the outermost block comment started */
 	unsigned string_start_line;	 /**< The line number where the string started */
