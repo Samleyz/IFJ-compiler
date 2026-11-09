@@ -112,10 +112,9 @@ typedef struct {
 									 line is lexical error */
 	int indentation_token_value;  /**< The value shows, how many indent or dedent tokens should be
 									 sent (-1 for dedent, 1 for indent)*/
-	int interpolateds_substate;	  /**< Stores substate flag, where is stored whether the lexer is in
-									 interpolated string (1),
-									 interpolated block string (2) or in
-									 normal function (0) */
+	size_t interpolateds_substate; /**< Stores substate flag, where is stored whether the lexer is
+								in interpolated string (1), interpolated block string (2) or in
+								normal function (0) */
 	stack_t interpolateds_substate_stack; /**< Stack to store the interpolated substates in nested
 													  interpolated strings */
 

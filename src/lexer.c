@@ -1329,7 +1329,7 @@ token lexer_get_token(void) {
 						  "ending interpolated expression that didn't start");
 			}
 			lexer_state.interpolateds_substate =
-				(int)stack_top(lexer_state.interpolateds_substate_stack);
+				(size_t)stack_top(lexer_state.interpolateds_substate_stack);
 			stack_pop(lexer_state.interpolateds_substate_stack);
 			// move
 			if (lexer_state.interpolateds_substate == 1) {
