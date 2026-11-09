@@ -8,4 +8,8 @@
 
 #include "code_gen_private.h"
 
-// TODO stmt generation
+bool generate_statements(ast_node_t current_node) {
+	(void)current_node;
+	// TODO stmt generation
+	return true;
+}

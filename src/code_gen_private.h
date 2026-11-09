@@ -18,9 +18,17 @@ typedef struct code_generator {
 	int label_counter;
 } code_gen_t;
 
+extern code_gen_t code_generator; // TODO: get rid of the gloab variable
+
+void generate_function_prologue(const char *label_name);
+
+void generate_function_epilogue(void);
+
+void generate_builtins_definitions(void);
+
 bool generate_expression(ast_node_t current_node);
 
-bool generate_statement(ast_node_t current_node);
+bool generate_statements(ast_node_t current_node);
 
 /**
  * @brief Creates a dynamically allocated string prefixed with given prefix
