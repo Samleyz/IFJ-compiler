@@ -1325,7 +1325,7 @@ token lexer_get_token(void) {
 		case C_CURLY_BRACKET:
 			// pop interpolateds state
 			if (stack_is_empty(lexer_state.interpolateds_substate_stack)) {
-				throw_err(ERR_INTERNAL, lexer_state.line_num,
+				throw_err(ERR_LEXICAL, lexer_state.line_num,
 						  "ending interpolated expression that didn't start");
 			}
 			lexer_state.interpolateds_substate =
