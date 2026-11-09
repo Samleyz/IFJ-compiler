@@ -831,7 +831,7 @@ token lexer_get_token(void) {
 				return (token){.type = TOKEN_STRING,
 							   .attribute = (token_attr_t){.string_val = str_val},
 							   .line_num = lexer_state.line_num};
-			} else if (lexer_state.interpolateds_substate == -1) { // if string token already sended
+			} else { // iterpolated string token already sended
 				// move
 				lexer_state.fsm_state = START;
 				// reset interpolateds flag
@@ -892,7 +892,7 @@ token lexer_get_token(void) {
 				return (token){.type = TOKEN_STRING,
 							   .attribute = (token_attr_t){.string_val = str_val},
 							   .line_num = lexer_state.string_start_line};
-			} else if (lexer_state.interpolateds_substate == -1) { // if string token already sended
+			} else { // interpolated string token already sended
 				// move
 				lexer_state.fsm_state = START;
 				// reset interpolateds flag
@@ -1355,20 +1355,43 @@ token lexer_get_token(void) {
 			} else if (isalpha(c) || isdigit(c)) {
 				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after string");
 			} else { // Empty string
+				// check invalid characters after string
+				if (isalpha(c) || isdigit(c)) {
+					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after string");
+				}
 				// unget
 				ungetc(c, lexer_state.source_file);
-				// move
-				lexer_state.fsm_state = START;
-				// send empty string
-				char *str_val = dstring_get_string(lexer_state.dynamic_string);
-				if (!str_val) {
-					throw_err(ERR_INTERNAL, lexer_state.line_num,
-							  "failed to get string from dynamic string");
+				// send correct token
+				if (lexer_state.interpolateds_substate != -1) {
+					// send empty string
+					if (lexer_state.interpolateds_substate == 1) { // if sending interpolated string
+						// store that it was sended
+						lexer_state.interpolateds_substate = -1;
+						// stay (for sending interpolateds end)
+					} else {
+						// move
+						lexer_state.fsm_state = START;
+					}
+					// return string token
+					char *str_val = dstring_get_string(lexer_state.dynamic_string);
+					if (!str_val) {
+						throw_err(ERR_INTERNAL, lexer_state.line_num,
+								  "failed to get string from dynamic string");
+					}
+					dstring_erase(lexer_state.dynamic_string);
+					return (token){.type = TOKEN_STRING,
+								   .attribute = (token_attr_t){.string_val = str_val},
+								   .line_num = lexer_state.line_num};
+				} else { // empty interpolated string token already sended
+					// move
+					lexer_state.fsm_state = START;
+					// reset interpolateds flag
+					lexer_state.interpolateds_substate = 0;
+					// send end of interpolateds
+					return (token){.type = TOKEN_INTRPLTDS_END,
+								   .attribute = (token_attr_t){},
+								   .line_num = lexer_state.line_num};
 				}
-				dstring_erase(lexer_state.dynamic_string);
-				return (token){.type = TOKEN_STRING,
-							   .attribute = (token_attr_t){.string_val = str_val},
-							   .line_num = lexer_state.line_num};
 			}
 			break;
 		case DOLLAR:
