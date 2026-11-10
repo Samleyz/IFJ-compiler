@@ -19,9 +19,9 @@
  * Keep this order in sync with the rows and columns in parse_expr.c.
  * END is the parser's pseudo-terminal ($), not a lexer token.
  *
- * LEFT_PAREN starts a grouped expression; CALL_OPEN starts a postfix function
- * call after an expression. Both are produced from TOKEN_LPAREN, distinguished
- * by whether the parser was expecting an operand.
+ * LEFT_PAREN is produced from TOKEN_LPAREN. Whether it starts a group or the
+ * argument list of a call depends on whether the parser expects an operand, and
+ * parse_expression decides that itself, so the table only knows grouping.
  */
 typedef enum {
 	EXPR_SYMBOL_END,
@@ -34,7 +34,6 @@ typedef enum {
 	EXPR_SYMBOL_PREFIX,
 	EXPR_SYMBOL_OPERAND,
 	EXPR_SYMBOL_LEFT_PAREN,
-	EXPR_SYMBOL_CALL_OPEN,
 	EXPR_SYMBOL_RIGHT_PAREN,
 	EXPR_SYMBOL_COUNT,
 	EXPR_SYMBOL_INVALID = EXPR_SYMBOL_COUNT

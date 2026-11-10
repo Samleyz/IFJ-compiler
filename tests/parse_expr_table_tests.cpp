@@ -1,8 +1,18 @@
+/**
+ * @file parse_expr_table_tests.cpp
+ * @author Claude Code (Claude Sonnet 5.5) and Samuel Cehlarik (xcehlas00@vutbr.cz)
+ * @brief AI GENERATED TESTS for the precedence table and the token mapping, HUMAN APPROVED
+ * (the first version of the tests was generated earlier with GitHub Copilot)
+ */
+
 #include <gtest/gtest.h>
 
+// stack.h declares "stack_t", which clashes with the POSIX type pulled in by gtest in C++.
+#define stack_t my_stack_t
 extern "C" {
 #include "parse_expr_private.h"
 }
+#undef stack_t
 
 namespace {
 
@@ -32,12 +42,16 @@ TEST(ExprSymbolMapping, DistinguishesPrefixAndBinaryPlusMinus) {
 	EXPECT_EQ(expr_symbol_from_token(&minus, false), EXPR_SYMBOL_ADDITIVE);
 }
 
-TEST(ExprSymbolMapping, DistinguishesGroupingAndCallParentheses) {
+TEST(ExprSymbolMapping, ClassifiesParentheses) {
 	token left_parenthesis{};
 	left_parenthesis.type = TOKEN_LPAREN;
+	token right_parenthesis{};
+	right_parenthesis.type = TOKEN_RPAREN;
 
+	// Whether "(" starts a group or a call is decided by parse_expression, not by the mapping.
 	EXPECT_EQ(expr_symbol_from_token(&left_parenthesis, true), EXPR_SYMBOL_LEFT_PAREN);
-	EXPECT_EQ(expr_symbol_from_token(&left_parenthesis, false), EXPR_SYMBOL_CALL_OPEN);
+	EXPECT_EQ(expr_symbol_from_token(&left_parenthesis, false), EXPR_SYMBOL_LEFT_PAREN);
+	EXPECT_EQ(expr_symbol_from_token(&right_parenthesis, false), EXPR_SYMBOL_RIGHT_PAREN);
 }
 
 TEST(ExprSymbolMapping, ClassifiesSelectedExtensionOperators) {
@@ -82,6 +96,18 @@ TEST(ExprPrecedenceTable, EncodesAssociativityAndNonAssociativity) {
 			  EXPR_RELATION_ERROR);
 }
 
+TEST(ExprPrecedenceTable, EndShiftsBinaryOperatorsAfterAReducedOperand) {
+	// "a + b": once "a" is reduced to a node, END is the nearest terminal again.
+	for (expr_symbol_t op : {EXPR_SYMBOL_OR, EXPR_SYMBOL_AND, EXPR_SYMBOL_EQUALITY,
+							 EXPR_SYMBOL_RELATIONAL, EXPR_SYMBOL_ADDITIVE,
+							 EXPR_SYMBOL_MULTIPLICATIVE}) {
+		EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_END, op), EXPR_RELATION_SHIFT);
+	}
+	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_END, EXPR_SYMBOL_END), EXPR_RELATION_MATCH);
+	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_END, EXPR_SYMBOL_RIGHT_PAREN),
+			  EXPR_RELATION_ERROR);
+}
+
 TEST(ExprPrecedenceTable, HandlesParenthesesAndInvalidRelations) {
 	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_LEFT_PAREN, EXPR_SYMBOL_RIGHT_PAREN),
 			  EXPR_RELATION_MATCH);
@@ -89,10 +115,10 @@ TEST(ExprPrecedenceTable, HandlesParenthesesAndInvalidRelations) {
 			  EXPR_RELATION_SHIFT);
 	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_LEFT_PAREN, EXPR_SYMBOL_ADDITIVE),
 			  EXPR_RELATION_SHIFT);
-	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_OPERAND, EXPR_SYMBOL_CALL_OPEN),
-			  EXPR_RELATION_SHIFT);
-	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_CALL_OPEN, EXPR_SYMBOL_RIGHT_PAREN),
-			  EXPR_RELATION_MATCH);
+	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_OPERAND, EXPR_SYMBOL_RIGHT_PAREN),
+			  EXPR_RELATION_REDUCE);
+	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_RIGHT_PAREN, EXPR_SYMBOL_ADDITIVE),
+			  EXPR_RELATION_REDUCE);
 	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_OPERAND, EXPR_SYMBOL_OPERAND),
 			  EXPR_RELATION_ERROR);
 	EXPECT_EQ(expr_precedence_relation(EXPR_SYMBOL_COUNT, EXPR_SYMBOL_END), EXPR_RELATION_ERROR);
