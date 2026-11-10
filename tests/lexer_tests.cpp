@@ -187,7 +187,7 @@ LexerResult runLexer(const std::string &source) {
 				 !writeAll(descriptors[1], current.attribute.string_val, wire.string_length))) {
 				_exit(121);
 			}
-			if (wire.string_length > 0) {
+			if (current.type == TOKEN_IDENTIFIER || current.type == TOKEN_STRING) {
 				free(current.attribute.string_val);
 			}
 			if (current.type == TOKEN_EOF) {

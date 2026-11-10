@@ -24,7 +24,9 @@ export default {
             'docs',      // Documentation (README, etc.)
             'setup',     // Repository configuration
             'test',      // Test scripts and test cases
-			'utils'      // Shared utilities
+			'utils',     // Shared utilities
+			'core',      // Main orchestration and entry point
+			'ast'        // Abstract syntax tree
             ]
         ]
     }
