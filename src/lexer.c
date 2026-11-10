@@ -48,8 +48,8 @@ bool lexer_init(FILE *source) {
 		init_status && (lexer_state.indent_stack = stack_init(NULL)) && // Stack init
 		stack_push(lexer_state.indent_stack, (size_t)0); // Set initial indent level to be zero
 
-	init_status =
-		init_status && (lexer_state.interpolateds_substate_stack = stack_init()); // Stack init
+	init_status = init_status &&
+				  (lexer_state.interpolateds_substate_stack = stack_init(nullptr)); // Stack init
 
 	init_status =
 		init_status && (lexer_state.dynamic_string = dstring_init()); // Dynamic string init
