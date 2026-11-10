@@ -12,6 +12,11 @@
 
 #include <stdarg.h>
 
+/**
+ * @brief Function pointer type for cleanup callback handler
+ */
+typedef void (*error_cleanup_func)(void);
+
 typedef enum {
 	ERR_OK = 0,				  // without an error, successful compilation
 	ERR_LEXICAL = 1,		  // error during lexical analysis
@@ -47,5 +52,35 @@ throw_err(err_c_t code, unsigned line_num, const char *fmt, ...);
  * @param[in] fmt Formatted warning string to be printed to stderr
  */
 __attribute__((format(printf, 2, 3))) void throw_warning(unsigned line_num, const char *fmt, ...);
+
+/**
+ * @brief Prints an error message to stderr without terminating the program and saves the first
+ * error code
+ *
+ * @param[in] code Error code to be stored for exit
+ * @param[in] line_num Number of the line where the error is located, 0 will not print line num
+ * @param[in] fmt Formatted error string to be printed to stderr
+ */
+__attribute__((format(printf, 3, 4))) void print_error(err_c_t code, unsigned line_num,
+													   const char *fmt, ...);
+
+/**
+ * @brief Terminates the program with the first recorded error code
+ */
+__attribute__((noreturn)) void error_exit(void);
+
+/**
+ * @brief Sets a cleanup callback function to be called before process termination
+ *
+ * @param[in] in_cleanup_func Function pointer to the cleanup handler
+ */
+void error_set_cleanup(error_cleanup_func in_cleanup_func);
+
+/**
+ * @brief Checks if any error has been recorded
+ *
+ * @return true if an error has occurred, false otherwise
+ */
+bool error_is_set(void);
 
 #endif
