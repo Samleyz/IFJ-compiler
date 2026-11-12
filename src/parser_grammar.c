@@ -381,6 +381,7 @@ ast_node_t parse_cond_stmt(parser_t *p) {
 		return NULL;
 	}
 
+	// creating node
 	ast_node_t if_node = ast_create_node(NODE_IF, line_num);
 	if (!if_node) {
 		return NULL;
@@ -468,6 +469,7 @@ ast_node_t parse_while_stmt(parser_t *p) {
 		return NULL;
 	}
 
+	// node creation
 	ast_node_t while_node = ast_create_node(NODE_WHILE, line_num);
 	if (!while_node) {
 		return NULL;
@@ -505,10 +507,181 @@ ast_node_t parse_while_stmt(parser_t *p) {
 }
 
 ast_node_t parse_for_stmt(parser_t *p) {
-	// TODO: Rule 84-95
-	// <for_stmt> -> "for" <for_header> "do" <branch_body>
-	(void)p;
-	return nullptr;
+	// Rule 84: <for_stmt> -> "for" <for_header> "do" <branch_body>
+	// Rule 85: <for_header> -> <for_generator> <guards_inline>
+	// Rule 86: <for_header> -> "EOL" "indent" <for_generator> "EOL" <guards_multiline> "dedent"
+	// Rule 87: <for_generator> -> identifier "<-" expr <range_type>
+	// Rule 88: <range_type> -> "to" expr <opt_by>
+	// Rule 89: <range_type> -> "until" expr
+	// Rule 90: <opt_by> -> "by" expr
+	// Rule 91: <opt_by> -> eps
+	// Rule 92: <guards_inline> -> "if" expr <guards_inline>
+	// Rule 93: <guards_inline> -> eps
+	// Rule 94: <guards_multiline> -> "if" expr "EOL" <guards_multiline>
+	// Rule 95: <guards_multiline> -> eps
+
+	unsigned line_num = p->curr_tkn.line_num;
+
+	// "for"
+	if (!expect_keyword(p, KW_FOR)) {
+		return NULL;
+	}
+
+	ast_node_t for_node = ast_create_node(NODE_FOR, line_num);
+	if (!for_node) {
+		return NULL;
+	}
+	ast_list_init(&for_node->as.for_stmt.guards);
+
+	// <for_header>
+	bool is_multiline = false;
+	if (match_token_type(p, TOKEN_EOL)) {
+		// Rule 86: "EOL" "indent" <for_generator> "EOL" <guards_multiline> "dedent"
+		is_multiline = true;
+		// "indent"
+		if (!expect_token_type(p, TOKEN_INDENT)) {
+			ast_dtor(for_node);
+			return NULL;
+		}
+	}
+
+	// <for_generator>
+	// identifier
+	if (!peek_token_type(p, TOKEN_IDENTIFIER)) {
+		print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected loop variable identifier");
+		ast_dtor(for_node);
+		return NULL;
+	}
+	char *var_name = strdup(p->curr_tkn.attribute.string_val);
+	if (!var_name) {
+		ast_dtor(for_node);
+		return NULL;
+	}
+	for_node->as.for_stmt.var_name = var_name;
+	parser_advance(p);
+
+	// "<-"
+	if (!expect_operator(p, OPERATOR_LEFT_ARROW)) {
+		ast_dtor(for_node);
+		return NULL;
+	}
+
+	// expr
+	ast_node_t from_expr = parse_expression(p);
+	if (!from_expr) {
+		ast_dtor(for_node);
+		return NULL;
+	}
+	for_node->as.for_stmt.from_expr = from_expr;
+
+	// <range_type>
+	// Rule 88: <range_type> -> "to" expr <opt_by>
+	// Rule 89: <range_type> -> "until" expr
+	if (match_specific_id(p, "to")) {
+		for_node->as.for_stmt.is_inclusive = true;
+		// expr (to)
+		ast_node_t to_expr = parse_expression(p);
+		if (!to_expr) {
+			ast_dtor(for_node);
+			return NULL;
+		}
+		for_node->as.for_stmt.to_expr = to_expr;
+
+		// <opt_by>
+		// Rule 90: <opt_by> -> "by" expr
+		// Rule 91: <opt_by> -> eps
+		if (match_specific_id(p, "by")) {
+			// expr (step)
+			ast_node_t step_expr = parse_expression(p);
+			if (!step_expr) {
+				ast_dtor(for_node);
+				return NULL;
+			}
+			for_node->as.for_stmt.step_expr = step_expr;
+		}
+	} else if (match_specific_id(p, "until")) {
+		for_node->as.for_stmt.is_inclusive = false;
+		// expr (to)
+		ast_node_t to_expr = parse_expression(p);
+		if (!to_expr) {
+			ast_dtor(for_node);
+			return NULL;
+		}
+		for_node->as.for_stmt.to_expr = to_expr;
+	} else {
+		print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected 'to' or 'until' in for range");
+		ast_dtor(for_node);
+		return NULL;
+	}
+
+	// Guards
+	if (is_multiline) {
+		// "EOL" after <for_generator>
+		if (!expect_token_type(p, TOKEN_EOL)) {
+			ast_dtor(for_node);
+			return NULL;
+		}
+
+		// Rule 94: <guards_multiline> -> "if" expr "EOL" <guards_multiline>
+		// Rule 95: <guards_multiline> -> eps
+		while (match_keyword(p, KW_IF)) {
+			// expr
+			ast_node_t guard = parse_expression(p);
+			if (!guard) {
+				ast_dtor(for_node);
+				return NULL;
+			}
+			// "EOL"
+			if (!expect_token_type(p, TOKEN_EOL)) {
+				ast_dtor(guard);
+				ast_dtor(for_node);
+				return NULL;
+			}
+			if (!ast_list_append(&for_node->as.for_stmt.guards, guard)) {
+				ast_dtor(guard);
+				ast_dtor(for_node);
+				return NULL;
+			}
+		}
+
+		// "dedent"
+		if (!expect_token_type(p, TOKEN_DEDENT)) {
+			ast_dtor(for_node);
+			return NULL;
+		}
+	} else {
+		// Rule 92: <guards_inline> -> "if" expr <guards_inline>
+		// Rule 93: <guards_inline> -> eps
+		while (match_keyword(p, KW_IF)) {
+			// expr
+			ast_node_t guard = parse_expression(p);
+			if (!guard) {
+				ast_dtor(for_node);
+				return NULL;
+			}
+			if (!ast_list_append(&for_node->as.for_stmt.guards, guard)) {
+				ast_dtor(guard);
+				ast_dtor(for_node);
+				return NULL;
+			}
+		}
+	}
+
+	// "do"
+	if (!expect_keyword(p, KW_DO)) {
+		ast_dtor(for_node);
+		return NULL;
+	}
+
+	// <branch_body>
+	ast_node_t body = parse_branch_body(p);
+	if (!body) {
+		ast_dtor(for_node);
+		return NULL;
+	}
+	for_node->as.for_stmt.body = body;
+
+	return for_node;
 }
 
 ast_node_t parse_var_def(parser_t *p) {
@@ -568,8 +741,33 @@ ast_node_t parse_param_list(parser_t *p) {
 }
 
 char *parse_type(parser_t *p) {
-	// TODO: Rule 71-75
-	// <type> -> "Int" | "Double" | "String" | "Unit" | "Boolean"
-	(void)p;
-	return nullptr;
+	// Rule 71: <type> -> "Int"
+	// Rule 72: <type> -> "Double"
+	// Rule 73: <type> -> "String"
+	// Rule 74: <type> -> "Unit"
+	// Rule 75: <type> -> "Boolean"
+
+	// "Int"
+	if (match_keyword(p, KW_INT)) {
+		return strdup("Int");
+	}
+	// "Double"
+	if (match_keyword(p, KW_DOUBLE)) {
+		return strdup("Double");
+	}
+	// "String"
+	if (match_keyword(p, KW_STRING)) {
+		return strdup("String");
+	}
+	// "Unit"
+	if (match_keyword(p, KW_UNIT)) {
+		return strdup("Unit");
+	}
+	// "Boolean"
+	if (match_keyword(p, KW_BOOLEAN)) {
+		return strdup("Boolean");
+	}
+
+	print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected data type");
+	return NULL;
 }
