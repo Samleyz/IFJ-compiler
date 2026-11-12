@@ -18,9 +18,10 @@ extern "C" {
 #include "parser_private.h"
 }
 
-// Stand-in for the grammar rule of the real parser (parser_grammar.c), which is not written yet:
-// if <expression> then <expression> [else <expression>]
-extern "C" ast_node_t parse_if_statement(parser_t *p) {
+// Stand-in for the grammar rule of the real parser (parser_grammar.c, parse_cond_stmt):
+// if <expression> then <expression> [else (<if rule> | <expression>)]
+// Like the real rule, "else if" is parsed by recursion and is not marked as an expression.
+extern "C" ast_node_t parse_cond_stmt(parser_t *p) {
 	ast_node_t node = ast_create_node(NODE_IF, p->curr_tkn.line_num);
 	parser_advance(p); // "if"
 	node->as.if_stmt.condition = parse_expression(p);
@@ -34,7 +35,8 @@ extern "C" ast_node_t parse_if_statement(parser_t *p) {
 		return nullptr;
 	}
 	if (match_keyword(p, KW_ELSE)) {
-		node->as.if_stmt.else_branch = parse_expression(p);
+		node->as.if_stmt.else_branch =
+			peek_keyword(p, KW_IF) ? parse_cond_stmt(p) : parse_expression(p);
 		if (node->as.if_stmt.else_branch == nullptr) {
 			ast_dtor(node);
 			return nullptr;
@@ -46,49 +48,68 @@ extern "C" ast_node_t parse_if_statement(parser_t *p) {
 namespace {
 
 struct ParseOutcome {
-	bool ok = false;			  // an expression was returned
-	std::string tree;			  // the tree in prefix form, e.g. "(+ a (* b c))"
-	token_type next_type;		  // type of the token left in the parser (not consumed)
-	kw_type_t next_keyword = {};  // keyword of that token, if it is one
-	std::string next_identifier;  // name of that token, if it is an identifier
+	bool ok = false;			 // an expression was returned
+	std::string tree;			 // the tree in prefix form, e.g. "(+ a (* b c))"
+	token_type next_type;		 // type of the token left in the parser (not consumed)
+	kw_type_t next_keyword = {}; // keyword of that token, if it is one
+	std::string next_identifier; // name of that token, if it is an identifier
 };
 
 std::string operatorText(op_type_t op) {
 	switch (op) {
-	case OPERATOR_PLUS: return "+";
-	case OPERATOR_MINUS: return "-";
-	case OPERATOR_STAR: return "*";
-	case OPERATOR_SLASH: return "/";
-	case OPERATOR_EX_MARK: return "!";
-	case OPERATOR_AND: return "&&";
-	case OPERATOR_OR: return "||";
-	case OPERATOR_EQUAL: return "==";
-	case OPERATOR_NOT_EQUAL: return "!=";
-	case OPERATOR_LESS: return "<";
-	case OPERATOR_LESS_EQUAL: return "<=";
-	case OPERATOR_GREATER: return ">";
-	case OPERATOR_GREATER_EQUAL: return ">=";
-	default: return "?";
+	case OPERATOR_PLUS:
+		return "+";
+	case OPERATOR_MINUS:
+		return "-";
+	case OPERATOR_STAR:
+		return "*";
+	case OPERATOR_SLASH:
+		return "/";
+	case OPERATOR_EX_MARK:
+		return "!";
+	case OPERATOR_AND:
+		return "&&";
+	case OPERATOR_OR:
+		return "||";
+	case OPERATOR_EQUAL:
+		return "==";
+	case OPERATOR_NOT_EQUAL:
+		return "!=";
+	case OPERATOR_LESS:
+		return "<";
+	case OPERATOR_LESS_EQUAL:
+		return "<=";
+	case OPERATOR_GREATER:
+		return ">";
+	case OPERATOR_GREATER_EQUAL:
+		return ">=";
+	default:
+		return "?";
 	}
 }
 
 std::string dump(ast_node_t node) {
 	switch (node->type) {
-	case NODE_IDENTIFIER: return node->as.id.name;
-	case NODE_LIT_INT: return std::to_string(node->as.int_val);
+	case NODE_IDENTIFIER:
+		return node->as.id.name;
+	case NODE_LIT_INT:
+		return std::to_string(node->as.int_val);
 	case NODE_LIT_DOUBLE: {
 		char buffer[32];
 		snprintf(buffer, sizeof buffer, "%g", node->as.double_val);
 		return buffer;
 	}
-	case NODE_LIT_STRING: return std::string("\"") + node->as.string_val + "\"";
-	case NODE_LIT_BOOL: return node->as.bool_val ? "true" : "false";
-	case NODE_LIT_UNIT: return "()";
+	case NODE_LIT_STRING:
+		return std::string("\"") + node->as.string_val + "\"";
+	case NODE_LIT_BOOL:
+		return node->as.bool_val ? "true" : "false";
+	case NODE_LIT_UNIT:
+		return "()";
 	case NODE_IF:
 		// "ifexpr" when the node was marked as an expression, plain "if" otherwise
 		return std::string(node->as.if_stmt.is_expr ? "(ifexpr " : "(if ") +
-			   dump(node->as.if_stmt.condition) + " " + dump(node->as.if_stmt.then_branch) +
-			   " " + dump(node->as.if_stmt.else_branch) + ")";
+			   dump(node->as.if_stmt.condition) + " " + dump(node->as.if_stmt.then_branch) + " " +
+			   dump(node->as.if_stmt.else_branch) + ")";
 	case NODE_FUNC_CALL: {
 		std::string text = "(call " + dump(node->as.func_call.callee);
 		for (ast_node_t arg = node->as.func_call.args.head; arg != nullptr; arg = arg->next) {
@@ -102,7 +123,8 @@ std::string dump(ast_node_t node) {
 	case NODE_BINARY_OP:
 		return "(" + operatorText(node->as.binary_op.operator_type) + " " +
 			   dump(node->as.binary_op.left) + " " + dump(node->as.binary_op.right) + ")";
-	default: return "?";
+	default:
+		return "?";
 	}
 }
 
@@ -193,6 +215,9 @@ TEST(ParseExpression, BuildsTreesWithCorrectPrecedenceAndAssociativity) {
 		{"(if a then b else c) + 1", "(+ (ifexpr a b c) 1)"},
 		{"f(if a then 1 else 2, x)", "(call f (ifexpr a 1 2) x)"},
 		{"if a then if b then c else d else e", "(ifexpr a (ifexpr b c d) e)"},
+		{"if a then b else if c then d else e", "(ifexpr a b (ifexpr c d e))"},
+		{"if a then b else if c then d else if e then f else g",
+		 "(ifexpr a b (ifexpr c d (ifexpr e f g)))"},
 		{"1.5 + 2.25", "(+ 1.5 2.25)"},
 		{"0.5 * 4", "(* 0.5 4)"},
 		{"-2.5", "(- 2.5)"},
@@ -214,20 +239,22 @@ TEST(ParseExpression, BuildsTreesWithCorrectPrecedenceAndAssociativity) {
 
 TEST(ParseExpression, RejectsInvalidExpressions) {
 	const char *sources[] = {
-		"a < b < c",  // relational operators are not associative
-		"a == b != c", // neither are equality operators
-		"1 2",		   // two operands in a row (two literals)
-		"* 3",		   // operator without a left operand
-		"a +",		   // operator without a right operand
-		"a + * b",	   // operator after an operator
-		"a !b",		   // prefix operator after an operand
-		"f(a,)",	   // trailing comma on the same line as ")"
-		"f(,a)",	   // missing argument
-		"f(a b)",	   // two operands in one argument
-		"f(a +)",	   // incomplete argument
-		"if a then b", // an if expression needs an else branch
-		"if a b else c", // the condition is not a valid expression
-		"1 + if a then b", // missing else in the middle of an expression
+		"a < b < c",					// relational operators are not associative
+		"a == b != c",					// neither are equality operators
+		"1 2",							// two operands in a row (two literals)
+		"* 3",							// operator without a left operand
+		"a +",							// operator without a right operand
+		"a + * b",						// operator after an operator
+		"a !b",							// prefix operator after an operand
+		"f(a,)",						// trailing comma on the same line as ")"
+		"f(,a)",						// missing argument
+		"f(a b)",						// two operands in one argument
+		"f(a +)",						// incomplete argument
+		"if a then b",					// an if expression needs an else branch
+		"if a b else c",				// the condition is not a valid expression
+		"1 + if a then b",				// missing else in the middle of an expression
+		"if a then b else if c then d", // the else if chain has no final else
+		"if a then b else if c then d else if e then f", // same, with a longer chain
 		// An error in the middle of a call: everything built so far must be freed (Valgrind).
 		"f(a, b +)",
 		"f(a, b, c +)",

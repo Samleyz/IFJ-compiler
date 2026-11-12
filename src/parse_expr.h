@@ -18,7 +18,7 @@
  * Starts at the current token of the parser. Supports operands (identifiers and literals),
  * prefix and binary operators with the priority and associativity of the specification,
  * groups, "()" as the Unit literal, function calls with any number of argument lists, and
- * "if" used as an expression (parsed by parse_if_statement).
+ * "if" used as an expression (parsed by parse_cond_stmt).
  *
  * The expression ends at the first token that cannot continue it, for example "then", "do",
  * "else", ",", ";", "=", the end of the line, a ")" that closes something outside of the

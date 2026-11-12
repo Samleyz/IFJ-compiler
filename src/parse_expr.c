@@ -575,7 +575,7 @@ static bool expr_parse_call(stack_t stk, parser_t *p) {
  */
 static ast_node_t expr_parse_if(parser_t *p) {
 	unsigned line = p->curr_tkn.line_num;
-	ast_node_t node = parse_if_statement(p);
+	ast_node_t node = parse_cond_stmt(p);
 	if (node == nullptr) {
 		return nullptr;
 	}
@@ -584,12 +584,21 @@ static ast_node_t expr_parse_if(parser_t *p) {
 		print_error(ERR_SYNTACTIC, line, "Expected an if expression");
 		return nullptr;
 	}
-	node->as.if_stmt.is_expr = true;
-	// The else branch is mandatory when if is used as an expression (spec, CONTROL).
-	if (node->as.if_stmt.else_branch == nullptr) {
-		ast_dtor(node);
-		print_error(ERR_SYNTACTIC, line, "An if expression requires an else branch");
-		return nullptr;
+	// "else if" arrives as a nested NODE_IF in the else branch. Every link of the chain is part of
+	// the expression, and the last one must end with a plain else (spec, CONTROL).
+	for (ast_node_t link = node;;) {
+		link->as.if_stmt.is_expr = true;
+		ast_node_t next = link->as.if_stmt.else_branch;
+		if (next == nullptr) {
+			unsigned link_line = link->line_num;
+			ast_dtor(node);
+			print_error(ERR_SYNTACTIC, link_line, "An if expression requires an else branch");
+			return nullptr;
+		}
+		if (next->type != NODE_IF) {
+			break;
+		}
+		link = next;
 	}
 	return node;
 }
