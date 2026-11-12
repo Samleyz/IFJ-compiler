@@ -69,7 +69,7 @@ bool peek_is_rel_op(const parser_t *parser) {
 }
 
 bool peek_is_expr_beg(const parser_t *parser) {
-	if (peek_is_literal(parser)) {
+	if (peek_is_literal(parser) || peek_keyword(parser, KW_IF)) {
 		return true;
 	}
 	if (parser->curr_tkn.type == TOKEN_IDENTIFIER || parser->curr_tkn.type == TOKEN_LPAREN ||
