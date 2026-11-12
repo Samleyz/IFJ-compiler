@@ -102,13 +102,10 @@ ast_node_t parse_top_def(parser_t *p) {
 }
 
 ast_node_t parse_func_def(parser_t *p) {
-	// Rule 24: <func_def> -> <opt_main> "def" identifier <param_list_seq> <opt_type> "=" <func_body>
-	// Rule 25: <opt_main> -> "@main" <opt_eol>
-	// Rule 26: <opt_main> -> eps
-	// Rule 27: <param_list_seq> -> <param_list> <param_list_seq>
-	// Rule 28: <param_list_seq> -> eps
-	// Rule 29: <opt_type> -> ":" <type>
-	// Rule 30: <opt_type> -> eps
+	// Rule 24: <func_def> -> <opt_main> "def" identifier <param_list_seq> <opt_type> "="
+	// <func_body> Rule 25: <opt_main> -> "@main" <opt_eol> Rule 26: <opt_main> -> eps Rule 27:
+	// <param_list_seq> -> <param_list> <param_list_seq> Rule 28: <param_list_seq> -> eps Rule 29:
+	// <opt_type> -> ":" <type> Rule 30: <opt_type> -> eps
 
 	// <opt_main>
 	bool main = false;
@@ -212,8 +209,8 @@ ast_node_t parse_func_body(parser_t *p) {
 }
 
 ast_node_t parse_ext_def(parser_t *p) {
-	// Rule 54: <ext_def> -> "extension" "(" identifier ":" <type> ")" "EOL" "indent" <ext_method_seq> "dedent"
-	// Rule 55: <ext_method_seq> -> <ext_method> <ext_method_seq_tail>
+	// Rule 54: <ext_def> -> "extension" "(" identifier ":" <type> ")" "EOL" "indent"
+	// <ext_method_seq> "dedent" Rule 55: <ext_method_seq> -> <ext_method> <ext_method_seq_tail>
 	// Rule 56: <ext_method_seq_tail> -> <ext_method> <ext_method_seq_tail>
 	// Rule 57: <ext_method_seq_tail> -> eps
 	// Rule 58: <ext_method> -> "def" identifier <param_list_seq> <opt_type> "=" <func_body>
