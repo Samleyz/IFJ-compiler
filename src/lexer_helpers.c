@@ -20,36 +20,44 @@ const char *keywords[] = {"def", "do",	   "Double",  "else", "if",	   "import",
 
 #define KEYWORDS_LEN (int)(sizeof(keywords) / sizeof(keywords[0]))
 
-int handle_indent(lexer_state_t *lexer_state) {
+void check_indent(lexer_state_t *lexer_state) {
 	// Count leading spaces
 	int c;
-	static size_t space_counter = 0;
+	lexer_state->leading_space_counter = 0;
 	while (' ' == (c = fgetc(lexer_state->source_file))) {
-		space_counter++;
+		lexer_state->leading_space_counter++;
 	}
 	ungetc(c, lexer_state->source_file);
+	return;
+}
+
+void handle_indent(lexer_state_t *lexer_state) {
 	// Choose outcome
-	if (space_counter > (size_t)stack_top(lexer_state->indent_stack)) {		 // If deeper
-		if (!stack_push(lexer_state->indent_stack, (void *)space_counter)) { // Store
-			// FAILED MALLOC
-			return -3;
+	if (lexer_state->leading_space_counter >
+		(size_t)stack_top(lexer_state->indent_stack)) { // If deeper
+		if (!stack_push(lexer_state->indent_stack,
+						(void *)lexer_state->leading_space_counter)) { // Store
+			throw_err(ERR_INTERNAL, lexer_state->line_num,
+					  "failed stack push inside handle indent");
 		}
 		// INDENT
-		return 1;
-	} else if (space_counter < (size_t)stack_top(lexer_state->indent_stack)) { // If shallower
-		stack_pop(lexer_state->indent_stack);								   // Remove resolved
-		// test for missing indent level
-		if (space_counter > (size_t)stack_top(lexer_state->indent_stack)) {
-			// INDENTATION ERROR - invalid token (no such level of indent used before)
-			return -2;
+		lexer_state->indentation_token_value++;
+	} else {
+		while (lexer_state->leading_space_counter !=
+			   (size_t)stack_top(lexer_state->indent_stack)) { // While shallower
+			stack_pop(lexer_state->indent_stack);
+			// test for missing indent level
+			if (lexer_state->leading_space_counter > (size_t)stack_top(lexer_state->indent_stack)) {
+				// INDENTATION ERROR - no such level of indent used before
+				throw_err(ERR_LEXICAL, lexer_state->line_num, "Invalid indentation");
+			}
+			// DEDENT
+			lexer_state->indentation_token_value--;
 		}
-		// DEDENT
-		return -1;
-	} else {			   // Same level
-		space_counter = 0; // Reset for later use
-		// DONE - can leave FSM state
-		return 0;
+		// Reached same level
 	}
+	lexer_state->leading_space_counter = 0;
+	return;
 }
 
 bool convert_int(const char *num_string, int32_t *int_number) {
