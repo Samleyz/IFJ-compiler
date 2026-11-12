@@ -54,7 +54,7 @@ ast_node_t parse_func_def(parser_t *p);
  * Rule 31: <func_body> -> "EOL" <block>
  * Rule 32: <func_body> -> expr "EOL"
  * @param p Pointer to parser structure
- * @return AST node representing block or expression, or nullptr on error
+ * @return AST node representing block or expression, or NULL on error
  */
 ast_node_t parse_func_body(parser_t *p);
 

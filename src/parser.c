@@ -12,7 +12,7 @@
 static parser_t parser;
 
 void parser_init(void) {
-	parser.root = nullptr;
+	parser.root = NULL;
 	parser_advance(&parser);
 	parser_advance(&parser);
 }

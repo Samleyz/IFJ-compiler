@@ -21,25 +21,40 @@
  */
 
 ast_node_t parse_header(parser_t *p) {
+	// Rule 2: <prologue> -> "import" "ifj26" "." "*" "EOL"
+
+	// "import"
 	if (!expect_keyword(p, KW_IMPORT)) {
 		return NULL;
 	}
+
+	// "ifj26"
 	if (!expect_specific_id(p, "ifj26")) {
 		return NULL;
 	}
+
+	// "."
 	if (!expect_operator(p, OPERATOR_DOT)) {
 		return NULL;
 	}
+
+	// "*"
 	if (!expect_operator(p, OPERATOR_STAR)) {
-		return nullptr;
+		return NULL;
 	}
+
+	// "EOL"
 	if (!expect_token_type(p, TOKEN_EOL)) {
-		return nullptr;
+		return NULL;
 	}
+
 	return p->root;
 }
 
 ast_node_t parse_top_def_seq(parser_t *p) {
+	// Rule 3: <top_def_seq> -> <top_def> <top_def_seq>
+	// Rule 4: <top_def_seq> -> eps
+
 	while (match_token_type(p, TOKEN_EOL))
 		; // skipping EOLs
 
@@ -47,14 +62,16 @@ ast_node_t parse_top_def_seq(parser_t *p) {
 	if (peek_token_type(p, TOKEN_MAIN) || peek_keyword(p, KW_DEF) ||
 		peek_keyword(p, KW_EXTENSION)) {
 
-		ast_node_t def = parse_top_def(p); // <top_def>
+		// <top_def>
+		ast_node_t def = parse_top_def(p);
 		if (!def) {
 			return NULL;
 		}
 
 		ast_list_append(&p->root->as.program.items, def);
 
-		return parse_top_def_seq(p); // <top_def_seq>
+		// <top_def_seq>
+		return parse_top_def_seq(p);
 	}
 	// Rule 4: <top_def_seq> -> eps
 	else if (peek_token_type(p, TOKEN_EOF)) {
@@ -68,19 +85,31 @@ ast_node_t parse_top_def_seq(parser_t *p) {
 
 ast_node_t parse_top_def(parser_t *p) {
 	// Rule 5: <top_def> -> <func_def>
+	// Rule 6: <top_def> -> <ext_def>
+
+	// Rule 5: <top_def> -> <func_def>
 	if (peek_token_type(p, TOKEN_MAIN) || peek_keyword(p, KW_DEF)) {
-		ast_node_t func = parse_func_def(p);
-		return func;
+		// <func_def>
+		return parse_func_def(p);
 	}
 	// Rule 6: <top_def> -> <ext_def>
 	else if (peek_keyword(p, KW_EXTENSION)) {
-		ast_node_t ext = parse_ext_def(p);
-		return ext;
+		// <ext_def>
+		return parse_ext_def(p);
 	}
+
 	return NULL;
 }
 
 ast_node_t parse_func_def(parser_t *p) {
+	// Rule 24: <func_def> -> <opt_main> "def" identifier <param_list_seq> <opt_type> "=" <func_body>
+	// Rule 25: <opt_main> -> "@main" <opt_eol>
+	// Rule 26: <opt_main> -> eps
+	// Rule 27: <param_list_seq> -> <param_list> <param_list_seq>
+	// Rule 28: <param_list_seq> -> eps
+	// Rule 29: <opt_type> -> ":" <type>
+	// Rule 30: <opt_type> -> eps
+
 	// <opt_main>
 	bool main = false;
 	if (match_token_type(p, TOKEN_MAIN)) {
@@ -101,7 +130,7 @@ ast_node_t parse_func_def(parser_t *p) {
 	char *func_id = strdup(p->curr_tkn.attribute.string_val);
 	parser_advance(p);
 
-	/// func node creation, more rule to comes
+	// creating the node
 	ast_node_t func_node = ast_create_node(NODE_FUNC_DEF, p->curr_tkn.line_num);
 	if (!func_node) {
 		free(func_id);
@@ -115,6 +144,7 @@ ast_node_t parse_func_def(parser_t *p) {
 	bool has_parens = false;
 	while (peek_token_type(p, TOKEN_LPAREN)) {
 		has_parens = true;
+		// <param_list>
 		ast_node_t plist = parse_param_list(p);
 		if (!plist) {
 			ast_dtor(func_node);
@@ -125,7 +155,10 @@ ast_node_t parse_func_def(parser_t *p) {
 	func_node->as.func_def.has_parens = has_parens;
 
 	// <opt_type>
+	// Rule 29: <opt_type> -> ":" <type>
+	// Rule 30: <opt_type> -> eps
 	if (match_operator(p, OPERATOR_COLON)) {
+		// <type>
 		char *ret_type = parse_type(p);
 		if (!ret_type) {
 			ast_dtor(func_node);
@@ -154,16 +187,22 @@ ast_node_t parse_func_def(parser_t *p) {
 }
 
 ast_node_t parse_func_body(parser_t *p) {
+	// Rule 31: <func_body> -> "EOL" <block>
+	// Rule 32: <func_body> -> expr "EOL"
 
+	// "EOL"
 	if (match_token_type(p, TOKEN_EOL)) {
+		// <block>
 		return parse_block(p);
 	}
 
+	// expr
 	ast_node_t expr = parse_expression(p);
 	if (!expr) {
 		return NULL;
 	}
 
+	// "EOL"
 	if (!expect_token_type(p, TOKEN_EOL)) {
 		ast_dtor(expr);
 		return NULL;
@@ -173,12 +212,14 @@ ast_node_t parse_func_body(parser_t *p) {
 }
 
 ast_node_t parse_ext_def(parser_t *p) {
-	// <ext_def> -> "extension" "(" identifier ":" <type> ")" "EOL" "indent" <ext_method_seq>
+	// Rule 54: <ext_def> -> "extension" "(" identifier ":" <type> ")" "EOL" "indent" <ext_method_seq> "dedent"
+	// Rule 55: <ext_method_seq> -> <ext_method> <ext_method_seq_tail>
+	// Rule 56: <ext_method_seq_tail> -> <ext_method> <ext_method_seq_tail>
+	// Rule 57: <ext_method_seq_tail> -> eps
+	// Rule 58: <ext_method> -> "def" identifier <param_list_seq> <opt_type> "=" <func_body>
 
-	// already peeked for extension, we know its present
 	ast_node_t ext_node = ast_create_node(NODE_EXTENSION, p->curr_tkn.line_num);
 	if (!ext_node) {
-		free(ext_node);
 		return NULL;
 	}
 	ast_list_init(&ext_node->as.extension.methods);
@@ -237,8 +278,11 @@ ast_node_t parse_ext_def(parser_t *p) {
 		return NULL;
 	}
 
-	// ext_method_seq
+	// <ext_method_seq>
+	// Rule 55: <ext_method_seq> -> <ext_method> <ext_method_seq_tail>
+	// Rule 58: <ext_method> -> "def" identifier <param_list_seq> <opt_type> "=" <func_body>
 	while (peek_keyword(p, KW_DEF)) {
+		// <ext_method>
 		ast_node_t method = parse_func_def(p);
 		if (!method) {
 			ast_dtor(ext_node);
@@ -267,7 +311,7 @@ ast_node_t parse_ext_def(parser_t *p) {
 }
 
 ast_node_t parse_block(parser_t *p) {
-	// <block> -> "indent" <line> <line_seq> <opt_eol> "dedent"
+	// Rule 7: <block> -> "indent" <line> <line_seq> <opt_eol> "dedent"
 
 	// "indent"
 	if (!expect_token_type(p, TOKEN_INDENT)) {
@@ -288,8 +332,8 @@ ast_node_t parse_block(parser_t *p) {
 	}
 
 	// <line_seq>
-	// <line_seq> -> "EOL" <line> <line_seq>
-	// <line_seq> -> eps
+	// Rule 13: <line_seq> -> "EOL" <line> <line_seq>
+	// Rule 14: <line_seq> -> eps
 	while (peek_token_type(p, TOKEN_EOL) || peek_line_beg(p)) {
 		// "EOL"
 		if (peek_token_type(p, TOKEN_EOL)) {
@@ -313,8 +357,8 @@ ast_node_t parse_block(parser_t *p) {
 	}
 
 	// <opt_eol>
-	// <opt_eol> -> "EOL"
-	// <opt_eol> -> eps
+	// Rule 15: <opt_eol> -> "EOL"
+	// Rule 16: <opt_eol> -> eps
 	if (peek_token_type(p, TOKEN_EOL)) {
 		match_token_type(p, TOKEN_EOL);
 	}
@@ -329,8 +373,8 @@ ast_node_t parse_block(parser_t *p) {
 }
 
 bool parse_line(parser_t *p, ast_node_t block_node) {
-	// <line> -> <simple_seq>
-	// <line> -> <complex_stmt>
+	// Rule 8: <line> -> <simple_seq>
+	// Rule 9: <line> -> <complex_stmt>
 	if (peek_keyword(p, KW_WHILE) || peek_keyword(p, KW_IF) || peek_keyword(p, KW_FOR)) {
 		// <complex_stmt>
 		ast_node_t cstmt = parse_complex_stmt(p);
@@ -372,7 +416,11 @@ bool parse_line(parser_t *p, ast_node_t block_node) {
 }
 
 ast_node_t parse_cond_stmt(parser_t *p) {
-	// <cond_stmt> -> "if" expr "then" <branch_body> <opt_else>
+	// Rule 76: <cond_stmt> -> "if" expr "then" <branch_body> <opt_else>
+	// Rule 79: <opt_else> -> <opt_eol> "else" <else_branch>
+	// Rule 80: <opt_else> -> eps
+	// Rule 81: <else_branch> -> <cond_stmt>
+	// Rule 82: <else_branch> -> <branch_body>
 
 	unsigned line_num = p->curr_tkn.line_num;
 
@@ -410,8 +458,8 @@ ast_node_t parse_cond_stmt(parser_t *p) {
 	if_node->as.if_stmt.then_branch = then_branch;
 
 	// <opt_else>
-	// <opt_else> -> <opt_eol> "else" <else_branch>
-	// <opt_else> -> eps
+	// Rule 79: <opt_else> -> <opt_eol> "else" <else_branch>
+	// Rule 80: <opt_else> -> eps
 	if (peek_token_type(p, TOKEN_EOL) && peek_next_keyword(p, KW_ELSE)) {
 		// <opt_eol>
 		match_token_type(p, TOKEN_EOL);
@@ -419,8 +467,8 @@ ast_node_t parse_cond_stmt(parser_t *p) {
 
 	// "else"
 	if (match_keyword(p, KW_ELSE)) {
-		// <else_branch> -> <cond_stmt>
-		// <else_branch> -> <branch_body>
+		// Rule 81: <else_branch> -> <cond_stmt>
+		// Rule 82: <else_branch> -> <branch_body>
 		if (peek_keyword(p, KW_IF)) {
 			// <cond_stmt>
 			ast_node_t else_branch = parse_cond_stmt(p);
@@ -439,6 +487,7 @@ ast_node_t parse_cond_stmt(parser_t *p) {
 			if_node->as.if_stmt.else_branch = else_branch;
 		}
 	} else {
+		// Rule 80: <opt_else> -> eps
 		if_node->as.if_stmt.else_branch = NULL;
 	}
 
@@ -446,8 +495,8 @@ ast_node_t parse_cond_stmt(parser_t *p) {
 }
 
 ast_node_t parse_branch_body(parser_t *p) {
-	// <branch_body> -> "EOL" <block>
-	// <branch_body> -> <simple_stmt>
+	// Rule 77: <branch_body> -> "EOL" <block>
+	// Rule 78: <branch_body> -> <simple_stmt>
 
 	// "EOL"
 	if (match_token_type(p, TOKEN_EOL)) {
@@ -685,31 +734,194 @@ ast_node_t parse_for_stmt(parser_t *p) {
 }
 
 ast_node_t parse_var_def(parser_t *p) {
-	// TODO: Rule 67-69
-	// <var_def> -> <var_kw> identifier <opt_type> "=" expr
-	(void)p;
-	return nullptr;
+	// Rule 67: <var_def> -> <var_kw> identifier <opt_type> "=" expr
+	// Rule 68: <var_kw> -> "val"
+	// Rule 69: <var_kw> -> "var"
+	// Rule 29: <opt_type> -> ":" <type>
+	// Rule 30: <opt_type> -> eps
+
+	unsigned line_num = p->curr_tkn.line_num;
+
+	// <var_kw>
+	bool is_val = false;
+	if (match_keyword(p, KW_VAL)) {
+		is_val = true;
+	} else if (match_keyword(p, KW_VAR)) {
+		is_val = false;
+	} else {
+		print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected 'val' or 'var'");
+		return NULL;
+	}
+
+	ast_node_t var_node = ast_create_node(NODE_VAR_DEF, line_num);
+	if (!var_node) {
+		return NULL;
+	}
+	var_node->as.var_def.is_val = is_val;
+
+	// identifier
+	if (!peek_token_type(p, TOKEN_IDENTIFIER)) {
+		print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected variable name");
+		ast_dtor(var_node);
+		return NULL;
+	}
+	char *name = strdup(p->curr_tkn.attribute.string_val);
+	if (!name) {
+		ast_dtor(var_node);
+		return NULL;
+	}
+	var_node->as.var_def.name = name;
+	parser_advance(p);
+
+	// <opt_type>
+	// Rule 29: <opt_type> -> ":" <type>
+	// Rule 30: <opt_type> -> eps
+	if (match_operator(p, OPERATOR_COLON)) {
+		// <type>
+		char *type_name = parse_type(p);
+		if (!type_name) {
+			ast_dtor(var_node);
+			return NULL;
+		}
+		var_node->as.var_def.type_name = type_name;
+	} else {
+		var_node->as.var_def.type_name = NULL;
+	}
+
+	// "="
+	if (!expect_operator(p, OPERATOR_ASSIGN)) {
+		ast_dtor(var_node);
+		return NULL;
+	}
+
+	// expr
+	ast_node_t init_expr = parse_expression(p);
+	if (!init_expr) {
+		ast_dtor(var_node);
+		return NULL;
+	}
+	var_node->as.var_def.init_expr = init_expr;
+
+	return var_node;
 }
 
 ast_node_t parse_assign_stmt(parser_t *p) {
-	// TODO: Rule 70
-	// <assign_stmt> -> identifier "=" expr
-	(void)p;
-	return nullptr;
+	// Rule 70: <assign_stmt> -> identifier "=" expr
+
+	unsigned line_num = p->curr_tkn.line_num;
+
+	// identifier
+	if (!peek_token_type(p, TOKEN_IDENTIFIER)) {
+		print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected target identifier");
+		return NULL;
+	}
+
+	char *target_id = strdup(p->curr_tkn.attribute.string_val);
+	if (!target_id) {
+		return NULL;
+	}
+	parser_advance(p);
+
+	ast_node_t assign_node = ast_create_node(NODE_ASSIGN, line_num);
+	if (!assign_node) {
+		free(target_id);
+		return NULL;
+	}
+	assign_node->as.assign.target_id = target_id;
+
+	// "="
+	if (!expect_operator(p, OPERATOR_ASSIGN)) {
+		ast_dtor(assign_node);
+		return NULL;
+	}
+
+	// expr
+	ast_node_t expr = parse_expression(p);
+	if (!expr) {
+		ast_dtor(assign_node);
+		return NULL;
+	}
+	assign_node->as.assign.expr = expr;
+
+	return assign_node;
 }
 
 ast_node_t parse_return_stmt(parser_t *p) {
-	// TODO: Rule 51-53
-	// <return_stmt> -> "return" <opt_expr>
-	(void)p;
-	return nullptr;
+	// Rule 51: <return_stmt> -> "return" <opt_expr>
+	// Rule 52: <opt_expr> -> expr
+	// Rule 53: <opt_expr> -> eps
+
+	unsigned line_num = p->curr_tkn.line_num;
+
+	// "return"
+	if (!expect_keyword(p, KW_RETURN)) {
+		return NULL;
+	}
+
+	ast_node_t return_node = ast_create_node(NODE_RETURN, line_num);
+	if (!return_node) {
+		return NULL;
+	}
+
+	// <opt_expr>
+	// Rule 52: <opt_expr> -> expr
+	// Rule 53: <opt_expr> -> eps
+	if (peek_operator(p, OPERATOR_SEMICOLON) || peek_token_type(p, TOKEN_EOL) ||
+		peek_token_type(p, TOKEN_DEDENT) || peek_token_type(p, TOKEN_EOF)) {
+		return_node->as.return_stmt.expr = NULL;
+	} else {
+		// expr
+		ast_node_t expr = parse_expression(p);
+		if (!expr) {
+			ast_dtor(return_node);
+			return NULL;
+		}
+		return_node->as.return_stmt.expr = expr;
+	}
+
+	return return_node;
 }
 
 ast_node_t parse_simple_stmt(parser_t *p) {
-	// TODO: Rule 17-20
-	// <simple_stmt> -> <var_def> | <assign_stmt> | <return_stmt> | expr
-	(void)p;
-	return nullptr;
+	// Rule 17: <simple_stmt> -> <var_def>
+	// Rule 18: <simple_stmt> -> <assign_stmt>
+	// Rule 19: <simple_stmt> -> <return_stmt>
+	// Rule 20: <simple_stmt> -> expr
+
+	// <var_def>
+	if (peek_keyword(p, KW_VAL) || peek_keyword(p, KW_VAR)) {
+		return parse_var_def(p);
+	}
+
+	// <return_stmt>
+	if (peek_keyword(p, KW_RETURN)) {
+		return parse_return_stmt(p);
+	}
+
+	// <assign_stmt>
+	if (peek_token_type(p, TOKEN_IDENTIFIER) && peek_next_operator(p, OPERATOR_ASSIGN)) {
+		return parse_assign_stmt(p);
+	}
+
+	// expr
+	if (peek_is_expr_beg(p)) {
+		unsigned line_num = p->curr_tkn.line_num;
+		ast_node_t expr = parse_expression(p);
+		if (!expr) {
+			return NULL;
+		}
+
+		ast_node_t stmt_node = ast_create_node(NODE_EXPR_STMT, line_num);
+		if (!stmt_node) {
+			ast_dtor(expr);
+			return NULL;
+		}
+		stmt_node->as.expr_stmt.expr = expr;
+		return stmt_node;
+	}
+
+	print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected simple statement");
+	return NULL;
 }
 
 ast_node_t parse_complex_stmt(parser_t *p) {
@@ -734,10 +946,98 @@ ast_node_t parse_complex_stmt(parser_t *p) {
 }
 
 ast_node_t parse_param_list(parser_t *p) {
-	// TODO: Rule 34-41
-	// <param_list> -> "(" <param_list_opt> ")"
-	(void)p;
-	return nullptr;
+	// Rule 34: <param_list> -> "(" <param_list_opt> ")"
+	// Rule 35: <param_list_opt> -> <param> <params_tail>
+	// Rule 36: <param_list_opt> -> eps
+	// Rule 37: <param> -> identifier ":" <type>
+	// Rule 38: <params_tail> -> "," <params_tail_more>
+	// Rule 39: <params_tail> -> eps
+	// Rule 40: <params_tail_more> -> <param> <params_tail>
+	// Rule 41: <params_tail_more> -> eps
+
+	unsigned line_num = p->curr_tkn.line_num;
+
+	// "("
+	if (!expect_token_type(p, TOKEN_LPAREN)) {
+		return NULL;
+	}
+
+	ast_node_t plist_node = ast_create_node(NODE_PARAM_LIST, line_num);
+	if (!plist_node) {
+		return NULL;
+	}
+	ast_list_init(&plist_node->as.param_list.params);
+
+	// <param_list_opt>
+	if (peek_token_type(p, TOKEN_IDENTIFIER)) {
+		do {
+			// Rule 37: <param> -> identifier ":" <type>
+			// identifier
+			if (!peek_token_type(p, TOKEN_IDENTIFIER)) {
+				print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected parameter name");
+				ast_dtor(plist_node);
+				return NULL;
+			}
+			char *param_name = strdup(p->curr_tkn.attribute.string_val);
+			if (!param_name) {
+				ast_dtor(plist_node);
+				return NULL;
+			}
+			unsigned param_line = p->curr_tkn.line_num;
+			parser_advance(p);
+
+			// ":"
+			if (!expect_operator(p, OPERATOR_COLON)) {
+				free(param_name);
+				ast_dtor(plist_node);
+				return NULL;
+			}
+
+			// <type>
+			char *type_name = parse_type(p);
+			if (!type_name) {
+				free(param_name);
+				ast_dtor(plist_node);
+				return NULL;
+			}
+
+			ast_node_t param_node = ast_create_node(NODE_PARAM, param_line);
+			if (!param_node) {
+				free(param_name);
+				free(type_name);
+				ast_dtor(plist_node);
+				return NULL;
+			}
+			param_node->as.param.name = param_name;
+			param_node->as.param.type_name = type_name;
+
+			if (!ast_list_append(&plist_node->as.param_list.params, param_node)) {
+				ast_dtor(param_node);
+				ast_dtor(plist_node);
+				return NULL;
+			}
+
+			// Rule 38: <params_tail> -> "," <params_tail_more>
+			// Rule 39: <params_tail> -> eps
+			if (!match_operator(p, OPERATOR_COMMA)) {
+				break;
+			}
+
+			// Rule 41: <params_tail_more> -> eps (trailing comma before ')')
+			if (peek_token_type(p, TOKEN_RPAREN)) {
+				break;
+			}
+			// Rule 40: <params_tail_more> -> <param> <params_tail>
+		} while (true);
+	}
+
+	// ")"
+	if (!expect_token_type(p, TOKEN_RPAREN)) {
+		ast_dtor(plist_node);
+		return NULL;
+	}
+
+	return plist_node;
 }
 
 char *parse_type(parser_t *p) {
