@@ -93,6 +93,14 @@ bool peek_is_rel_op(const parser_t *parser);
 bool peek_is_expr_beg(const parser_t *parser);
 
 /**
+ * @brief Checks if current token can begin a statement line in a block without advancing
+ *
+ * @param[in] parser Pointer to parser structure
+ * @return true if current token can start a line, otherwise false
+ */
+bool peek_line_beg(const parser_t *parser);
+
+/**
  * @brief Checks if next lookahead token matches specified token type
  *
  * @param[in] parser Pointer to parser structure

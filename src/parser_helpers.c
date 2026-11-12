@@ -83,6 +83,16 @@ bool peek_is_expr_beg(const parser_t *parser) {
 	return false;
 }
 
+bool peek_line_beg(const parser_t *parser) {
+	if (peek_keyword(parser, KW_VAL) || peek_keyword(parser, KW_VAR) ||
+		peek_keyword(parser, KW_RETURN) || peek_keyword(parser, KW_WHILE) ||
+		peek_keyword(parser, KW_IF) || peek_keyword(parser, KW_FOR) ||
+		parser->curr_tkn.type == TOKEN_IDENTIFIER || peek_is_expr_beg(parser)) {
+		return true;
+	}
+	return false;
+}
+
 bool peek_next_token_type(const parser_t *parser, token_type type) {
 	return (bool)(parser->look_ahead_tkn.type == type);
 }

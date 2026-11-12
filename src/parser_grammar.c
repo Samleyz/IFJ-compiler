@@ -267,26 +267,241 @@ ast_node_t parse_ext_def(parser_t *p) {
 }
 
 ast_node_t parse_block(parser_t *p) {
-	// TODO: Rule 7
 	// <block> -> "indent" <line> <line_seq> <opt_eol> "dedent"
-	(void)p;
-	return nullptr;
+
+	// "indent"
+	if (!expect_token_type(p, TOKEN_INDENT)) {
+		return NULL;
+	}
+
+	// creating the node
+	ast_node_t block_node = ast_create_node(NODE_BLOCK, p->curr_tkn.line_num);
+	if (!block_node) {
+		return NULL;
+	}
+	ast_list_init(&block_node->as.block.statements);
+
+	// <line>
+	if (!parse_line(p, block_node)) {
+		ast_dtor(block_node);
+		return NULL;
+	}
+
+	// <line_seq>
+	// <line_seq> -> "EOL" <line> <line_seq>
+	// <line_seq> -> eps
+	while (peek_token_type(p, TOKEN_EOL) || peek_line_beg(p)) {
+		// "EOL"
+		if (peek_token_type(p, TOKEN_EOL)) {
+			if (peek_next_token_type(p, TOKEN_DEDENT)) {
+				// <opt_eol>
+				match_token_type(p, TOKEN_EOL);
+				break;
+			}
+			match_token_type(p, TOKEN_EOL);
+		}
+
+		if (peek_token_type(p, TOKEN_DEDENT)) {
+			break;
+		}
+
+		// <line>
+		if (!parse_line(p, block_node)) {
+			ast_dtor(block_node);
+			return NULL;
+		}
+	}
+
+	// <opt_eol>
+	// <opt_eol> -> "EOL"
+	// <opt_eol> -> eps
+	if (peek_token_type(p, TOKEN_EOL)) {
+		match_token_type(p, TOKEN_EOL);
+	}
+
+	// "dedent"
+	if (!expect_token_type(p, TOKEN_DEDENT)) {
+		ast_dtor(block_node);
+		return NULL;
+	}
+
+	return block_node;
+}
+
+bool parse_line(parser_t *p, ast_node_t block_node) {
+	// <line> -> <simple_seq>
+	// <line> -> <complex_stmt>
+	if (peek_keyword(p, KW_WHILE) || peek_keyword(p, KW_IF) || peek_keyword(p, KW_FOR)) {
+		// <complex_stmt>
+		ast_node_t cstmt = parse_complex_stmt(p);
+		if (!cstmt) {
+			return false;
+		}
+		return ast_list_append(&block_node->as.block.statements, cstmt);
+	} else {
+		// Rule 10: <simple_seq> -> <simple_stmt> <simple_seq_tail>
+		// <simple_stmt>
+		ast_node_t sstmt = parse_simple_stmt(p);
+		if (!sstmt) {
+			return false;
+		}
+		if (!ast_list_append(&block_node->as.block.statements, sstmt)) {
+			ast_dtor(sstmt);
+			return false;
+		}
+
+		// Rule 11: <simple_seq_tail> -> ";" <simple_stmt> <simple_seq_tail>
+		// Rule 12: <simple_seq_tail> -> eps
+		while (match_operator(p, OPERATOR_SEMICOLON)) {
+			if (peek_token_type(p, TOKEN_EOL) || peek_token_type(p, TOKEN_DEDENT) ||
+				peek_token_type(p, TOKEN_EOF)) {
+				break;
+			}
+			// <simple_stmt>
+			sstmt = parse_simple_stmt(p);
+			if (!sstmt) {
+				return false;
+			}
+			if (!ast_list_append(&block_node->as.block.statements, sstmt)) {
+				ast_dtor(sstmt);
+				return false;
+			}
+		}
+		return true;
+	}
 }
 
 ast_node_t parse_cond_stmt(parser_t *p) {
-	// TODO: Rule 76-82
 	// <cond_stmt> -> "if" expr "then" <branch_body> <opt_else>
-	(void)p;
-	return nullptr;
+
+	unsigned line_num = p->curr_tkn.line_num;
+
+	// "if"
+	if (!expect_keyword(p, KW_IF)) {
+		return NULL;
+	}
+
+	ast_node_t if_node = ast_create_node(NODE_IF, line_num);
+	if (!if_node) {
+		return NULL;
+	}
+
+	// expr
+	ast_node_t cond = parse_expression(p);
+	if (!cond) {
+		ast_dtor(if_node);
+		return NULL;
+	}
+	if_node->as.if_stmt.condition = cond;
+
+	// "then"
+	if (!expect_keyword(p, KW_THEN)) {
+		ast_dtor(if_node);
+		return NULL;
+	}
+
+	// <branch_body>
+	ast_node_t then_branch = parse_branch_body(p);
+	if (!then_branch) {
+		ast_dtor(if_node);
+		return NULL;
+	}
+	if_node->as.if_stmt.then_branch = then_branch;
+
+	// <opt_else>
+	// <opt_else> -> <opt_eol> "else" <else_branch>
+	// <opt_else> -> eps
+	if (peek_token_type(p, TOKEN_EOL) && peek_next_keyword(p, KW_ELSE)) {
+		// <opt_eol>
+		match_token_type(p, TOKEN_EOL);
+	}
+
+	// "else"
+	if (match_keyword(p, KW_ELSE)) {
+		// <else_branch> -> <cond_stmt>
+		// <else_branch> -> <branch_body>
+		if (peek_keyword(p, KW_IF)) {
+			// <cond_stmt>
+			ast_node_t else_branch = parse_cond_stmt(p);
+			if (!else_branch) {
+				ast_dtor(if_node);
+				return NULL;
+			}
+			if_node->as.if_stmt.else_branch = else_branch;
+		} else {
+			// <branch_body>
+			ast_node_t else_branch = parse_branch_body(p);
+			if (!else_branch) {
+				ast_dtor(if_node);
+				return NULL;
+			}
+			if_node->as.if_stmt.else_branch = else_branch;
+		}
+	} else {
+		if_node->as.if_stmt.else_branch = NULL;
+	}
+
+	return if_node;
 }
 
-ast_node_t parse_if_statement(parser_t *p) { return parse_cond_stmt(p); }
+ast_node_t parse_branch_body(parser_t *p) {
+	// <branch_body> -> "EOL" <block>
+	// <branch_body> -> <simple_stmt>
+
+	// "EOL"
+	if (match_token_type(p, TOKEN_EOL)) {
+		// <block>
+		return parse_block(p);
+	}
+
+	// <simple_stmt>
+	return parse_simple_stmt(p);
+}
 
 ast_node_t parse_while_stmt(parser_t *p) {
-	// TODO: Rule 83
-	// <while_stmt> -> "while" expr "do" "EOL" <block>
-	(void)p;
-	return nullptr;
+	// Rule 83: <while_stmt> -> "while" expr "do" "EOL" <block>
+
+	unsigned line_num = p->curr_tkn.line_num;
+
+	// "while"
+	if (!expect_keyword(p, KW_WHILE)) {
+		return NULL;
+	}
+
+	ast_node_t while_node = ast_create_node(NODE_WHILE, line_num);
+	if (!while_node) {
+		return NULL;
+	}
+
+	// expr
+	ast_node_t cond = parse_expression(p);
+	if (!cond) {
+		ast_dtor(while_node);
+		return NULL;
+	}
+	while_node->as.while_stmt.condition = cond;
+
+	// "do"
+	if (!expect_keyword(p, KW_DO)) {
+		ast_dtor(while_node);
+		return NULL;
+	}
+
+	// "EOL"
+	if (!expect_token_type(p, TOKEN_EOL)) {
+		ast_dtor(while_node);
+		return NULL;
+	}
+
+	// <block>
+	ast_node_t body = parse_block(p);
+	if (!body) {
+		ast_dtor(while_node);
+		return NULL;
+	}
+	while_node->as.while_stmt.body = body;
+
+	return while_node;
 }
 
 ast_node_t parse_for_stmt(parser_t *p) {
@@ -325,10 +540,24 @@ ast_node_t parse_simple_stmt(parser_t *p) {
 }
 
 ast_node_t parse_complex_stmt(parser_t *p) {
-	// TODO: Rule 21-23
-	// <complex_stmt> -> <while_stmt> | <cond_stmt> | <for_stmt>
-	(void)p;
-	return nullptr;
+	// Rule 21: <complex_stmt> -> <while_stmt>
+	// Rule 22: <complex_stmt> -> <cond_stmt>
+	// Rule 23: <complex_stmt> -> <for_stmt>
+	if (peek_keyword(p, KW_WHILE)) {
+		// <while_stmt>
+		return parse_while_stmt(p);
+	}
+	if (peek_keyword(p, KW_IF)) {
+		// <cond_stmt>
+		return parse_cond_stmt(p);
+	}
+	if (peek_keyword(p, KW_FOR)) {
+		// <for_stmt>
+		return parse_for_stmt(p);
+	}
+
+	print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected complex statement");
+	return NULL;
 }
 
 ast_node_t parse_param_list(parser_t *p) {

@@ -78,6 +78,16 @@ ast_node_t parse_ext_def(parser_t *p);
 ast_node_t parse_block(parser_t *p);
 
 /**
+ * @brief Parses a line rule within a block
+ * Rule 8: <line> -> <simple_seq>
+ * Rule 9: <line> -> <complex_stmt>
+ * @param p Pointer to parser structure
+ * @param block_node AST node representing the enclosing block
+ * @return true on success, false on error
+ */
+bool parse_line(parser_t *p, ast_node_t block_node);
+
+/**
  * @brief Parses a conditional statement (if-then-else)
  * Rule 76: <cond_stmt> -> "if" expr "then" <branch_body> <opt_else>
  * Rule 79: <opt_else> -> <opt_eol> "else" <else_branch>
@@ -90,11 +100,13 @@ ast_node_t parse_block(parser_t *p);
 ast_node_t parse_cond_stmt(parser_t *p);
 
 /**
- * @brief Alias for parse_cond_stmt for backward compatibility
+ * @brief Parses a branch body rule (for if/for branches)
+ * Rule 77: <branch_body> -> "EOL" <block>
+ * Rule 78: <branch_body> -> <simple_stmt>
  * @param p Pointer to parser structure
- * @return AST node representing NODE_IF, or NULL on error
+ * @return AST node representing block or statement, or NULL on error
  */
-ast_node_t parse_if_statement(parser_t *p);
+ast_node_t parse_branch_body(parser_t *p);
 
 /**
  * @brief Parses a while loop statement
