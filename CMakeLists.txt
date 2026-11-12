@@ -53,6 +53,7 @@ if(BUILD_TESTING)
 	)
 	set(PARSE_EXPR_SOURCES
 		src/parse_expr.c
+		src/parse_expr_helpers.c
 		src/parser_helpers.c
 		src/ast.c
 		src/dynamic_string.c
