@@ -72,6 +72,13 @@ if(BUILD_TESTING)
 		${PARSE_EXPR_SOURCES}
 		src/parser_grammar.c
 	)
+	# the whole front end with the real grammar (everything except main.c)
+	add_unit_test(parser_integration_tests
+		tests/parser_integration_tests.cpp
+		${PARSE_EXPR_SOURCES}
+		src/parser.c
+		src/parser_grammar.c
+	)
 	# parse_expr_tests does not link parser_grammar.c: it defines its own stand-in for the if rule.
 	add_unit_test(parse_expr_tests
 		tests/parse_expr_tests.cpp

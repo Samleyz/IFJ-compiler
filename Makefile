@@ -10,7 +10,8 @@ TEST_EXECUTABLES := \
 	$(BUILD_DIR)/lexer_tests \
 	$(BUILD_DIR)/parse_expr_table_tests \
 	$(BUILD_DIR)/parse_expr_stack_tests \
-	$(BUILD_DIR)/parse_expr_tests
+	$(BUILD_DIR)/parse_expr_tests \
+	$(BUILD_DIR)/parser_integration_tests
 
 .PHONY: all test valgrind clean
 
