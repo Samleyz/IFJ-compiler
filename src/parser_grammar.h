@@ -50,6 +50,15 @@ ast_node_t parse_top_def(parser_t *p);
 ast_node_t parse_func_def(parser_t *p);
 
 /**
+ * @brief Parses function body rule (<func_body>)
+ * Rule 31: <func_body> -> "EOL" <block>
+ * Rule 32: <func_body> -> expr "EOL"
+ * @param p Pointer to parser structure
+ * @return AST node representing block or expression, or nullptr on error
+ */
+ast_node_t parse_func_body(parser_t *p);
+
+/**
  * @brief Parses an extension definition
  * Rule 54: <ext_def> -> "extension" "(" identifier ":" <type> ")" "EOL" "indent" <ext_method_seq>
  * "dedent" Rule 55: <ext_method_seq> -> <ext_method> <ext_method_seq_tail> Rule 56:

@@ -6,6 +6,7 @@
  */
 
 #include "parser.h"
+#include "parser_grammar.h"
 #include "parser_private.h"
 
 static parser_t parser;
@@ -27,12 +28,14 @@ ast_node_t parse_program(void) {
 	if (!root) {
 		throw_err(ERR_INTERNAL, 0, "Memory allocation failed for root AST");
 	}
+
 	parser.root = root;
 	ast_list_init(&parser.root->as.program.items);
 
 	if (!parse_header(&parser)) {
 		return NULL;
 	}
+
 	if (!parse_top_def_seq(&parser)) {
 		return NULL;
 	}
