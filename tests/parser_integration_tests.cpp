@@ -260,6 +260,12 @@ TEST(FrontEnd, ParsesIfExpressionsWithTheRealGrammar) {
 		 "(program (def main (block (stmt (call foo (ifexpr a (stmt 1) (stmt 2)) 3)))))"},
 		{"def main() =\n    return if a then 1 else 2\n",
 		 "(program (def main (block (return (ifexpr a (stmt 1) (stmt 2))))))"},
+		{"def main() =\n    val x = -if a then 1 else 2\n",
+		 "(program (def main (block (val x (- (ifexpr a (stmt 1) (stmt 2)))))))"},
+		{"def main() =\n    val x = (if a then 1 else 2) + 1\n",
+		 "(program (def main (block (val x (+ (ifexpr a (stmt 1) (stmt 2)) 1)))))"},
+		{"def main() =\n    val x = if a then 1 else 2 + 3\n",
+		 "(program (def main (block (val x (ifexpr a (stmt 1) (stmt (+ 2 3)))))))"},
 		{"def f(a: Int): Int = if a < 1 then 1 else 2\n",
 		 "(program (def f (ifexpr (< a 1) (stmt 1) (stmt 2))))"},
 		// the layouts shown in the specification (CONTROL)
@@ -306,6 +312,7 @@ TEST(FrontEnd, RejectsInvalidExpressions) {
 		"def main() =\n    val x = 1 2\n",
 		"def main() =\n    val x = f(1 2)\n",
 		"def main() =\n    val x = if a then 1\n",
+		"def main() =\n    val x = if a 1 else 2\n", // the condition is not a valid expression
 		"def main() =\n    val x = if a then 1 else if b then 3\n",
 		"def main() =\n    val x = 1 + if a then 1\n",
 		"def main() =\n    if a then if b then foo()\n", // a one-line nested if is an expression

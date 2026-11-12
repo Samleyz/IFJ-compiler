@@ -18,33 +18,6 @@ extern "C" {
 #include "parser_private.h"
 }
 
-// Stand-in for the grammar rule of the real parser (parser_grammar.c, parse_cond_stmt):
-// if <expression> then <expression> [else (<if rule> | <expression>)]
-// Like the real rule, "else if" is parsed by recursion and is not marked as an expression.
-extern "C" ast_node_t parse_cond_stmt(parser_t *p) {
-	ast_node_t node = ast_create_node(NODE_IF, p->curr_tkn.line_num);
-	parser_advance(p); // "if"
-	node->as.if_stmt.condition = parse_expression(p);
-	if (node->as.if_stmt.condition == nullptr || !match_keyword(p, KW_THEN)) {
-		ast_dtor(node);
-		return nullptr;
-	}
-	node->as.if_stmt.then_branch = parse_expression(p);
-	if (node->as.if_stmt.then_branch == nullptr) {
-		ast_dtor(node);
-		return nullptr;
-	}
-	if (match_keyword(p, KW_ELSE)) {
-		node->as.if_stmt.else_branch =
-			peek_keyword(p, KW_IF) ? parse_cond_stmt(p) : parse_expression(p);
-		if (node->as.if_stmt.else_branch == nullptr) {
-			ast_dtor(node);
-			return nullptr;
-		}
-	}
-	return node;
-}
-
 namespace {
 
 struct ParseOutcome {
@@ -105,11 +78,6 @@ std::string dump(ast_node_t node) {
 		return node->as.bool_val ? "true" : "false";
 	case NODE_LIT_UNIT:
 		return "()";
-	case NODE_IF:
-		// "ifexpr" when the node was marked as an expression, plain "if" otherwise
-		return std::string(node->as.if_stmt.is_expr ? "(ifexpr " : "(if ") +
-			   dump(node->as.if_stmt.condition) + " " + dump(node->as.if_stmt.then_branch) + " " +
-			   dump(node->as.if_stmt.else_branch) + ")";
 	case NODE_FUNC_CALL: {
 		std::string text = "(call " + dump(node->as.func_call.callee);
 		for (ast_node_t arg = node->as.func_call.args.head; arg != nullptr; arg = arg->next) {
@@ -207,17 +175,6 @@ TEST(ParseExpression, BuildsTreesWithCorrectPrecedenceAndAssociativity) {
 		{"-f(x)", "(- (call f x))"},
 		{"f(x) < g(y)", "(< (call f x) (call g y))"},
 		{"f(a,\n  b,\n  )", "(call f a b)"},
-		{"if a then b else c", "(ifexpr a b c)"},
-		{"1 + if a then b else c", "(+ 1 (ifexpr a b c))"},
-		{"if a then b else c + 1", "(ifexpr a b (+ c 1))"},
-		{"if a < 0 then 0 - a else a", "(ifexpr (< a 0) (- 0 a) a)"},
-		{"-if a then b else c", "(- (ifexpr a b c))"},
-		{"(if a then b else c) + 1", "(+ (ifexpr a b c) 1)"},
-		{"f(if a then 1 else 2, x)", "(call f (ifexpr a 1 2) x)"},
-		{"if a then if b then c else d else e", "(ifexpr a (ifexpr b c d) e)"},
-		{"if a then b else if c then d else e", "(ifexpr a b (ifexpr c d e))"},
-		{"if a then b else if c then d else if e then f else g",
-		 "(ifexpr a b (ifexpr c d (ifexpr e f g)))"},
 		{"1.5 + 2.25", "(+ 1.5 2.25)"},
 		{"0.5 * 4", "(* 0.5 4)"},
 		{"-2.5", "(- 2.5)"},
@@ -239,22 +196,17 @@ TEST(ParseExpression, BuildsTreesWithCorrectPrecedenceAndAssociativity) {
 
 TEST(ParseExpression, RejectsInvalidExpressions) {
 	const char *sources[] = {
-		"a < b < c",					// relational operators are not associative
-		"a == b != c",					// neither are equality operators
-		"1 2",							// two operands in a row (two literals)
-		"* 3",							// operator without a left operand
-		"a +",							// operator without a right operand
-		"a + * b",						// operator after an operator
-		"a !b",							// prefix operator after an operand
-		"f(a,)",						// trailing comma on the same line as ")"
-		"f(,a)",						// missing argument
-		"f(a b)",						// two operands in one argument
-		"f(a +)",						// incomplete argument
-		"if a then b",					// an if expression needs an else branch
-		"if a b else c",				// the condition is not a valid expression
-		"1 + if a then b",				// missing else in the middle of an expression
-		"if a then b else if c then d", // the else if chain has no final else
-		"if a then b else if c then d else if e then f", // same, with a longer chain
+		"a < b < c",   // relational operators are not associative
+		"a == b != c", // neither are equality operators
+		"1 2",		   // two operands in a row (two literals)
+		"* 3",		   // operator without a left operand
+		"a +",		   // operator without a right operand
+		"a + * b",	   // operator after an operator
+		"a !b",		   // prefix operator after an operand
+		"f(a,)",	   // trailing comma on the same line as ")"
+		"f(,a)",	   // missing argument
+		"f(a b)",	   // two operands in one argument
+		"f(a +)",	   // incomplete argument
 		// An error in the middle of a call: everything built so far must be freed (Valgrind).
 		"f(a, b +)",
 		"f(a, b, c +)",
