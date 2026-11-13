@@ -125,11 +125,16 @@ ast_node_t parse_func_def(parser_t *p) {
 		return NULL;
 	}
 	char *func_id = strdup(p->curr_tkn.attribute.string_val);
+	if (!func_id) {
+		print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate a name");
+		return NULL;
+	}
 	parser_advance(p);
 
 	// creating the node
 	ast_node_t func_node = ast_create_node(NODE_FUNC_DEF, p->curr_tkn.line_num);
 	if (!func_node) {
+		print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate AST node");
 		free(func_id);
 		return NULL;
 	}
@@ -217,6 +222,7 @@ ast_node_t parse_ext_def(parser_t *p) {
 
 	ast_node_t ext_node = ast_create_node(NODE_EXTENSION, p->curr_tkn.line_num);
 	if (!ext_node) {
+		print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate AST node");
 		return NULL;
 	}
 	ast_list_init(&ext_node->as.extension.methods);
@@ -240,6 +246,11 @@ ast_node_t parse_ext_def(parser_t *p) {
 		return NULL;
 	}
 	char *ext_reciever = strdup(p->curr_tkn.attribute.string_val);
+	if (!ext_reciever) {
+		print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate a name");
+		ast_dtor(ext_node);
+		return NULL;
+	}
 	ext_node->as.extension.receiver_name = ext_reciever;
 	parser_advance(p);
 
@@ -318,6 +329,7 @@ ast_node_t parse_block(parser_t *p) {
 	// creating the node
 	ast_node_t block_node = ast_create_node(NODE_BLOCK, p->curr_tkn.line_num);
 	if (!block_node) {
+		print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate AST node");
 		return NULL;
 	}
 	ast_list_init(&block_node->as.block.statements);
@@ -387,6 +399,7 @@ bool parse_line(parser_t *p, ast_node_t block_node) {
 			return false;
 		}
 		if (!ast_list_append(&block_node->as.block.statements, sstmt)) {
+			print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to append to a list");
 			ast_dtor(sstmt);
 			return false;
 		}
@@ -404,6 +417,7 @@ bool parse_line(parser_t *p, ast_node_t block_node) {
 				return false;
 			}
 			if (!ast_list_append(&block_node->as.block.statements, sstmt)) {
+				print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to append to a list");
 				ast_dtor(sstmt);
 				return false;
 			}
@@ -429,6 +443,7 @@ ast_node_t parse_cond_stmt(parser_t *p) {
 	// creating node
 	ast_node_t if_node = ast_create_node(NODE_IF, line_num);
 	if (!if_node) {
+		print_error(ERR_INTERNAL, line_num, "Failed to allocate AST node");
 		return NULL;
 	}
 
@@ -518,6 +533,7 @@ ast_node_t parse_while_stmt(parser_t *p) {
 	// node creation
 	ast_node_t while_node = ast_create_node(NODE_WHILE, line_num);
 	if (!while_node) {
+		print_error(ERR_INTERNAL, line_num, "Failed to allocate AST node");
 		return NULL;
 	}
 
@@ -575,6 +591,7 @@ ast_node_t parse_for_stmt(parser_t *p) {
 
 	ast_node_t for_node = ast_create_node(NODE_FOR, line_num);
 	if (!for_node) {
+		print_error(ERR_INTERNAL, line_num, "Failed to allocate AST node");
 		return NULL;
 	}
 	ast_list_init(&for_node->as.for_stmt.guards);
@@ -600,6 +617,7 @@ ast_node_t parse_for_stmt(parser_t *p) {
 	}
 	char *var_name = strdup(p->curr_tkn.attribute.string_val);
 	if (!var_name) {
+		print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate a name");
 		ast_dtor(for_node);
 		return NULL;
 	}
@@ -684,6 +702,7 @@ ast_node_t parse_for_stmt(parser_t *p) {
 				return NULL;
 			}
 			if (!ast_list_append(&for_node->as.for_stmt.guards, guard)) {
+				print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to append to a list");
 				ast_dtor(guard);
 				ast_dtor(for_node);
 				return NULL;
@@ -706,6 +725,7 @@ ast_node_t parse_for_stmt(parser_t *p) {
 				return NULL;
 			}
 			if (!ast_list_append(&for_node->as.for_stmt.guards, guard)) {
+				print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to append to a list");
 				ast_dtor(guard);
 				ast_dtor(for_node);
 				return NULL;
@@ -752,6 +772,7 @@ ast_node_t parse_var_def(parser_t *p) {
 
 	ast_node_t var_node = ast_create_node(NODE_VAR_DEF, line_num);
 	if (!var_node) {
+		print_error(ERR_INTERNAL, line_num, "Failed to allocate AST node");
 		return NULL;
 	}
 	var_node->as.var_def.is_val = is_val;
@@ -764,6 +785,7 @@ ast_node_t parse_var_def(parser_t *p) {
 	}
 	char *name = strdup(p->curr_tkn.attribute.string_val);
 	if (!name) {
+		print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate a name");
 		ast_dtor(var_node);
 		return NULL;
 	}
@@ -815,12 +837,14 @@ ast_node_t parse_assign_stmt(parser_t *p) {
 
 	char *target_id = strdup(p->curr_tkn.attribute.string_val);
 	if (!target_id) {
+		print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate a name");
 		return NULL;
 	}
 	parser_advance(p);
 
 	ast_node_t assign_node = ast_create_node(NODE_ASSIGN, line_num);
 	if (!assign_node) {
+		print_error(ERR_INTERNAL, line_num, "Failed to allocate AST node");
 		free(target_id);
 		return NULL;
 	}
@@ -857,6 +881,7 @@ ast_node_t parse_return_stmt(parser_t *p) {
 
 	ast_node_t return_node = ast_create_node(NODE_RETURN, line_num);
 	if (!return_node) {
+		print_error(ERR_INTERNAL, line_num, "Failed to allocate AST node");
 		return NULL;
 	}
 
@@ -910,6 +935,7 @@ ast_node_t parse_simple_stmt(parser_t *p) {
 
 		ast_node_t stmt_node = ast_create_node(NODE_EXPR_STMT, line_num);
 		if (!stmt_node) {
+			print_error(ERR_INTERNAL, line_num, "Failed to allocate AST node");
 			ast_dtor(expr);
 			return NULL;
 		}
@@ -961,6 +987,7 @@ ast_node_t parse_param_list(parser_t *p) {
 
 	ast_node_t plist_node = ast_create_node(NODE_PARAM_LIST, line_num);
 	if (!plist_node) {
+		print_error(ERR_INTERNAL, line_num, "Failed to allocate AST node");
 		return NULL;
 	}
 	ast_list_init(&plist_node->as.param_list.params);
@@ -977,6 +1004,7 @@ ast_node_t parse_param_list(parser_t *p) {
 			}
 			char *param_name = strdup(p->curr_tkn.attribute.string_val);
 			if (!param_name) {
+				print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate a name");
 				ast_dtor(plist_node);
 				return NULL;
 			}
@@ -1000,6 +1028,7 @@ ast_node_t parse_param_list(parser_t *p) {
 
 			ast_node_t param_node = ast_create_node(NODE_PARAM, param_line);
 			if (!param_node) {
+				print_error(ERR_INTERNAL, param_line, "Failed to allocate AST node");
 				free(param_name);
 				free(type_name);
 				ast_dtor(plist_node);
@@ -1009,6 +1038,7 @@ ast_node_t parse_param_list(parser_t *p) {
 			param_node->as.param.type_name = type_name;
 
 			if (!ast_list_append(&plist_node->as.param_list.params, param_node)) {
+				print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to append to a list");
 				ast_dtor(param_node);
 				ast_dtor(plist_node);
 				return NULL;
@@ -1044,25 +1074,25 @@ char *parse_type(parser_t *p) {
 	// Rule 74: <type> -> "Unit"
 	// Rule 75: <type> -> "Boolean"
 
-	// "Int"
+	const char *name = NULL;
 	if (match_keyword(p, KW_INT)) {
-		return strdup("Int");
+		name = "Int";
+	} else if (match_keyword(p, KW_DOUBLE)) {
+		name = "Double";
+	} else if (match_keyword(p, KW_STRING)) {
+		name = "String";
+	} else if (match_keyword(p, KW_UNIT)) {
+		name = "Unit";
+	} else if (match_keyword(p, KW_BOOLEAN)) {
+		name = "Boolean";
 	}
-	// "Double"
-	if (match_keyword(p, KW_DOUBLE)) {
-		return strdup("Double");
-	}
-	// "String"
-	if (match_keyword(p, KW_STRING)) {
-		return strdup("String");
-	}
-	// "Unit"
-	if (match_keyword(p, KW_UNIT)) {
-		return strdup("Unit");
-	}
-	// "Boolean"
-	if (match_keyword(p, KW_BOOLEAN)) {
-		return strdup("Boolean");
+
+	if (name) {
+		char *copy = strdup(name);
+		if (!copy) {
+			print_error(ERR_INTERNAL, p->curr_tkn.line_num, "Failed to allocate a type name");
+		}
+		return copy;
 	}
 
 	print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected data type");

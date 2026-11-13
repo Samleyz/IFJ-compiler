@@ -26,7 +26,8 @@ void parser_cleanup(void) {
 ast_node_t parse_program(void) {
 	ast_node_t root = ast_create_node(NODE_PROGRAM, parser.curr_tkn.line_num);
 	if (!root) {
-		throw_err(ERR_INTERNAL, 0, "Memory allocation failed for root AST");
+		print_error(ERR_INTERNAL, 0, "Memory allocation failed for root AST");
+		return NULL;
 	}
 
 	parser.root = root;
