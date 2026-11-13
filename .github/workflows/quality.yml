@@ -44,20 +44,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc valgrind
-      # TODO: Once the Makefile and tests are available, build the complete
-      # project with make and run its test suite under Valgrind instead of
-      # compiling and checking only main.c.
+          sudo apt-get install --yes build-essential cmake valgrind
       - name: Build and run under Valgrind
         if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          if [ ! -f main.c ]; then
-            echo "main.c not found; skipping Valgrind until the program is added."
-            exit 0
-          fi
-
-          gcc -std=c23 -g -O0 -Wall -Wextra main.c -o my_program
-          valgrind --leak-check=full --track-origins=yes \
-            --show-leak-kinds=all --errors-for-leak-kinds=all \
-            --error-exitcode=1 ./my_program
+        run: make valgrind

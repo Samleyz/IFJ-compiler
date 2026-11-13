@@ -14,6 +14,7 @@
 void parser_advance(parser_t *parser) {
 	free_token_attr(&parser->curr_tkn);
 	parser->curr_tkn = parser->look_ahead_tkn;
+	parser->look_ahead_tkn = (token){0}; // curr_tkn owns the string now, the lexer may throw below
 	parser->look_ahead_tkn = lexer_get_token();
 }
 
@@ -69,7 +70,7 @@ bool peek_is_rel_op(const parser_t *parser) {
 }
 
 bool peek_is_expr_beg(const parser_t *parser) {
-	if (peek_is_literal(parser)) {
+	if (peek_is_literal(parser) || peek_keyword(parser, KW_IF)) {
 		return true;
 	}
 	if (parser->curr_tkn.type == TOKEN_IDENTIFIER || parser->curr_tkn.type == TOKEN_LPAREN ||
@@ -79,6 +80,16 @@ bool peek_is_expr_beg(const parser_t *parser) {
 	if (parser->curr_tkn.type == TOKEN_OPERATOR) {
 		op_type_t op = parser->curr_tkn.attribute.operator_type;
 		return (bool)(op == OPERATOR_PLUS || op == OPERATOR_MINUS || op == OPERATOR_EX_MARK);
+	}
+	return false;
+}
+
+bool peek_line_beg(const parser_t *parser) {
+	if (peek_keyword(parser, KW_VAL) || peek_keyword(parser, KW_VAR) ||
+		peek_keyword(parser, KW_RETURN) || peek_keyword(parser, KW_WHILE) ||
+		peek_keyword(parser, KW_IF) || peek_keyword(parser, KW_FOR) ||
+		parser->curr_tkn.type == TOKEN_IDENTIFIER || peek_is_expr_beg(parser)) {
+		return true;
 	}
 	return false;
 }

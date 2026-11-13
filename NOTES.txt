@@ -8,11 +8,9 @@ GitHub Actions workflow
   and clang-analyzer checks. Both checks currently skip if there are no C files.
 - clang-tidy currently runs with basic C17, -Wall, and -Wextra flags. When the
   project has a Makefile,ill update it to use the project's actual build flags so include paths and defines are analyzed correctly.
-- Valgrind runs only on pull requests. For now, it compiles a root-level main.c
-  and runs that executable; it skips if main.c does not exist. Once the Makefile
-  and tests are ready, update this job to build the complete project and run the
-  test suite under Valgrind. This checks the paths exercised by the tests, not
-  every possible execution path.
+- Valgrind runs only on pull requests. The Makefile builds all unit test
+  executables and runs each under Valgrind. This checks the paths exercised by
+  the tests, not every possible execution path.
 - A future workflow could build and deploy Doxygen documentation.
 
 Project structure and repository settings
