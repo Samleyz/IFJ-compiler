@@ -26,13 +26,9 @@ token operandToken(const char *name) {
 	return result;
 }
 
-expr_entry_t *newOperator(expr_symbol_t symbol) {
-	return expr_entry_new_terminal(symbol, token{});
-}
+expr_entry_t *newOperator(expr_symbol_t symbol) { return expr_entry_new_terminal(symbol, token{}); }
 
-expr_entry_t *newNode() {
-	return expr_entry_new_node(ast_create_node(NODE_LIT_INT, 1));
-}
+expr_entry_t *newNode() { return expr_entry_new_node(ast_create_node(NODE_LIT_INT, 1)); }
 
 class ExprStackTest : public ::testing::Test {
   protected:
@@ -168,13 +164,14 @@ TEST_F(ExprStackTest, DestroyFreesNodesAndTokenStrings) {
 	expr_stack_push(stk, newOperator(EXPR_SYMBOL_ADDITIVE));
 }
 
-TEST_F(ExprStackTest, PopHandleWithoutMarkerIsAnInternalError) {
-	EXPECT_EXIT(
-		{
-			expr_entry_t *handle[2];
-			expr_stack_pop_handle(stk, handle, 2);
-		},
-		::testing::ExitedWithCode(ERR_INTERNAL), "No '<' marker");
+TEST_F(ExprStackTest, PopHandleWithoutMarkerFailsAndFreesWhatItPopped) {
+	expr_stack_push(stk, newNode());
+	expr_stack_push(stk, newOperator(EXPR_SYMBOL_ADDITIVE));
+
+	expr_entry_t *handle[4];
+	EXPECT_EQ(expr_stack_pop_handle(stk, handle, 4), EXPR_STACK_FAILED);
+	// Everything above the marker that was not there is gone, nothing is leaked (Valgrind).
+	EXPECT_TRUE(stack_is_empty(stk));
 }
 
 } // namespace

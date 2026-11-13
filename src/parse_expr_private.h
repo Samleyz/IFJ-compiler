@@ -9,6 +9,7 @@
 #define PARSE_EXPR_PRIVATE_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "ast.h"
 #include "stack.h"
@@ -57,6 +58,11 @@ expr_symbol_t expr_symbol_from_token(const token *tkn, bool expects_operand);
 #define EXPR_STACK_SCAN_LIMIT 8
 
 /**
+ * @brief Returned by expr_stack_pop_handle when it fails (the error is already printed)
+ */
+#define EXPR_STACK_FAILED SIZE_MAX
+
+/**
  * @brief Kinds of expression stack entries
  */
 typedef enum {
@@ -83,20 +89,20 @@ typedef struct {
  * @brief Creates a terminal entry
  * @param symbol Symbol class of the terminal
  * @param tkn Source token, the entry takes ownership of its string_val
- * @return pointer to the new entry, terminates with ERR_INTERNAL if allocation fails
+ * @return pointer to the new entry, nullptr if allocation fails (ERR_INTERNAL is printed)
  */
 expr_entry_t *expr_entry_new_terminal(expr_symbol_t symbol, token tkn);
 
 /**
  * @brief Creates a node entry
  * @param node AST subtree, the entry takes ownership of it
- * @return pointer to the new entry, terminates with ERR_INTERNAL if allocation fails
+ * @return pointer to the new entry, nullptr if allocation fails (ERR_INTERNAL is printed)
  */
 expr_entry_t *expr_entry_new_node(ast_node_t node);
 
 /**
  * @brief Creates a '<' marker entry
- * @return pointer to the new entry, terminates with ERR_INTERNAL if allocation fails
+ * @return pointer to the new entry, nullptr if allocation fails (ERR_INTERNAL is printed)
  */
 expr_entry_t *expr_entry_new_marker(void);
 
@@ -111,7 +117,7 @@ void expr_entry_free(expr_entry_t *entry);
  * @note The stack is created with stack_init(NULL) and must stay that way: the helpers pop entries
  * temporarily and push the same pointers back, so a destroyer callback would free entries that are
  * still in use. Entries are freed only by expr_entry_free and expr_stack_destroy
- * @return pointer to the new stack, terminates with ERR_INTERNAL if creation fails
+ * @return pointer to the new stack, nullptr if creation fails (ERR_INTERNAL is printed)
  */
 stack_t expr_stack_create(void);
 
@@ -124,10 +130,11 @@ void expr_stack_destroy(stack_t stk);
 /**
  * @brief Pushes an entry to the top of the stack
  * @param stk Target stack
- * @param entry Entry to be pushed, freed if the push fails
- * @note Terminates with ERR_INTERNAL if the push fails
+ * @param entry Entry to be pushed, freed if the push fails, nullptr is allowed (it is the result of
+ * a failed expr_entry_new_* call, the error is already printed) and makes the push fail
+ * @return true on success, false if the push failed (ERR_INTERNAL is printed)
  */
-void expr_stack_push(stack_t stk, expr_entry_t *entry);
+bool expr_stack_push(stack_t stk, expr_entry_t *entry);
 
 /**
  * @brief Returns the top entry without removing it
@@ -139,25 +146,28 @@ expr_entry_t *expr_stack_top(stack_t stk);
 /**
  * @brief Finds the nearest terminal on the stack, skipping nodes
  * @param stk Target stack, the stack is left unchanged
- * @return symbol class of the nearest terminal, used as the row of the precedence table
- * @note Terminates with ERR_INTERNAL if more than EXPR_STACK_SCAN_LIMIT entries are skipped
+ * @return symbol class of the nearest terminal, used as the row of the precedence table,
+ * EXPR_SYMBOL_INVALID on failure (ERR_INTERNAL is printed): more than EXPR_STACK_SCAN_LIMIT
+ * entries are skipped or the stack has no terminal
  */
 expr_symbol_t expr_stack_nearest_terminal(stack_t stk);
 
 /**
  * @brief Inserts a '<' marker directly above the nearest terminal (below any node on top)
  * @param stk Target stack
- * @note Terminates with ERR_INTERNAL if more than EXPR_STACK_SCAN_LIMIT entries are skipped
+ * @return true on success, false on failure (ERR_INTERNAL is printed), for the same reasons as
+ * expr_stack_nearest_terminal or if a push fails
  */
-void expr_stack_insert_marker(stack_t stk);
+bool expr_stack_insert_marker(stack_t stk);
 
 /**
  * @brief Pops everything above the nearest '<' marker and removes the marker
  * @param stk Target stack
  * @param[out] handle Receives the popped entries ordered left to right, as in the source
  * @param capacity Size of the handle array
- * @return number of entries written to handle, ownership passes to the caller
- * @note Terminates with ERR_INTERNAL if there is no marker or the handle exceeds capacity
+ * @return number of entries written to handle, ownership passes to the caller,
+ * EXPR_STACK_FAILED if there is no marker or the handle exceeds capacity (ERR_INTERNAL is printed
+ * and the entries popped so far are freed)
  */
 size_t expr_stack_pop_handle(stack_t stk, expr_entry_t *handle[], size_t capacity);
 

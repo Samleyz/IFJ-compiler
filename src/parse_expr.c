@@ -157,27 +157,31 @@ static expr_symbol_t expr_input_symbol(const parser_t *p, bool expects_operand,
  * @param stk Expression stack
  * @param p Parser whose current token is consumed
  * @param symbol Symbol class of the token
+ * @return true on success, false if the entry could not be pushed (the error is printed)
  */
-static void expr_push_token(stack_t stk, parser_t *p, expr_symbol_t symbol) {
+static bool expr_push_token(stack_t stk, parser_t *p, expr_symbol_t symbol) {
 	token tkn = p->curr_tkn;
 	// The entry takes over the string of the token, the parser must not free it when it advances.
 	if (tkn.type == TOKEN_IDENTIFIER || tkn.type == TOKEN_STRING) {
 		p->curr_tkn.attribute.string_val = nullptr;
 	}
-	expr_stack_push(stk, expr_entry_new_terminal(symbol, tkn));
+	if (!expr_stack_push(stk, expr_entry_new_terminal(symbol, tkn))) {
+		return false;
+	}
 	parser_advance(p);
+	return true;
 }
 
 /**
- * @brief Helper function: Creates an AST node, terminates with ERR_INTERNAL if it fails
+ * @brief Helper function: Creates an AST node
  * @param type Type of the node
  * @param line_num Source line of the node
- * @return pointer to the new node
+ * @return pointer to the new node, nullptr if allocation fails (ERR_INTERNAL is printed)
  */
 static ast_node_t expr_create_node(node_type_t type, unsigned line_num) {
 	ast_node_t node = ast_create_node(type, line_num);
 	if (node == nullptr) {
-		throw_err(ERR_INTERNAL, 0, "Failed to allocate AST node");
+		print_error(ERR_INTERNAL, 0, "Failed to allocate AST node");
 	}
 	return node;
 }
@@ -196,32 +200,43 @@ static ast_node_t expr_take_node(expr_entry_t *entry) {
 /**
  * @brief Helper function: Creates a leaf node from an operand token
  * @param tkn Operand token, its string (if any) is moved into the node
- * @return pointer to the new leaf node, nullptr if the token is not an operand
+ * @return pointer to the new leaf node, nullptr if the token is not an operand or the allocation
+ * failed (the token keeps its string then)
  */
 static ast_node_t expr_make_leaf(token *tkn) {
 	ast_node_t node = nullptr;
 	switch (tkn->type) {
 	case TOKEN_IDENTIFIER:
 		node = expr_create_node(NODE_IDENTIFIER, tkn->line_num);
-		node->as.id.name = tkn->attribute.string_val;
-		tkn->attribute.string_val = nullptr;
+		if (node != nullptr) {
+			node->as.id.name = tkn->attribute.string_val;
+			tkn->attribute.string_val = nullptr;
+		}
 		break;
 	case TOKEN_STRING:
 		node = expr_create_node(NODE_LIT_STRING, tkn->line_num);
-		node->as.string_val = tkn->attribute.string_val;
-		tkn->attribute.string_val = nullptr;
+		if (node != nullptr) {
+			node->as.string_val = tkn->attribute.string_val;
+			tkn->attribute.string_val = nullptr;
+		}
 		break;
 	case TOKEN_INTEGER:
 		node = expr_create_node(NODE_LIT_INT, tkn->line_num);
-		node->as.int_val = tkn->attribute.int_val;
+		if (node != nullptr) {
+			node->as.int_val = tkn->attribute.int_val;
+		}
 		break;
 	case TOKEN_DOUBLE:
 		node = expr_create_node(NODE_LIT_DOUBLE, tkn->line_num);
-		node->as.double_val = tkn->attribute.double_val;
+		if (node != nullptr) {
+			node->as.double_val = tkn->attribute.double_val;
+		}
 		break;
 	case TOKEN_BOOLEAN:
 		node = expr_create_node(NODE_LIT_BOOL, tkn->line_num);
-		node->as.bool_val = tkn->attribute.bool_literal;
+		if (node != nullptr) {
+			node->as.bool_val = tkn->attribute.bool_literal;
+		}
 		break;
 	default:
 		break;
@@ -272,7 +287,8 @@ static bool expr_is_binary_operator(const expr_entry_t *entry) {
  * @brief Helper function: Builds the AST node for a handle, validating the shape of the handle
  * @param handle Entries of the handle ordered left to right, what is used is moved into the node
  * @param count Number of entries in the handle
- * @return pointer to the new node, nullptr if the handle has no valid shape
+ * @return pointer to the new node, nullptr if the handle has no valid shape or the allocation
+ * failed (in that case nothing was moved out of the handle)
  */
 static ast_node_t expr_build_node(expr_entry_t *handle[], size_t count) {
 	// operand
@@ -283,6 +299,9 @@ static ast_node_t expr_build_node(expr_entry_t *handle[], size_t count) {
 	if (count == 2 && expr_is_terminal(handle[0], EXPR_SYMBOL_PREFIX) && expr_is_node(handle[1])) {
 		token *op = &handle[0]->as.terminal.tkn;
 		ast_node_t node = expr_create_node(NODE_UNARY_OP, op->line_num);
+		if (node == nullptr) {
+			return nullptr;
+		}
 		node->as.unary_op.operator_type = op->attribute.operator_type;
 		node->as.unary_op.operand = expr_take_node(handle[1]);
 		return node;
@@ -297,6 +316,9 @@ static ast_node_t expr_build_node(expr_entry_t *handle[], size_t count) {
 		expr_is_node(handle[2])) {
 		token *op = &handle[1]->as.terminal.tkn;
 		ast_node_t node = expr_create_node(NODE_BINARY_OP, op->line_num);
+		if (node == nullptr) {
+			return nullptr;
+		}
 		node->as.binary_op.operator_type = op->attribute.operator_type;
 		node->as.binary_op.left = expr_take_node(handle[0]);
 		node->as.binary_op.right = expr_take_node(handle[2]);
@@ -315,11 +337,15 @@ static ast_node_t expr_build_node(expr_entry_t *handle[], size_t count) {
  * @brief Helper function: Reduces the handle above the nearest marker to a single node
  * @param stk Expression stack
  * @param p Parser, used for the line of an error
- * @return true on success, false if the handle has no valid shape (syntax error is printed)
+ * @return true on success, false if the handle has no valid shape (syntax error is printed) or
+ * a step failed (internal error is printed)
  */
 static bool expr_reduce(stack_t stk, const parser_t *p) {
 	expr_entry_t *handle[EXPR_HANDLE_MAX];
 	size_t count = expr_stack_pop_handle(stk, handle, EXPR_HANDLE_MAX);
+	if (count == EXPR_STACK_FAILED) {
+		return false;
+	}
 	ast_node_t node = expr_build_node(handle, count);
 	for (size_t i = 0; i < count; i++) {
 		expr_entry_free(handle[i]);
@@ -328,8 +354,7 @@ static bool expr_reduce(stack_t stk, const parser_t *p) {
 		print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Invalid expression");
 		return false;
 	}
-	expr_stack_push(stk, expr_entry_new_node(node));
-	return true;
+	return expr_stack_push(stk, expr_entry_new_node(node));
 }
 
 /**
@@ -364,7 +389,9 @@ static bool expr_parse_arguments(parser_t *p, ast_list_t *args) {
 			return false;
 		}
 		if (!ast_list_append(args, arg)) {
-			throw_err(ERR_INTERNAL, 0, "Failed to append a call argument");
+			ast_dtor(arg);
+			print_error(ERR_INTERNAL, 0, "Failed to append a call argument");
+			return false;
 		}
 		if (!peek_operator(p, OPERATOR_COMMA)) {
 			break;
@@ -400,6 +427,10 @@ static bool expr_parse_call(stack_t stk, parser_t *p) {
 
 	// From here on the call node owns the callee, so freeing it on an error frees both.
 	ast_node_t call = expr_create_node(NODE_FUNC_CALL, callee->line_num);
+	if (call == nullptr) {
+		ast_dtor(callee);
+		return false;
+	}
 	call->as.func_call.callee = callee;
 	call->as.func_call.has_parens = true;
 
@@ -408,8 +439,7 @@ static bool expr_parse_call(stack_t stk, parser_t *p) {
 		ast_dtor(call);
 		return false;
 	}
-	expr_stack_push(stk, expr_entry_new_node(call));
-	return true;
+	return expr_stack_push(stk, expr_entry_new_node(call));
 }
 
 /**
@@ -449,6 +479,9 @@ static ast_node_t expr_parse_if(parser_t *p) {
 
 ast_node_t parse_expression(parser_t *p) {
 	stack_t stk = expr_stack_create();
+	if (stk == nullptr) {
+		return nullptr;
+	}
 	bool expects_operand = true;
 	size_t paren_depth = 0;
 	ast_node_t result = nullptr;
@@ -464,7 +497,9 @@ ast_node_t parse_expression(parser_t *p) {
 			if (node == nullptr) {
 				goto done;
 			}
-			expr_stack_push(stk, expr_entry_new_node(node));
+			if (!expr_stack_push(stk, expr_entry_new_node(node))) {
+				goto done;
+			}
 			expects_operand = false;
 			continue;
 		}
@@ -485,11 +520,15 @@ ast_node_t parse_expression(parser_t *p) {
 		}
 
 		expr_symbol_t top = expr_stack_nearest_terminal(stk);
+		if (top == EXPR_SYMBOL_INVALID) {
+			goto done;
+		}
 
 		switch (expr_precedence_relation(top, input)) {
 		case EXPR_RELATION_SHIFT:
-			expr_stack_insert_marker(stk);
-			expr_push_token(stk, p, input);
+			if (!expr_stack_insert_marker(stk) || !expr_push_token(stk, p, input)) {
+				goto done;
+			}
 			if (input == EXPR_SYMBOL_LEFT_PAREN) {
 				paren_depth++;
 			}
@@ -502,7 +541,9 @@ ast_node_t parse_expression(parser_t *p) {
 				goto done;
 			}
 			// ')' closes a '(' of a group, it is reduced together with it
-			expr_push_token(stk, p, input);
+			if (!expr_push_token(stk, p, input)) {
+				goto done;
+			}
 			paren_depth--;
 			expects_operand = false;
 			break;

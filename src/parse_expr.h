@@ -30,8 +30,9 @@
  * @return AST node pointer to the root of the expression subtree, owned by the caller
  * (free it with ast_dtor), or nullptr
  * @note On a syntax error (also when there is no expression at all) the error is printed with
- * print_error(ERR_SYNTACTIC, ...) and nullptr is returned. The program is not terminated, the
- * caller decides how to continue. Everything built so far is freed, so nothing leaks.
+ * print_error(ERR_SYNTACTIC, ...) and nullptr is returned. A failed allocation is reported the
+ * same way with ERR_INTERNAL. The program is not terminated, the caller decides how to continue.
+ * Everything built so far is freed, so nothing leaks.
  * @note The eval_type of the returned nodes is TYPE_UNKNOWN, semantic analysis fills it in.
  */
 ast_node_t parse_expression(parser_t *p);
