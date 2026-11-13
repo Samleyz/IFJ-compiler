@@ -1,6 +1,7 @@
 /**
  * @file parser_integration_tests.cpp
  * @author Claude Code (Claude Sonnet 5.5) and Samuel Cehlarik (xcehlas00@vutbr.cz)
+ * @author Claude Code (Claude Sonnet 5.5) and Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief AI GENERATED TESTS of the whole front end (source text -> lexer -> grammar rules ->
  * precedence parser -> AST) with the real grammar, HUMAN APPROVED
  */
@@ -316,6 +317,36 @@ TEST(FrontEnd, RejectsInvalidExpressions) {
 		"def main() =\n    val x = if a then 1 else if b then 3\n",
 		"def main() =\n    val x = 1 + if a then 1\n",
 		"def main() =\n    if a then if b then foo()\n", // a one-line nested if is an expression
+	};
+	for (const char *source : sources) {
+		SCOPED_TRACE(source);
+		EXPECT_FALSE(compile(source).ok);
+	}
+}
+
+// A lexical error does not end the process, the lexer returns TOKEN_ERR and the parser unwinds
+// through its syntax error path. Each source fails in the middle of an unfinished construct, so
+// valgrind (make valgrind) shows if anything the parser holds in local variables leaks. The bad
+// token is two tokens ahead of the parser, because the parser keeps one token of look-ahead.
+TEST(FrontEnd, RejectsLexicalErrorsInTheMiddleOfAConstruct) {
+	const char *sources[] = {
+		"def f = \"x",									   // function name
+		"def f(a: \"x",									   // parameter name and list
+		"extension(a: \"x",								   // extension receiver
+		"def main() =\n    while a do\n        x = \"y\n", // nested blocks, target
+		"def main() =\n    val x = \"y",				   // variable definition
+		"def main() =\n    for i <- 1 to \"x\n",		   // for loop
+		"def main() =\n    if a then \"y\n",			   // if statement
+		"def main() =\n    val x = 1 + 2 * \"y",		   // expression stack
+		"def main() =\n    f(1, \"y",					   // call arguments
+		"def main() =\n    val x = if a then \"y",		   // if expression
+		"def main() =\n    val x = 1\n  y\n",			   // invalid indentation
+		"def main() =\n    return 1 + \"y",				   // return statement
+		"def main() =\n    val x = 1 + $\n",			   // unrecognized character
+		"def main() =\n    val x = 01\n",				   // integer starting with zero
+		"def main() =\n    val x = \"a\\q\"\n",			   // invalid escape
+		"def main() =\n    val x = 1 /* never closed\n",   // unterminated comment
+		"\"x",											   // error right after the header
 	};
 	for (const char *source : sources) {
 		SCOPED_TRACE(source);
