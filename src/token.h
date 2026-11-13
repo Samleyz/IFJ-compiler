@@ -103,6 +103,7 @@ typedef enum {
 	TOKEN_LSQUARE,	  /**< left square parenthesis */
 	TOKEN_RSQUARE,	  /**< right square parenthesis */
 	TOKEN_MAIN,		  /**< @main token */
+	TOKEN_ERR		  /**< token returned when error occurs */
 } token_type;
 
 /**
