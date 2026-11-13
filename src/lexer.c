@@ -26,6 +26,7 @@ bool lexer_init(FILE *source) {
 	lexer_state.source_file = source;
 	lexer_state.fsm_state = EOL_STATE;
 	lexer_state.line_num = 1;
+	lexer_state.failed = false;
 
 	lexer_state.bracket_cnt = 0;
 	lexer_state.comment_depth_cnt = 0;
@@ -60,6 +61,18 @@ void lexer_cleanup(void) {
 	lexer_state.dynamic_string = nullptr;
 }
 
+/**
+ * @brief Registers lexical error into error module and sets lexer_state.failed to true
+ *
+ * @param[in] msg error message string
+ * @return TOKEN_ERR token
+ */
+static token lexer_fail(const char *msg) {
+	print_error(ERR_LEXICAL, lexer_state.line_num, "%s", msg);
+	lexer_state.failed = true;
+	return (token){.type = TOKEN_ERR, .line_num = lexer_state.line_num};
+}
+
 // Tool: GitHub Copilot
 // Initial FSM switch skeleton generated using an AI agent based on our hand-designed state diagram.
 // Prompt (paraphrase): Generate the lexer FSM switch structure from the provided state transition
@@ -67,6 +80,10 @@ void lexer_cleanup(void) {
 // Note: Only the basic switch skeleton was kept; complex logic, indentation tracking, and
 // edge cases were manually rewritten.
 token lexer_get_token(void) {
+	if (lexer_state.failed) {
+		return (token){.type = TOKEN_ERR, .line_num = lexer_state.line_num};
+	}
+
 	if (lexer_state.line_has_code) {
 		if (lexer_state.indentation_token_value > 0) {
 			lexer_state.indentation_token_value--;

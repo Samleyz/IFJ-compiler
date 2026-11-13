@@ -11,7 +11,6 @@
 #define LEXER_PRIVATE_H
 
 #include "dynamic_string.h"
-#include "lexer.h"
 #include "stack.h"
 #include "token.h"
 #include <stdint.h>
@@ -94,6 +93,7 @@ typedef struct {
 	FILE *source_file; /**< Input file */
 	state_t fsm_state; /**< Current state a the fsm */
 	unsigned line_num; /**< The number of the line currently beeíng read */
+	bool failed;
 
 	int bracket_cnt;	   /**< Brackent depth counter */
 	int comment_depth_cnt; /**< Current depth of the comment */
