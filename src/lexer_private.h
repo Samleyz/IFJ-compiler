@@ -123,8 +123,9 @@ void check_indent(lexer_state_t *lexer_state);
  * @brief Sets to lexer_state what indentation tokens should be sent (if any)
  *
  * @param[in] lexer_state Current state of the lexer
+ * @return true on success, false on invalid indentation
  */
-void handle_indent(lexer_state_t *lexer_state);
+bool handle_indent(lexer_state_t *lexer_state);
 
 /**
  * @brief Converts an integer from a string in the Scala int format to a 32-bit C variable

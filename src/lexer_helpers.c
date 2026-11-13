@@ -7,6 +7,7 @@
  * @date 2026-10-09
  */
 
+#include "error.h"
 #include "lexer_private.h"
 #include "token.h"
 #include <errno.h>
@@ -31,7 +32,7 @@ void check_indent(lexer_state_t *lexer_state) {
 	return;
 }
 
-void handle_indent(lexer_state_t *lexer_state) {
+bool handle_indent(lexer_state_t *lexer_state) {
 	// Choose outcome
 	if (lexer_state->leading_space_counter >
 		(size_t)stack_top(lexer_state->indent_stack)) { // If deeper
@@ -49,7 +50,8 @@ void handle_indent(lexer_state_t *lexer_state) {
 			// test for missing indent level
 			if (lexer_state->leading_space_counter > (size_t)stack_top(lexer_state->indent_stack)) {
 				// INDENTATION ERROR - no such level of indent used before
-				throw_err(ERR_LEXICAL, lexer_state->line_num, "Invalid indentation");
+				print_error(ERR_LEXICAL, lexer_state->line_num, "Invalid indentation");
+				return false;
 			}
 			// DEDENT
 			lexer_state->indentation_token_value--;
@@ -57,7 +59,7 @@ void handle_indent(lexer_state_t *lexer_state) {
 		// Reached same level
 	}
 	lexer_state->leading_space_counter = 0;
-	return;
+	return true;
 }
 
 bool convert_int(const char *num_string, int32_t *int_number) {
