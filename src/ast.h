@@ -73,6 +73,7 @@ typedef enum {
 	// Parameter lists and formal parameters
 	NODE_PARAM_LIST, // group of parameters
 	NODE_PARAM,		 // formal parameter (name: Type)
+	NODE_ARG_LIST,	 // list of arguments
 
 	// Leaves (atoms)
 	NODE_IDENTIFIER,
@@ -185,18 +186,21 @@ struct ast_node {
 
 		// NODE_FUNC_CALL
 		struct {
-			ast_node_t callee; // Expression being called (e.g. IDENTIFIER, FUNC_CALL, LAMBDA)
-			bool has_parens;   // False for parameterless calls without parens
-			ast_list_t args;   // Linked list of argument expressions
+			ast_node_t callee;	  // Expression being called (e.g. IDENTIFIER, FUNC_CALL, LAMBDA)
+			bool has_parens;	  // False for parameterless calls without parens
+			ast_list_t arg_lists; // Linked list of lists of arguments
 		} func_call;
 
 		// NODE_MEMBER_ACCESS
 		struct {
 			ast_node_t target;
 			char *member_name;
-			bool is_call;	 // True if followed by parentheses
-			ast_list_t args; // Argument expressions if is_call
 		} member_access;
+
+		// NODE_ARG_LIST
+		struct {
+			ast_list_t args;
+		} arg_lists;
 
 		// NODE_STRING_INTERP
 		struct {
