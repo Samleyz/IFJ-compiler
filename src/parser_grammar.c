@@ -1046,12 +1046,20 @@ ast_node_t parse_param_list(parser_t *p) {
 
 			// Rule 38: <params_tail> -> "," <params_tail_more>
 			// Rule 39: <params_tail> -> eps
+			unsigned comma_line = p->curr_tkn.line_num;
 			if (!match_operator(p, OPERATOR_COMMA)) {
 				break;
 			}
 
 			// Rule 41: <params_tail_more> -> eps (trailing comma before ')')
 			if (peek_token_type(p, TOKEN_RPAREN)) {
+				// only allowed if a line break separates the comma from ')'
+				if (p->curr_tkn.line_num <= comma_line) {
+					print_error(ERR_SYNTACTIC, p->curr_tkn.line_num,
+								"A trailing comma must be followed by a line break");
+					ast_dtor(plist_node);
+					return NULL;
+				}
 				break;
 			}
 			// Rule 40: <params_tail_more> -> <param> <params_tail>
