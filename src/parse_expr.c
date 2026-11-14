@@ -412,6 +412,11 @@ static bool expr_parse_arguments(parser_t *p, ast_list_t *args) {
 	return true;
 }
 
+// Tool: Claude Code (agent, Sonnet 5.5)
+// Prompt (paraphrase): Change the parser for the new AST: func_call.arg_lists holds
+// NODE_ARG_LIST nodes, member_access has no arguments.
+// Note: Agent session, verbatim prompts are not listed. AST design is ours, AI only changed
+// expr_parse_call and expr_parse_member.
 /**
  * @brief Helper function: Turns the expression on top of the stack into the callee of a call
  * @param stk Expression stack, a node entry must be on top
@@ -433,10 +438,25 @@ static bool expr_parse_call(stack_t stk, parser_t *p) {
 	call->as.func_call.callee = callee;
 	call->as.func_call.has_parens = true;
 
-	parser_advance(p); // "("
-	if (!expr_parse_arguments(p, &call->as.func_call.args)) {
-		ast_dtor(call);
-		return false;
+	// one NODE_ARG_LIST per "(...)"
+	while (peek_token_type(p, TOKEN_LPAREN)) {
+		ast_node_t arg_list = expr_create_node(NODE_ARG_LIST, p->curr_tkn.line_num);
+		if (arg_list == nullptr) {
+			ast_dtor(call);
+			return false;
+		}
+		// appended first so ast_dtor(call) frees it
+		if (!ast_list_append(&call->as.func_call.arg_lists, arg_list)) {
+			ast_dtor(arg_list);
+			ast_dtor(call);
+			print_error(ERR_INTERNAL, 0, "Failed to append an argument list");
+			return false;
+		}
+		parser_advance(p); // "("
+		if (!expr_parse_arguments(p, &arg_list->as.arg_lists.args)) {
+			ast_dtor(call);
+			return false;
+		}
 	}
 	return expr_stack_push(stk, expr_entry_new_node(call));
 }
@@ -447,7 +467,7 @@ static bool expr_parse_call(stack_t stk, parser_t *p) {
  * @param stk Expression stack, a node entry must be on top
  * @param p Parser, its current token is the "." that follows the expression
  * @return true on success, false on a syntax error (it is printed)
- * @note "x.name" and "x.name(arguments)" both build a NODE_MEMBER_ACCESS, is_call tells them apart
+ * @note Arguments are parsed in expr_parse_call
  */
 static bool expr_parse_member(stack_t stk, parser_t *p) {
 	parser_advance(p); // "."
@@ -468,16 +488,6 @@ static bool expr_parse_member(stack_t stk, parser_t *p) {
 	member->as.member_access.target = expr_take_node(entry);
 	expr_entry_free(entry);
 	parser_advance(p); // the member name
-
-	// From here on the member node owns the target, so freeing it on an error frees both.
-	if (peek_token_type(p, TOKEN_LPAREN)) {
-		member->as.member_access.is_call = true;
-		parser_advance(p); // "("
-		if (!expr_parse_arguments(p, &member->as.member_access.args)) {
-			ast_dtor(member);
-			return false;
-		}
-	}
 	return expr_stack_push(stk, expr_entry_new_node(member));
 }
 
