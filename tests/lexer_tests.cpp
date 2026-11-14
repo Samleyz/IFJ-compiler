@@ -365,6 +365,14 @@ TEST(LexerNumbers, RecognizesDigitSeparatorsInFractionAndExponent) {
 									   plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
+// Tool: Claude Code
+// Prompt: Fix the lexer tests that failed after allowing a letter or underscore after
+// a dot; "1._2" and "._2" are now a dot followed by the identifier "_2", so add a positive test.
+TEST(LexerNumbers, DotFollowedByUnderscoreIdentifierIsMemberAccess) {
+	expectTokens("1._2 ._2", {integer(1), op(OPERATOR_DOT), identifier("_2"), op(OPERATOR_DOT),
+							  identifier("_2"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
+}
+
 TEST(LexerNumbers, SignsAreSeparateOperators) {
 	expectTokens("-12 +.5", {op(OPERATOR_MINUS), integer(12), op(OPERATOR_PLUS), doubleToken(0.5),
 							 plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
@@ -377,7 +385,7 @@ TEST(LexerNumbers, RejectsLeadingZeroes) {
 }
 
 TEST(LexerNumbers, RejectsIncompleteOrMisplacedSeparators) {
-	for (const std::string &source : {"1_", "1._2", "1.2_", "1e_2", "1e2_"}) {
+	for (const std::string &source : {"1_", "1.2_", "1e_2", "1e2_"}) {
 		expectLexicalError(source);
 	}
 }
@@ -397,7 +405,7 @@ TEST(LexerNumbers, RejectsUnsupportedBasesAndSuffixes) {
 }
 
 TEST(LexerNumbers, RejectsMisplacedUnderscoresNearDotAndExp) {
-	for (const std::string &source : {"1_.2", "._2", ".2_", "1_e2", "0_123", "0_"}) {
+	for (const std::string &source : {"1_.2", ".2_", "1_e2", "0_123", "0_"}) {
 		expectLexicalError(source);
 	}
 }
