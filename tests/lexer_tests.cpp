@@ -160,6 +160,9 @@ LexerResult runLexer(const std::string &source) {
 
 		while (true) {
 			token current = lexer_get_token();
+			if (current.type == TOKEN_ERR) {
+				error_exit();
+			}
 			WireToken wire{
 				.type = static_cast<int32_t>(current.type),
 				.line_num = current.line_num,

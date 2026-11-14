@@ -26,6 +26,7 @@ bool lexer_init(FILE *source) {
 	lexer_state.source_file = source;
 	lexer_state.fsm_state = EOL_STATE;
 	lexer_state.line_num = 1;
+	lexer_state.failed = false;
 
 	lexer_state.bracket_cnt = 0;
 	lexer_state.comment_depth_cnt = 0;
@@ -60,6 +61,18 @@ void lexer_cleanup(void) {
 	lexer_state.dynamic_string = nullptr;
 }
 
+/**
+ * @brief Registers lexical error into error module and sets lexer_state.failed to true
+ *
+ * @param[in] msg error message string
+ * @return TOKEN_ERR token
+ */
+static token lexer_fail(const char *msg) {
+	print_error(ERR_LEXICAL, lexer_state.line_num, "%s", msg);
+	lexer_state.failed = true;
+	return (token){.type = TOKEN_ERR, .line_num = lexer_state.line_num};
+}
+
 // Tool: GitHub Copilot
 // Initial FSM switch skeleton generated using an AI agent based on our hand-designed state diagram.
 // Prompt (paraphrase): Generate the lexer FSM switch structure from the provided state transition
@@ -67,6 +80,10 @@ void lexer_cleanup(void) {
 // Note: Only the basic switch skeleton was kept; complex logic, indentation tracking, and
 // edge cases were manually rewritten.
 token lexer_get_token(void) {
+	if (lexer_state.failed) {
+		return (token){.type = TOKEN_ERR, .line_num = lexer_state.line_num};
+	}
+
 	if (lexer_state.line_has_code) {
 		if (lexer_state.indentation_token_value > 0) {
 			lexer_state.indentation_token_value--;
@@ -92,13 +109,15 @@ token lexer_get_token(void) {
 			if (c != EOF && c != '\n' && c != ' ' && c != '\t' && c != '/') { // Will be code token
 				// Check if can be code token on this line
 				if (lexer_state.line_cant_have_code) {
-					throw_err(ERR_LEXICAL, lexer_state.line_num,
-							  "Tab indent folowed by token on same line");
+					return lexer_fail("Tab indent folowed by token on same line");
 				}
 				// Handle indent for first code token on line
 				if (!lexer_state.line_has_code) {
 					lexer_state.line_has_code = true;
-					handle_indent(&lexer_state);
+					if (!handle_indent(&lexer_state)) {
+						lexer_state.failed = true;
+						return (token){.type = TOKEN_ERR, .line_num = lexer_state.line_num};
+					}
 					if (lexer_state.indentation_token_value > 0) {
 						ungetc(c, lexer_state.source_file);
 						lexer_state.indentation_token_value--;
@@ -203,7 +222,7 @@ token lexer_get_token(void) {
 				}
 				lexer_state.fsm_state = DOT_STATE_2;
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unrecognized character");
+				return lexer_fail("Unrecognized character");
 			}
 			break;
 		case IDENTIFIER:
@@ -328,11 +347,10 @@ token lexer_get_token(void) {
 								   .line_num = lexer_state.line_num};
 				} else {
 					free(num_str);
-					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid integer literal");
+					return lexer_fail("Invalid integer literal");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num,
-						  "Invalid character in integer literal");
+				return lexer_fail("Invalid character in integer literal");
 			}
 			break;
 		case UND_FOR_NUMS:
@@ -347,7 +365,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid underscore in integer");
+				return lexer_fail("Invalid underscore in integer");
 			}
 			break;
 		case ZERO:
@@ -371,7 +389,7 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = D_RETURN;
 			} else if (c <= '9' && c >= '0') {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Integer starting with zero");
+				return lexer_fail("Integer starting with zero");
 			} else if (!isalpha(c) && c != '_') {
 				// unget
 				ungetc(c, lexer_state.source_file);
@@ -383,7 +401,7 @@ token lexer_get_token(void) {
 							   .attribute = (token_attr_t){.int_val = 0},
 							   .line_num = lexer_state.line_num};
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character in zero literal");
+				return lexer_fail("Invalid character in zero literal");
 			}
 			break;
 		case DOUBLE:
@@ -428,10 +446,10 @@ token lexer_get_token(void) {
 								   .line_num = lexer_state.line_num};
 				} else {
 					free(num_str);
-					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
+					return lexer_fail("Invalid double literal");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character in double literal");
+				return lexer_fail("Invalid character in double literal");
 			}
 			break;
 		case EXPONENT:
@@ -452,7 +470,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid exponent");
+				return lexer_fail("Invalid exponent");
 			}
 			break;
 		case EX_NUM:
@@ -489,10 +507,10 @@ token lexer_get_token(void) {
 								   .line_num = lexer_state.line_num};
 				} else {
 					free(num_str);
-					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
+					return lexer_fail("Invalid double literal");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character in exponent");
+				return lexer_fail("Invalid character in exponent");
 			}
 			break;
 		case EXP_SIGN:
@@ -505,7 +523,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid exponent");
+				return lexer_fail("Invalid exponent");
 			}
 			break;
 		case DOT_STATE:
@@ -518,7 +536,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Expected digit after decimal point");
+				return lexer_fail("Expected digit after decimal point");
 			}
 			break;
 		case DOT_STATE_2:
@@ -537,13 +555,12 @@ token lexer_get_token(void) {
 							   .attribute = (token_attr_t){.operator_type = OPERATOR_DOT},
 							   .line_num = lexer_state.line_num};
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num,
-						  "Invalid character after decimal point");
+				return lexer_fail("Invalid character after decimal point");
 			}
 			break;
 		case D_RETURN:
 			if (isalpha(c)) {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after double");
+				return lexer_fail("Invalid character after double");
 			}
 			// unget
 			ungetc(c, lexer_state.source_file);
@@ -564,7 +581,7 @@ token lexer_get_token(void) {
 							   .line_num = lexer_state.line_num};
 			} else {
 				free(num_str);
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
+				return lexer_fail("Invalid double literal");
 			}
 			break;
 		case UND_FOR_DOUBLES:
@@ -579,7 +596,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid double literal");
+				return lexer_fail("Invalid double literal");
 			}
 			break;
 		case UND_FOR_EXP:
@@ -594,7 +611,7 @@ token lexer_get_token(void) {
 							  "failed to append char to dynamic string");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid exponent");
+				return lexer_fail("Invalid exponent");
 			}
 			break;
 		case EOL_STATE:
@@ -651,31 +668,31 @@ token lexer_get_token(void) {
 			break;
 		case MAIN_AT:
 			if (c != 'm') {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Expected @main");
+				return lexer_fail("Expected @main");
 			}
 			lexer_state.fsm_state = MAIN_M;
 			break;
 		case MAIN_M:
 			if (c != 'a') {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Expected @main");
+				return lexer_fail("Expected @main");
 			}
 			lexer_state.fsm_state = MAIN_A;
 			break;
 		case MAIN_A:
 			if (c != 'i') {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Expected @main");
+				return lexer_fail("Expected @main");
 			}
 			lexer_state.fsm_state = MAIN_I;
 			break;
 		case MAIN_I:
 			if (c != 'n') {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Expected @main");
+				return lexer_fail("Expected @main");
 			}
 			lexer_state.fsm_state = MAIN_N;
 			break;
 		case MAIN_N:
 			if (c != EOF && c != '\n' && c != ' ' && c != '\t') {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after @main");
+				return lexer_fail("Invalid character after @main");
 			}
 			ungetc(c, lexer_state.source_file);
 			lexer_state.fsm_state = START;
@@ -734,7 +751,7 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = START;
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid indentation inside brackets");
+				return lexer_fail("Invalid indentation inside brackets");
 			}
 			break;
 		case O_SQUARE_BRACKET:
@@ -764,12 +781,12 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = STRING_END;
 			} else if (c == EOF) {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");
+				return lexer_fail("Unterminated string");
 			} else if (c == '\n') {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated string");
+				return lexer_fail("Unterminated string");
 			} else {
 				if (c > 0x7F) {
-					throw_err(ERR_LEXICAL, lexer_state.line_num, "Non-ASCII character in string");
+					return lexer_fail("Non-ASCII character in string");
 				}
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
@@ -785,7 +802,7 @@ token lexer_get_token(void) {
 					lexer_state.fsm_state = BLOCK_STRING;
 					lexer_state.string_start_line = lexer_state.line_num;
 				} else {
-					throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after string");
+					return lexer_fail("Invalid character after string");
 				}
 			} else if (!isalpha(c) && !isdigit(c)) {
 				// unget
@@ -803,7 +820,7 @@ token lexer_get_token(void) {
 							   .attribute = (token_attr_t){.string_val = str_val},
 							   .line_num = lexer_state.line_num};
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid character after string");
+				return lexer_fail("Invalid character after string");
 			}
 			break;
 		case BLOCK_STRING:
@@ -811,13 +828,13 @@ token lexer_get_token(void) {
 				// move
 				lexer_state.fsm_state = BLOCK_STRING_EX_1;
 			} else if (c == EOF) {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated block string");
+				return lexer_fail("Unterminated block string");
 			} else {
 				if (c == '\n') {
 					lexer_state.line_num++;
 				}
 				if (c > 0x7F) {
-					throw_err(ERR_LEXICAL, lexer_state.line_num, "Non-ASCII character in string");
+					return lexer_fail("Non-ASCII character in string");
 				}
 				// append
 				if (!dstring_append_char(lexer_state.dynamic_string, (char)c)) {
@@ -844,7 +861,7 @@ token lexer_get_token(void) {
 			break;
 		case BLOCK_STRING_EX_1:
 			if (c == EOF) {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unended block string");
+				return lexer_fail("Unended block string");
 			} else if (c == '"') {
 				// move
 				lexer_state.fsm_state = BLOCK_STRING_EX_2;
@@ -868,7 +885,7 @@ token lexer_get_token(void) {
 			break;
 		case BLOCK_STRING_EX_2:
 			if (c == EOF) {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unended block string");
+				return lexer_fail("Unended block string");
 			} else if (c == '"') {
 				// move
 				lexer_state.fsm_state = BLOCK_STRING_END;
@@ -937,7 +954,7 @@ token lexer_get_token(void) {
 							  "failed to append backslash to dynamic string");
 				}
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Invalid string escape");
+				return lexer_fail("Invalid string escape");
 			}
 			break;
 		case OP_SEMICOLON:
@@ -995,7 +1012,7 @@ token lexer_get_token(void) {
 						   .line_num = lexer_state.line_num};
 		case OP_AND_ENTRY:
 			if (c != '&') {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Expected &&");
+				return lexer_fail("Expected &&");
 			}
 			lexer_state.fsm_state = OP_AND;
 			break;
@@ -1047,13 +1064,15 @@ token lexer_get_token(void) {
 				ungetc(c, lexer_state.source_file);
 				// Indentation handling before first token on line
 				if (lexer_state.line_cant_have_code) {
-					throw_err(ERR_LEXICAL, lexer_state.line_num,
-							  "Tab indent folowed by token on same line");
+					return lexer_fail("Tab indent folowed by token on same line");
 				}
 				if (!lexer_state.line_has_code) {
 					lexer_state.line_has_code = true;
 					if (lexer_state.leading_space_counter) { // If not already done
-						handle_indent(&lexer_state);
+						if (!handle_indent(&lexer_state)) {
+							lexer_state.failed = true;
+							return (token){.type = TOKEN_ERR, .line_num = lexer_state.line_num};
+						}
 					}
 					if (lexer_state.indentation_token_value > 0) {
 						lexer_state.indentation_token_value--;
@@ -1149,7 +1168,7 @@ token lexer_get_token(void) {
 			break;
 		case BLOCK_COM:
 			if (c == EOF) {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated block comment");
+				return lexer_fail("Unterminated block comment");
 			}
 			if (c == '\n') {
 				lexer_state.line_num++;
@@ -1162,7 +1181,7 @@ token lexer_get_token(void) {
 			break;
 		case NEWLINE_BLOCK_COM:
 			if (c == EOF) {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Unterminated block comment");
+				return lexer_fail("Unterminated block comment");
 			}
 			if (c == '\n') {
 				lexer_state.line_num++;
@@ -1227,7 +1246,7 @@ token lexer_get_token(void) {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
 			} else {
-				throw_err(ERR_LEXICAL, lexer_state.line_num, "Token after multiline block comment");
+				return lexer_fail("Token after multiline block comment");
 			}
 			break;
 		default:
