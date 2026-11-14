@@ -102,8 +102,12 @@ typedef enum {
 	TOKEN_RPAREN,	  /**< right parenthesis */
 	TOKEN_LSQUARE,	  /**< left square parenthesis */
 	TOKEN_RSQUARE,	  /**< right square parenthesis */
-	TOKEN_MAIN,		  /**< @main token */
-	TOKEN_ERR		  /**< token returned when error occurs */
+	TOKEN_INTRPLTDS_START,	   /**< start of interpolated string */
+	TOKEN_INTRPLTDS_END,	   /**< end of interpolated string */
+	TOKEN_INTRPLTDS_EXP_START, /**< start of expression that should be interpolated */
+	TOKEN_INTRPLTDS_EXP_END,   /**< end of expression that should be interpolated */
+	TOKEN_MAIN,				   /**< @main token */
+	TOKEN_ERR				   /**< token returned when error occurs */
 } token_type;
 
 /**

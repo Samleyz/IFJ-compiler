@@ -847,3 +847,247 @@ TEST(LexerAdditional, BlockCommentWithNewlineCreatesLogicalLineEnd) {
 				 {plain(TOKEN_INDENT, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
 				  plain(TOKEN_EOL, 1), plain(TOKEN_DEDENT, 2), plain(TOKEN_EOF, 2)});
 }
+
+// ---------------------------------------------------------
+// Interpolated Strings Tests
+// ---------------------------------------------------------
+
+TEST(LexerInterpolatedStrings, EmptyString) {
+	expectTokens("s\"\"", {plain(TOKEN_INTRPLTDS_START), stringToken(""),
+						   plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, PlainText) {
+	expectTokens("s\"test\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("test"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, WhitespaceOnly) {
+	expectTokens("s\" \"", {plain(TOKEN_INTRPLTDS_START), stringToken(" "),
+							plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, SingleVariable) {
+	expectTokens("s\"$a\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, VariableAndText) {
+	expectTokens("s\"$a b\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(" b"),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, TextAndVariable) {
+	expectTokens("s\"a $b\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("a "), identifier("b"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, TextVariableText) {
+	expectTokens("s\"a $b c\"", {plain(TOKEN_INTRPLTDS_START), stringToken("a "), identifier("b"),
+								 stringToken(" c"), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+								 plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, AdjacentVariables) {
+	expectTokens("s\"$a$b\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(""),
+				  identifier("b"), stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, VariableStartingWithUnderscore) {
+	expectTokens("s\"$_val\"", {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("_val"),
+								stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+								plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, MixedVariablesWithUnderscores) {
+	expectTokens("s\"x $_val y\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("x "), identifier("_val"),
+				  stringToken(" y"), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, VariableWithDigits) {
+	expectTokens("s\"$a123\"", {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a123"),
+								stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+								plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, EscapedDollarSign) {
+	expectTokens("s\"$$\"", {plain(TOKEN_INTRPLTDS_START), stringToken("$"),
+							 plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, EscapedDollarSignWithText) {
+	expectTokens("s\"$$x\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("$x"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, EscapedDollarFollowedByVariable) {
+	expectTokens("s\"$$$x\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("$"), identifier("x"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, TextWithEscapedDollar) {
+	expectTokens("s\"a $$ b\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("a $ b"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, NormalEscapesAreProcessed) {
+	expectTokens("s\"\\n\\t\\r\\\"\\\\\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("\n\t\r\"\\"),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, SimpleIntegerExpression) {
+	expectTokens("s\"${1}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  integer(1), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, ExpressionSurroundedByText) {
+	expectTokens("s\"start ${a} end\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("start "),
+				  plain(TOKEN_INTRPLTDS_EXP_START), identifier("a"), plain(TOKEN_INTRPLTDS_EXP_END),
+				  stringToken(" end"), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, ArithmeticExpression) {
+	expectTokens("s\"${1+2}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  integer(1), op(OPERATOR_PLUS), integer(2), plain(TOKEN_INTRPLTDS_EXP_END),
+				  stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, AdjacentExpressions) {
+	expectTokens("s\"${a}${b}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  identifier("a"), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_EXP_START), identifier("b"), plain(TOKEN_INTRPLTDS_EXP_END),
+				  stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, ComplexExpressionWithMethodCall) {
+	expectTokens("s\"${1 + s\"${2}\".toInt}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  integer(1), op(OPERATOR_PLUS), plain(TOKEN_INTRPLTDS_START), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_EXP_START), integer(2), plain(TOKEN_INTRPLTDS_EXP_END),
+				  stringToken(""), plain(TOKEN_INTRPLTDS_END), op(OPERATOR_DOT),
+				  identifier("toInt"), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, NestedEmptyInterpolatedString) {
+	expectTokens("s\"${s\"\"}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, NestedTextInterpolatedString) {
+	expectTokens("s\"${s\"a\"}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  plain(TOKEN_INTRPLTDS_START), stringToken("a"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, NestedVariableInterpolatedString) {
+	expectTokens("s\"${s\"$a\"}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, InceptionNestingThreeLevels) {
+	expectTokens("s\"L1 ${s\"L2 ${s\"L3\"}\"}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("L1 "),
+				  plain(TOKEN_INTRPLTDS_EXP_START), plain(TOKEN_INTRPLTDS_START),
+				  stringToken("L2 "), plain(TOKEN_INTRPLTDS_EXP_START),
+				  plain(TOKEN_INTRPLTDS_START), stringToken("L3"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringBasic) {
+	expectTokens("s\"\"\"abc\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("abc"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringVariable) {
+	expectTokens("s\"\"\"$a\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringWithInternalQuotes) {
+	expectTokens("s\"\"\"a\"b\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("a\"b"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringWithDoubleInternalQuotes) {
+	expectTokens("s\"\"\"a\"\"b\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("a\"\"b"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringExpression) {
+	expectTokens("s\"\"\"${1}\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  integer(1), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringEscapedDollar) {
+	expectTokens("s\"\"\"$$\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("$"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringMultilineWithVariable) {
+	expectTokens("s\"\"\"a\n$b\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START, 1), stringToken("a\n", 2), identifier("b", 2),
+				  stringToken("", 1), plain(TOKEN_INTRPLTDS_END, 2), plain(TOKEN_EOL, 2),
+				  plain(TOKEN_EOF, 2)});
+}
+
+TEST(LexerInterpolatedErrors, RejectsIsolatedDollar) { expectLexicalError("s\"$\""); }
+
+TEST(LexerInterpolatedErrors, RejectsDollarFollowedBySpace) { expectLexicalError("s\"$ \""); }
+
+TEST(LexerInterpolatedErrors, RejectsDollarFollowedByInvalidChar) { expectLexicalError("s\"$!\""); }
+
+TEST(LexerInterpolatedErrors, RejectsIncompleteUnderscoreVariableEnd) {
+	expectLexicalError("s\"$_\"");
+}
+
+TEST(LexerInterpolatedErrors, RejectsIncompleteUnderscoreVariableSpace) {
+	expectLexicalError("s\"$_ \"");
+}
+
+TEST(LexerInterpolatedErrors, RejectsInvalidEscapeSequence) { expectLexicalError("s\"\\x\""); }
+
+TEST(LexerInterpolatedErrors, RejectsUnescapedNewlineInStandardString) {
+	expectLexicalError("s\"multi\nline\"");
+}
+
+TEST(LexerInterpolatedErrors, RejectsUnterminatedExpressionBlock) {
+	expectLexicalError("s\"${1\"");
+}
