@@ -9,62 +9,84 @@
 
 #include <stddef.h>
 
-struct htable;					 // Ignore (for linking)
-typedef struct htable *htable_t; // Ignore (for linking)
+struct stable; // Ignore (for linking)
 
 /**
  * @brief Type that is used to manipulate with symtable
  */
-typedef htable_t stable_t;
+typedef struct stable *stable_t;
 
-typedef struct {
-	char *key;
+struct symbol {
 	// TODO: what else will symbols need to store here
-} symbol_t;
+};
+
+typedef struct symbol *symbol_t;
 
 /**
- * @brief Initializes empty symbol table
+ * @brief Allocates empty symbol
  *
- * @return stable_t Initialized symbol table (nullptr if failed)
+ * @return symbol_t Allocated symbol set to 0 (nulltptr if failed)
+ */
+symbol_t stable_init_symbol();
+
+/**
+ * @brief Frees symbol
+ *
+ * @param sym Symbolt to free
+ */
+void stable_destroy_symbol(symbol_t sym);
+
+/**
+ * @brief Initializes symbol table stack with first empty scope level prepared
+ *
+ * @return stable_t Initialized table of symbols (nullptr if failed)
  */
 stable_t stable_init();
 
 /**
- * @brief Returns how many records are currently in symbol table
+ * @brief Creates a deeper scope level in symbol table
  *
- * @param stab Symbol table to get the count from
- * @return size_t Record count
+ * @param stab Symbol table to create the scope level in
+ * @return true
+ * @return false
  */
-size_t stable_record_count(stable_t stab);
+bool stable_enter_scope(stable_t stab);
 
 /**
- * @brief Stores saymbol under its key
+ * @brief Pops the current scope level
+ *
+ * @param stab Symbol table to end scope level
+ */
+void stable_leave_scope(stable_t stab);
+
+/**
+ * @brief Stores symbol under its key in the currect scope
  *
  * @param stab Symbol table to store it there
+ * @param key Key under which the symbol should be stored
  * @param entry Symbol to store
  * @return true Success
  * @return false Failed
  */
-bool stable_write(stable_t stab, symbol_t entry);
+bool stable_write(stable_t stab, const char *key, symbol_t entry);
 
 /**
- * @brief Gets you a symbol entry under specified key
+ * @brief Gets you the first symbol entry under specified key from the scope stack
  *
  * @param stab Symbol table to search
  * @param key Key under which you want to search
- * @return symbol_t* Pointer to your specified symbol (nullptr if not found)
+ * @return symbol_t Pointer to your specified symbol (nullptr if not found)
  */
-symbol_t *stable_read(stable_t stab, const char *key);
+symbol_t stable_find_alllevel(stable_t stab, const char *key);
 
 /**
- * @brief Clears a symbol under specified key
+ * @brief Gets you a symbol entry under specified key (fails if not in current scope)
  *
- * @param stab Symbol table where to clear it
- * @param key Cleared symbol key
- * @return true Symbol was cleared
- * @return false There already wasn't anything
+ * @param stab Symbol table to search
+ * @param key Key under which you want to search
+ * @return symbol_t Pointer to your specified symbol (nullptr if not found)
  */
-bool stable_remove(stable_t stab, const char *key);
+symbol_t stable_find_curlevel(stable_t stab, const char *key);
 
 /**
  * @brief Destructs specified symbol table

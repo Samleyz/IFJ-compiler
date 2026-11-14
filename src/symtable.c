@@ -6,48 +6,108 @@
 
 #include "hashtable.h"
 #include "symtable_private.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
-void symbol_dtor(void *sym) {
-	symbol_t *s = (symbol_t *)sym;
-	if (s) {
-		if (s->key) {
-			free(s->key);
-		}
-		free(s);
+symbol_t stable_init_symbol() { return calloc(1, sizeof(struct symbol)); }
+
+void stable_destroy_symbol(symbol_t sym) {
+	if (sym)
+		free(sym);
+}
+
+stable_t stable_init() {
+	// Alloc
+	stable_t stab = malloc(sizeof(struct stable));
+	struct stable_layer *slayer = malloc(sizeof(struct stable_layer));
+	htable_t htab = htable_init(stable_destroy_symbol);
+	if (stab && slayer && htab) {
+		// Success
+		stab->top = slayer;
+		stab->top->table = htab;
+		stab->top->next = nullptr;
+		return stab;
+	} else {
+		// Failed
+		free(stab);
+		free(slayer);
+		htable_dtor(htab);
+		return nullptr;
 	}
 }
 
-stable_t stable_init() { return htable_init(symbol_dtor); }
+bool stable_enter_scope(stable_t stab) {
+	assert(stab && "Called stable_enter_scope on nullptr.");
+	// Alloc
+	struct stable_layer *slayer = malloc(sizeof(struct stable_layer));
+	htable_t htab = htable_init((void (*)(void *))stable_destroy_symbol);
+	if (slayer && htab) {
+		// Success
+		slayer->table = htab;
+		slayer->next = stab->top;
+		stab->top = slayer;
+		return true;
+	} else {
+		// Failed
+		free(slayer);
+		htable_dtor(htab);
+		return false;
+	}
+}
 
-size_t stable_record_count(stable_t stab) { return htable_record_count((htable_t)stab); }
+void stable_leave_scope(stable_t stab) {
+	assert(stab && "Called stable_leave_scope on nullptr.");
+	if (stab->top) { // If there is something
+		// Pop
+		struct stable_layer *tmp = stab->top;
+		stab->top = stab->top->next;
+		htable_dtor(tmp->table);
+		free(tmp);
+	}
+}
 
-bool stable_write(stable_t stab, symbol_t entry) {
-	// Alloc memory
-	symbol_t *tmp_sym = malloc(sizeof(symbol_t));
-	char *tmp_key = strdup(entry.key);
-	if (tmp_sym && tmp_key) { // If success
-		// Transfer symbol data there
-		*tmp_sym = entry;
-		tmp_sym->key = tmp_key;
-		if (htable_write((htable_t)stab, entry.key, tmp_sym)) {
+bool stable_write(stable_t stab, const char *key, symbol_t entry) {
+	assert(stab && "Called stable_write on nullptr.");
+	if (stab->top) {
+		if (htable_write(stab->top->table, key, entry)) {
 			return true;
 		}
 	}
-	// Failed memory alloc
-	free(tmp_sym);
-	free(tmp_key);
 	return false;
 }
 
-symbol_t *stable_read(stable_t stab, const char *key) {
-	return (symbol_t *)htable_read((htable_t)stab, key);
+symbol_t stable_find_alllevel(stable_t stab, const char *key) {
+	assert(stab && "Called stable_find_alllevel on nullptr.");
+	struct stable_layer *current_layer = stab->top;
+	while (current_layer) { // Go though layers
+		// Search each
+		symbol_t sym = htable_read(current_layer->table, key);
+		if (sym) {
+			return sym;
+		}
+		// Move
+		current_layer = current_layer->next;
+	}
+	// Not found
+	return nullptr;
 }
 
-bool stable_remove(stable_t stab, const char *key) { return htable_remove((htable_t)stab, key); }
+symbol_t stable_find_curlevel(stable_t stab, const char *key) {
+	assert(stab && "Called stable_find_curlevel on nullptr.");
+	if (stab->top) {
+		return htable_read(stab->top->table, key);
+	}
+	return nullptr;
+}
 
 stable_t stable_dtor(stable_t stab) {
-	htable_dtor((htable_t)stab);
+	if (stab) {
+		while (stab->top) { // Pop all layers
+			stable_leave_scope(stab);
+		}
+		// Free head
+		free(stab);
+	}
 	return nullptr;
 }

@@ -7,15 +7,22 @@
 #ifndef SYMTABLE_PRIVATE_H
 #define SYMTABLE_PRIVATE_H
 
+#include "hashtable.h"
 #include "symtable.h"
 
 /**
- * @brief Frees specified symbol pointed to by void pointer
- *
- * helper function
- *
- * @param sym Symbol to free
+ * @brief Internal symbol table structure (scope stack of hastables)
  */
-void symbol_dtor(void *sym);
+struct stable_layer {
+	struct stable_layer *next;
+	htable_t table;
+};
+
+/**
+ * @brief Internal symbol table structure (scope stack of hastables)
+ */
+struct stable {
+	struct stable_layer *top;
+};
 
 #endif
