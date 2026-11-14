@@ -77,6 +77,9 @@ std::string dump(ast_node_t node) {
 			   ")";
 	case NODE_VAR_DEF:
 		return std::string(node->as.var_def.is_val ? "(val " : "(var ") + node->as.var_def.name +
+			   (node->as.var_def.type_name != nullptr
+					? std::string(":") + node->as.var_def.type_name
+					: std::string()) +
 			   " " + dump(node->as.var_def.init_expr) + ")";
 	case NODE_ASSIGN:
 		return std::string("(= ") + node->as.assign.target_id + " " + dump(node->as.assign.expr) +
@@ -142,6 +145,53 @@ std::string dump(ast_node_t node) {
 	}
 }
 
+// Prefix form of a function definition with its parameter lists and return type, for example
+// "(def add @main (a:Int)(b:Int) -> Int (+ a b))". A function without parentheses is "noparens".
+std::string dumpDefinition(ast_node_t node) {
+	std::string text = std::string("(def ") + node->as.func_def.name;
+	if (node->as.func_def.is_main) {
+		text += " @main";
+	}
+	if (!node->as.func_def.has_parens) {
+		text += " noparens";
+	} else {
+		text += " ";
+		for (ast_node_t list = node->as.func_def.param_lists.head; list != nullptr;
+			 list = list->next) {
+			text += "(";
+			for (ast_node_t param = list->as.param_list.params.head; param != nullptr;
+				 param = param->next) {
+				text += std::string(param == list->as.param_list.params.head ? "" : " ") +
+						param->as.param.name + ":" + param->as.param.type_name;
+			}
+			text += ")";
+		}
+	}
+	if (node->as.func_def.return_type != nullptr) {
+		text += std::string(" -> ") + node->as.func_def.return_type;
+	}
+	return text + " " + dump(node->as.func_def.body) + ")";
+}
+
+// Prefix form of the top-level definitions of a program (functions and extensions).
+std::string dumpDefinitions(ast_node_t root) {
+	std::string text = "(program";
+	for (ast_node_t item = root->as.program.items.head; item != nullptr; item = item->next) {
+		if (item->type == NODE_EXTENSION) {
+			text += std::string(" (extension ") + item->as.extension.receiver_name + " " +
+					item->as.extension.receiver_type;
+			for (ast_node_t method = item->as.extension.methods.head; method != nullptr;
+				 method = method->next) {
+				text += " " + dumpDefinition(method);
+			}
+			text += ")";
+		} else {
+			text += " " + dumpDefinition(item);
+		}
+	}
+	return text + ")";
+}
+
 // Result of one run: the tree (empty when the parser reported an error).
 struct Outcome {
 	bool ok = false;
@@ -149,7 +199,7 @@ struct Outcome {
 };
 
 // Runs lexer, grammar and expression parser the way main does and cleans up.
-Outcome compile(const std::string &body) {
+Outcome compile(const std::string &body, bool definitions = false) {
 	Outcome outcome;
 	std::string text = "import ifj26.*\n" + body;
 
@@ -163,7 +213,7 @@ Outcome compile(const std::string &body) {
 	ast_node_t root = parse_program(); // owned by the parser, freed by parser_cleanup
 	if (root != nullptr) {
 		outcome.ok = true;
-		outcome.tree = dump(root);
+		outcome.tree = definitions ? dumpDefinitions(root) : dump(root);
 	}
 
 	parser_cleanup();
@@ -177,16 +227,17 @@ struct Case {
 	const char *tree;
 };
 
-template <size_t N> void expectTrees(const Case (&cases)[N]) {
+template <size_t N> void expectTrees(const Case (&cases)[N], bool definitions = false) {
 	for (const Case &current : cases) {
 		SCOPED_TRACE(current.source);
-		Outcome outcome = compile(current.source);
+		Outcome outcome = compile(current.source, definitions);
 		EXPECT_TRUE(outcome.ok);
 		EXPECT_EQ(outcome.tree, current.tree);
 	}
 }
 
 #define EXPECT_TREES(cases) expectTrees(cases)
+#define EXPECT_TREES_OF_DEFINITIONS(cases) expectTrees(cases, true)
 
 TEST(FrontEnd, ParsesFunctionsAndStatements) {
 	const Case cases[] = {
@@ -205,6 +256,86 @@ TEST(FrontEnd, ParsesFunctionsAndStatements) {
 		{"def main() =\n    f(1)(2)\n", "(program (def main (block (stmt (call (call f 1) 2)))))"},
 	};
 	EXPECT_TREES(cases);
+}
+
+TEST(FrontEnd, ParsesFunctionDefinitionsAndParameterLists) {
+	const Case cases[] = {
+		{"def answer: Int = 42\n", "(program (def answer noparens -> Int 42))"},
+		{"def answer = 42\n", "(program (def answer noparens 42))"},
+		{"def f(): Int = 1\n", "(program (def f () -> Int 1))"},
+		{"def f() = 1\n", "(program (def f () 1))"},
+		{"def greet(name: String, times: Int) = name\n",
+		 "(program (def greet (name:String times:Int) name))"},
+		{"def add(a: Int)(b: Int): Int = a + b\n",
+		 "(program (def add (a:Int)(b:Int) -> Int (+ a b)))"},
+		{"def f(a: Double)(): Unit = a\n", "(program (def f (a:Double)() -> Unit a))"},
+		// a trailing comma is allowed when a line break separates it from the closing parenthesis
+		{"def f(a: Int,\n      ): Int = a\n", "(program (def f (a:Int) -> Int a))"},
+		{"def f(\n    a: Int,\n    b: Int,\n    ): Int = a\n",
+		 "(program (def f (a:Int b:Int) -> Int a))"},
+		{"def ok(flag: Boolean): Boolean = flag\n",
+		 "(program (def ok (flag:Boolean) -> Boolean flag))"},
+		{"@main\ndef main() =\n    return 1\n", "(program (def main @main () (block (return 1))))"},
+		{"@main\ndef main(): Unit =\n    val x = 1\n",
+		 "(program (def main @main () -> Unit (block (val x 1))))"},
+		{"def f() = 1\n\n// a comment\ndef g() = 2 // another one\n\ndef h() = 3\n",
+		 "(program (def f () 1) (def g () 2) (def h () 3))"},
+	};
+	EXPECT_TREES_OF_DEFINITIONS(cases);
+}
+
+TEST(FrontEnd, ParsesExtensionDefinitions) {
+	const Case cases[] = {
+		{"extension (value: Int)\n    def twice: Int = value * 2\n",
+		 "(program (extension value Int (def twice noparens -> Int (* value 2))))"},
+		{"extension (value: Int)\n"
+		 "    def twice: Int = value * 2\n"
+		 "    def plus(n: Int): Int = value + n\n"
+		 "    def both(a: Int)(b: Int): Int = a + b\n"
+		 "    def nothing(): Unit = value\n",
+		 "(program (extension value Int (def twice noparens -> Int (* value 2)) "
+		 "(def plus (n:Int) -> Int (+ value n)) (def both (a:Int)(b:Int) -> Int (+ a b)) "
+		 "(def nothing () -> Unit value)))"},
+		{"extension (text: String)\n    def shout: String = text\n\ndef f() = 1\n",
+		 "(program (extension text String (def shout noparens -> String text)) (def f () 1))"},
+		{"def f() = 1\nextension (x: Double)\n    def half: Double = x / 2\n",
+		 "(program (def f () 1) (extension x Double (def half noparens -> Double (/ x 2))))"},
+	};
+	EXPECT_TREES_OF_DEFINITIONS(cases);
+}
+
+TEST(FrontEnd, ParsesTypedVariableDefinitions) {
+	const Case cases[] = {
+		{"def main() =\n    val a: Int = 1\n    var b: Double = 2\n    val c: String = \"x\"\n"
+		 "    var d: Boolean = true\n    val e: Unit = ()\n",
+		 "(program (def main (block (val a:Int 1) (var b:Double 2) (val c:String \"x\") "
+		 "(var d:Boolean true) (val e:Unit ()))))"},
+		{"def main() =\n    val a = 1\n    var b = a\n",
+		 "(program (def main (block (val a 1) (var b a))))"},
+	};
+	EXPECT_TREES(cases);
+}
+
+TEST(FrontEnd, RejectsInvalidDefinitions) {
+	const char *sources[] = {
+		"def f(a Int) = 1\n",					   // parameter without a colon
+		"def f(a: Int,) = 1\n",					   // trailing comma on the same line
+		"def f() 1\n",							   // no equals sign
+		"def = 1\n",							   // no name
+		"def f(): = 1\n",						   // return type without a name
+		"def f(a: Foo) = 1\n",					   // not a type of the language
+		"def f() =\n",							   // no body
+		"extension (value: Int)\n",				   // an extension without a method
+		"extension (value)\n    def f() = 1\n",	   // receiver without a type
+		"extension value: Int\n    def f() = 1\n", // receiver without parentheses
+		"def main() =\n    val x: = 1\n",		   // variable type without a name
+		"def main() =\n    val = 1\n",			   // variable without a name
+		"def main() =\n    val x 1\n",			   // no equals sign
+	};
+	for (const char *source : sources) {
+		SCOPED_TRACE(source);
+		EXPECT_FALSE(compile(source).ok);
+	}
 }
 
 TEST(FrontEnd, ParsesOperatorPrecedenceInsideStatements) {
