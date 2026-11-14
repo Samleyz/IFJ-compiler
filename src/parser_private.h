@@ -14,6 +14,7 @@
 typedef struct parser {
 	token curr_tkn;
 	token look_ahead_tkn;
+	token_type prev_tkn_type; // type of the token consumed last, a block ends with a dedent
 	ast_node_t root;
 } parser_t;
 

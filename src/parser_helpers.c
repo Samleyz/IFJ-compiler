@@ -12,6 +12,7 @@
 #include <string.h>
 
 void parser_advance(parser_t *parser) {
+	parser->prev_tkn_type = parser->curr_tkn.type;
 	free_token_attr(&parser->curr_tkn);
 	parser->curr_tkn = parser->look_ahead_tkn;
 	parser->look_ahead_tkn = (token){0}; // curr_tkn owns the string now, the lexer may throw below
