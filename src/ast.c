@@ -70,6 +70,7 @@ ast_node_t ast_dtor(ast_node_t root) {
 		case NODE_EXTENSION:
 			free(root->as.extension.receiver_name);
 			free(root->as.extension.receiver_type);
+			free(root->as.extension.unique_receiver_name);
 			ast_dtor(root->as.extension.methods.head);
 			break;
 
@@ -87,16 +88,19 @@ ast_node_t ast_dtor(ast_node_t root) {
 		case NODE_PARAM:
 			free(root->as.param.name);
 			free(root->as.param.type_name);
+			free(root->as.param.unique_name);
 			break;
 
 		case NODE_VAR_DEF:
 			free(root->as.var_def.name);
 			free(root->as.var_def.type_name);
+			free(root->as.var_def.unique_name);
 			ast_dtor(root->as.var_def.init_expr);
 			break;
 
 		case NODE_ASSIGN:
 			free(root->as.assign.target_id);
+			free(root->as.assign.unique_target_id);
 			ast_dtor(root->as.assign.expr);
 			break;
 
@@ -113,6 +117,7 @@ ast_node_t ast_dtor(ast_node_t root) {
 
 		case NODE_FOR:
 			free(root->as.for_stmt.var_name);
+			free(root->as.for_stmt.unique_var_name);
 			ast_dtor(root->as.for_stmt.from_expr);
 			ast_dtor(root->as.for_stmt.to_expr);
 			ast_dtor(root->as.for_stmt.step_expr);
@@ -157,13 +162,14 @@ ast_node_t ast_dtor(ast_node_t root) {
 
 		case NODE_IDENTIFIER:
 			free(root->as.id.name);
+			free(root->as.id.unique_name);
 			break;
 
 		case NODE_LIT_STRING:
 			free(root->as.string_val);
 			break;
 		case NODE_ARG_LIST:
-			ast_dtor(root->as.arg_lists.args.head);
+			ast_dtor(root->as.arg_list.args.head);
 			break;
 		case NODE_LIT_INT:
 		case NODE_LIT_DOUBLE:
