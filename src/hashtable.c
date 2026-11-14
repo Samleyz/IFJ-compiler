@@ -70,11 +70,14 @@ bool htable_write(htable_t htab, const char *key, void *data) {
 			htab->boxes[current_idx].data = data;
 			htab->used++; // Increment used counter
 			return true;
-		} else if (!strcmp(htab->boxes[current_idx].key, key)) { // Has same key
-			// Update data there
-			if (htab->data_dtor && htab->boxes[current_idx].data) {
-				htab->data_dtor(htab->boxes[current_idx].data);
+		} else if (!strcmp(htab->boxes[current_idx].key, key)) {	// Has same key
+			if (htab->data_dtor && htab->boxes[current_idx].data) { // If the old can be freed
+				if (htab->boxes[current_idx].data != data) {		// And it isn't the same pointer
+					// free the old
+					htab->data_dtor(htab->boxes[current_idx].data);
+				}
 			}
+			// Update data there
 			htab->boxes[current_idx].data = data;
 			return true;
 		}
