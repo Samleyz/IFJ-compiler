@@ -365,6 +365,58 @@ TEST(LexerNumbers, RecognizesDigitSeparatorsInFractionAndExponent) {
 									   plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
+// Tool: Claude Code
+// Prompt: Fix the lexer tests that failed after allowing a letter or underscore after
+// a dot; "1._2" and "._2" are now a dot followed by the identifier "_2", so add a positive test.
+TEST(LexerNumbers, DotFollowedByUnderscoreIdentifierIsMemberAccess) {
+	expectTokens("1._2 ._2", {integer(1), op(OPERATOR_DOT), identifier("_2"), op(OPERATOR_DOT),
+							  identifier("_2"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
+}
+
+// Tool: Claude Code
+// Prompt: Add more lexer tests for member access after number literals, identifiers and
+// parentheses (5.toString, chaining, doubles, exponents, suffixes) and for invalid dot usage.
+TEST(LexerNumbers, DotAfterIntegerLiteralIsMemberAccess) {
+	expectTokens("5.toString 1_000.floor 7.x_1", {integer(5), op(OPERATOR_DOT), identifier("toString"),
+												  integer(1000), op(OPERATOR_DOT), identifier("floor"),
+												  integer(7), op(OPERATOR_DOT), identifier("x_1"),
+												  plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, ChainedMemberAccessAfterInteger) {
+	expectTokens("1.floor.toInt", {integer(1), op(OPERATOR_DOT), identifier("floor"),
+								   op(OPERATOR_DOT), identifier("toInt"), plain(TOKEN_EOL, 1),
+								   plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterDoubleLiteralIsMemberAccess) {
+	expectTokens("1.5.toString 1e5.toInt 1.5e3.floor 1.5d.toString 5d.toString",
+				 {doubleToken(1.5), op(OPERATOR_DOT), identifier("toString"), doubleToken(100000.0),
+				  op(OPERATOR_DOT), identifier("toInt"), doubleToken(1500.0), op(OPERATOR_DOT),
+				  identifier("floor"), doubleToken(1.5), op(OPERATOR_DOT), identifier("toString"),
+				  doubleToken(5.0), op(OPERATOR_DOT), identifier("toString"), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterIdentifierParenthesisAndString) {
+	expectTokens("x.length (a).toString \"abc\".length",
+				 {identifier("x"), op(OPERATOR_DOT), identifier("length"), plain(TOKEN_LPAREN),
+				  identifier("a"), plain(TOKEN_RPAREN), op(OPERATOR_DOT), identifier("toString"),
+				  stringToken("abc"), op(OPERATOR_DOT), identifier("length"), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterIntegerFollowedByUnderscoreIdentifier) {
+	expectTokens("5._a", {integer(5), op(OPERATOR_DOT), identifier("_a"), plain(TOKEN_EOL, 1),
+						  plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterIntegerWithoutDigitOrIdentifierIsError) {
+	for (const std::string &source : {"5.", "5.(", "5.+", "5. x"}) {
+		expectLexicalError(source);
+	}
+}
+
 TEST(LexerNumbers, SignsAreSeparateOperators) {
 	expectTokens("-12 +.5", {op(OPERATOR_MINUS), integer(12), op(OPERATOR_PLUS), doubleToken(0.5),
 							 plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
@@ -377,7 +429,7 @@ TEST(LexerNumbers, RejectsLeadingZeroes) {
 }
 
 TEST(LexerNumbers, RejectsIncompleteOrMisplacedSeparators) {
-	for (const std::string &source : {"1_", "1._2", "1.2_", "1e_2", "1e2_"}) {
+	for (const std::string &source : {"1_", "1.2_", "1e_2", "1e2_"}) {
 		expectLexicalError(source);
 	}
 }
@@ -397,7 +449,7 @@ TEST(LexerNumbers, RejectsUnsupportedBasesAndSuffixes) {
 }
 
 TEST(LexerNumbers, RejectsMisplacedUnderscoresNearDotAndExp) {
-	for (const std::string &source : {"1_.2", "._2", ".2_", "1_e2", "0_123", "0_"}) {
+	for (const std::string &source : {"1_.2", ".2_", "1_e2", "0_123", "0_"}) {
 		expectLexicalError(source);
 	}
 }

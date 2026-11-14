@@ -535,10 +535,36 @@ token lexer_get_token(void) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
 							  "failed to append char to dynamic string");
 				}
+			} else if (isalpha(c) || c == '_') {
+				ungetc(c, lexer_state.source_file);
+				int32_t number;
+				char *int_str = dstring_get_string(lexer_state.dynamic_string);
+				if (!int_str) {
+					throw_err(ERR_INTERNAL, lexer_state.line_num,
+							  "failed to get string from dynamic string");
+				}
+				int_str[strlen(int_str) - 1] = '\0'; // drops '.' from the string
+				if (convert_int(int_str, &number)) {
+					free(int_str);
+					dstring_erase(lexer_state.dynamic_string);
+					lexer_state.fsm_state = DOT_PENDING;
+					return (token){.type = TOKEN_INTEGER,
+								   .attribute = (token_attr_t){.int_val = number},
+								   .line_num = lexer_state.line_num};
+				} else {
+					free(int_str);
+					return lexer_fail("Invalid integer literal");
+				}
 			} else {
 				return lexer_fail("Expected digit after decimal point");
 			}
 			break;
+		case DOT_PENDING:
+			ungetc(c, lexer_state.source_file);
+			lexer_state.fsm_state = START;
+			return (token){.type = TOKEN_OPERATOR,
+						   .attribute = (token_attr_t){.operator_type = OPERATOR_DOT},
+						   .line_num = lexer_state.line_num};
 		case DOT_STATE_2:
 			if (c >= '0' && c <= '9') {
 				// move
@@ -548,14 +574,12 @@ token lexer_get_token(void) {
 					throw_err(ERR_INTERNAL, lexer_state.line_num,
 							  "failed to append char to dynamic string");
 				}
-			} else if (!isalpha(c) && c != '_') {
+			} else {
 				ungetc(c, lexer_state.source_file);
 				lexer_state.fsm_state = START;
 				return (token){.type = TOKEN_OPERATOR,
 							   .attribute = (token_attr_t){.operator_type = OPERATOR_DOT},
 							   .line_num = lexer_state.line_num};
-			} else {
-				return lexer_fail("Invalid character after decimal point");
 			}
 			break;
 		case D_RETURN:
