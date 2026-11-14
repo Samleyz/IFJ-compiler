@@ -102,10 +102,57 @@ bool generate_program(ast_node_t root) {
 	return true;
 }
 
+static bool generate_ext_def(ast_node_t current_node, const char *receiver_name,
+							 const char *receiver_type) {
+	// Function label
+	char *ext_def_name_half = get_modified_name("$$", receiver_type, "$");
+	if (!ext_def_name_half) {
+		return false;
+	}
+
+	char *ext_def_name = get_modified_name(ext_def_name_half, current_node->as.func_def.name, "");
+	free(ext_def_name_half);
+	if (!ext_def_name) {
+		return false;
+	}
+
+	generate_function_prologue(ext_def_name);
+	free(ext_def_name);
+
+	// Retrieve arguments from stack into local variables
+	if (current_node->as.func_def.has_parens) {
+		ast_node_t current_param_list = current_node->as.func_def.param_lists.head;
+		if (!generate_reverse_paramlists(current_param_list)) {
+			return false;
+		}
+	}
+
+	operand_t parameter = {
+		.operand_type = OP_TYPE_VAR,
+		.frame = FT_LOCAL,
+		.value = {.var_name = receiver_name}}; // TODO: switch to sym_entry unique name
+
+	print_inst_1(INST_DEFVAR, parameter);
+	print_inst_1(INST_POPS, parameter);
+
+	// Function body
+	if (current_node->as.func_def.body) {
+		if (!generate_statements(current_node->as.func_def.body)) {
+			return false;
+		}
+	}
+
+	// Epilogue
+	generate_function_epilogue();
+
+	return true;
+}
+
 static bool generate_extension(ast_node_t current_node) {
 	ast_node_t curr_node = current_node->as.extension.methods.head;
 	while (curr_node) { // cycle over all extension methods
-		if (!generate_function_def(curr_node)) {
+		if (!generate_ext_def(curr_node, current_node->as.extension.receiver_name,
+							  current_node->as.extension.receiver_type)) {
 			return false;
 		}
 		curr_node = curr_node->next;
@@ -153,7 +200,7 @@ static bool generate_reverse_paramlists(ast_node_t param_list) {
 
 static bool generate_function_def(ast_node_t current_node) {
 	// Function label
-	char *function_name = get_prefixed_name("$$", current_node->as.func_def.name);
+	char *function_name = get_modified_name("$$", current_node->as.func_def.name, "");
 	if (!function_name) {
 		return false;
 	}
@@ -201,7 +248,7 @@ static bool generate_prologue(ast_node_t root) {
 	}
 
 	// prepare the prefixed label for main function
-	char *pref_main_label = get_prefixed_name("$$", main_label);
+	char *pref_main_label = get_modified_name("$$", main_label, "");
 
 	if (!pref_main_label) {
 		return false;
@@ -226,20 +273,20 @@ static bool generate_prologue(ast_node_t root) {
 	return true;
 }
 
-char *get_prefixed_name(const char *prefix, const char *name) {
-	if (!prefix || !name) {
+char *get_modified_name(const char *prefix, const char *name, const char *suffix) {
+	if (!prefix || !name || !suffix) {
 		return nullptr;
 	}
 
 	// allocate space for prefix + name + null terminator
-	size_t dest_size = strlen(prefix) + strlen(name) + 1;
+	size_t dest_size = strlen(suffix) + strlen(prefix) + strlen(name) + 1;
 	char *buffer = malloc(dest_size * sizeof(char));
 
 	if (!buffer) {
 		return nullptr;
 	}
 
-	snprintf(buffer, dest_size, "%s%s", prefix, name);
+	snprintf(buffer, dest_size, "%s%s%s", prefix, name, suffix);
 
 	return buffer;
 }

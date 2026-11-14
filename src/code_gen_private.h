@@ -37,7 +37,7 @@ bool generate_statements(ast_node_t current_node);
  * @param[in] name Base identifier name
  * @return Allocated string (caller is responsible for free()), or nullptr on error
  */
-char *get_prefixed_name(const char *prefix, const char *name);
+char *get_modified_name(const char *prefix, const char *name, const char *suffix);
 
 bool get_unique_label();
 
