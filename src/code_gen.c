@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-code_gen_t code_generator;
+static code_gen_t code_generator;
 
 /**
  * @brief Emits the IFJcode26 header and the program bootstrap sequence
@@ -290,3 +290,5 @@ char *get_modified_name(const char *prefix, const char *name, const char *suffix
 
 	return buffer;
 }
+
+FILE *gen_get_output_file(void) { return code_generator.output_file; }

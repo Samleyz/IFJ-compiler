@@ -457,7 +457,7 @@ static void generate_builtin_subStr(void) {
 	// Error 40 exit path
 	print_inst_1(INST_LABEL, err_label);
 	print_inst_1(INST_EXIT, err_code_operand);
-	putc('\n', code_generator.output_file);
+	putc('\n', gen_get_output_file());
 }
 
 // Tool: Gemini
