@@ -453,7 +453,7 @@ static bool expr_parse_call(stack_t stk, parser_t *p) {
 			return false;
 		}
 		parser_advance(p); // "("
-		if (!expr_parse_arguments(p, &arg_list->as.arg_lists.args)) {
+		if (!expr_parse_arguments(p, &arg_list->as.arg_list.args)) {
 			ast_dtor(call);
 			return false;
 		}

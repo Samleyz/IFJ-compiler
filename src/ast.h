@@ -105,6 +105,7 @@ struct ast_node {
 		// NODE_EXTENSION
 		struct {
 			char *receiver_name;
+			char *unique_receiver_name;
 			char *receiver_type;
 			ast_list_t methods; // Linked list of NODE_FUNC_DEF
 		} extension;
@@ -127,12 +128,14 @@ struct ast_node {
 		// NODE_PARAM
 		struct {
 			char *name;
+			char *unique_name;
 			char *type_name;
 		} param;
 
 		// NODE_VAR_DEF
 		struct {
 			char *name;
+			char *unique_name;
 			bool is_val;		  // true = val, false = var
 			char *type_name;	  // Explicit type name or NULL
 			ast_node_t init_expr; // Initializing expression
@@ -141,6 +144,7 @@ struct ast_node {
 		// NODE_ASSIGN
 		struct {
 			char *target_id;
+			char *unique_target_id;
 			ast_node_t expr;
 		} assign;
 
@@ -166,6 +170,7 @@ struct ast_node {
 		// NODE_FOR
 		struct {
 			char *var_name;
+			char *unique_var_name;
 			bool is_inclusive; // true for 'to' (inclusive), false for 'until' (exclusive)
 			ast_node_t from_expr;
 			ast_node_t to_expr;
@@ -200,7 +205,7 @@ struct ast_node {
 		// NODE_ARG_LIST
 		struct {
 			ast_list_t args;
-		} arg_lists;
+		} arg_list;
 
 		// NODE_STRING_INTERP
 		struct {
@@ -231,6 +236,7 @@ struct ast_node {
 		// NODE_IDENTIFIER
 		struct {
 			char *name;
+			char *unique_name;
 		} id;
 
 		// Literals

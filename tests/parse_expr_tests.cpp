@@ -98,7 +98,7 @@ std::string dump(ast_node_t node) {
 			if (list != node->as.func_call.arg_lists.head) {
 				text += " |";
 			}
-			for (ast_node_t arg = list->as.arg_lists.args.head; arg != nullptr; arg = arg->next) {
+			for (ast_node_t arg = list->as.arg_list.args.head; arg != nullptr; arg = arg->next) {
 				text += " " + dump(arg);
 			}
 		}
