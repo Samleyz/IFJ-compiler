@@ -87,18 +87,20 @@ std::string dump(ast_node_t node) {
 		return text + ")";
 	}
 	case NODE_MEMBER_ACCESS: {
-		std::string text = std::string(node->as.member_access.is_call ? "(method " : "(member ") +
-						   dump(node->as.member_access.target) + " " +
-						   node->as.member_access.member_name;
-		for (ast_node_t arg = node->as.member_access.args.head; arg != nullptr; arg = arg->next) {
-			text += " " + dump(arg);
-		}
-		return text + ")";
+		return "(member " + dump(node->as.member_access.target) + " " +
+			   node->as.member_access.member_name + ")";
 	}
 	case NODE_FUNC_CALL: {
 		std::string text = "(call " + dump(node->as.func_call.callee);
-		for (ast_node_t arg = node->as.func_call.args.head; arg != nullptr; arg = arg->next) {
-			text += " " + dump(arg);
+		// lists separated with " |"
+		for (ast_node_t list = node->as.func_call.arg_lists.head; list != nullptr;
+			 list = list->next) {
+			if (list != node->as.func_call.arg_lists.head) {
+				text += " |";
+			}
+			for (ast_node_t arg = list->as.arg_lists.args.head; arg != nullptr; arg = arg->next) {
+				text += " " + dump(arg);
+			}
 		}
 		return text + ")";
 	}
@@ -184,7 +186,7 @@ TEST(ParseExpression, BuildsTreesWithCorrectPrecedenceAndAssociativity) {
 		{"f(1, 2, 3)", "(call f 1 2 3)"},
 		{"f(a + 1, b)", "(call f (+ a 1) b)"},
 		{"f(g(x), h())", "(call f (call g x) (call h))"},
-		{"f(a)(b)", "(call (call f a) b)"},
+		{"f(a)(b)", "(call f a | b)"},
 		{"s\"hello\"", "(interp \"hello\")"},
 		{"s\"$name\"", "(interp name)"},
 		{"s\"\"", "(interp)"},
@@ -204,14 +206,17 @@ TEST(ParseExpression, BuildsTreesWithCorrectPrecedenceAndAssociativity) {
 		{"!a.b && c", "(&& (! (member a b)) c)"},
 		{"a.b + c.d * 2", "(+ (member a b) (* (member c d) 2))"},
 		{"a . b", "(member a b)"},
-		{"a.foo()", "(method a foo)"},
-		{"a.plus(12)", "(method a plus 12)"},
-		{"a.plus(b + 1, c.d)", "(method a plus (+ b 1) (member c d))"},
-		{"a.foo(x)(y)", "(call (method a foo x) y)"},
+		{"a.foo()", "(call (member a foo))"},
+		{"a.plus(12)", "(call (member a plus) 12)"},
+		{"a.plus(b + 1, c.d)", "(call (member a plus) (+ b 1) (member c d))"},
+		{"a.foo(x)(y)", "(call (member a foo) x | y)"},
 		{"f(x).y", "(member (call f x) y)"},
-		{"a.b(c).d(e)", "(method (method a b c) d e)"},
+		{"a.b(c).d(e)", "(call (member (call (member a b) c) d) e)"},
 		{"f(a.b, c.d)", "(call f (member a b) (member c d))"},
-		{"add(x)(y)(1)", "(call (call (call add x) y) 1)"},
+		{"add(x)(y)(1)", "(call add x | y | 1)"},
+		{"f()()", "(call f |)"},
+		{"f(1)()(2)", "(call f 1 | | 2)"},
+		{"a.foo()(1)", "(call (member a foo) | 1)"},
 		{"(f)(x)", "(call f x)"},
 		{"a + f(b) * c", "(+ a (* (call f b) c))"},
 		{"2 * f(x) + 1", "(+ (* 2 (call f x)) 1)"},
@@ -292,6 +297,12 @@ TEST(ParseExpression, LeavesTheTokenThatEndsTheExpressionUnconsumed) {
 	ParseOutcome eol_case = parse("a * b");
 	ASSERT_TRUE(eol_case.ok);
 	EXPECT_EQ(eol_case.next_type, TOKEN_EOL);
+
+	// "(" on the next line is not another argument list
+	ParseOutcome newline_case = parse("f(1)\n(2)");
+	ASSERT_TRUE(newline_case.ok);
+	EXPECT_EQ(newline_case.tree, "(call f 1)");
+	EXPECT_EQ(newline_case.next_type, TOKEN_EOL);
 }
 
 TEST(ParseExpression, AnIdentifierRightAfterAnOperandEndsTheExpression) {
