@@ -77,6 +77,9 @@ std::string dump(ast_node_t node) {
 			   ")";
 	case NODE_VAR_DEF:
 		return std::string(node->as.var_def.is_val ? "(val " : "(var ") + node->as.var_def.name +
+			   (node->as.var_def.type_name != nullptr
+					? std::string(":") + node->as.var_def.type_name
+					: std::string()) +
 			   " " + dump(node->as.var_def.init_expr) + ")";
 	case NODE_ASSIGN:
 		return std::string("(= ") + node->as.assign.target_id + " " + dump(node->as.assign.expr) +
@@ -110,6 +113,12 @@ std::string dump(ast_node_t node) {
 		return "(stmt " + dump(node->as.expr_stmt.expr) + ")";
 	case NODE_FUNC_CALL:
 		return "(call " + dump(node->as.func_call.callee) + dumpList(node->as.func_call.args) + ")";
+	case NODE_STRING_INTERP:
+		return "(interp" + dumpList(node->as.string_interp.parts) + ")";
+	case NODE_MEMBER_ACCESS:
+		return std::string(node->as.member_access.is_call ? "(method " : "(member ") +
+			   dump(node->as.member_access.target) + " " + node->as.member_access.member_name +
+			   dumpList(node->as.member_access.args) + ")";
 	case NODE_BINARY_OP:
 		return "(" + operatorText(node->as.binary_op.operator_type) + " " +
 			   dump(node->as.binary_op.left) + " " + dump(node->as.binary_op.right) + ")";
@@ -136,6 +145,53 @@ std::string dump(ast_node_t node) {
 	}
 }
 
+// Prefix form of a function definition with its parameter lists and return type, for example
+// "(def add @main (a:Int)(b:Int) -> Int (+ a b))". A function without parentheses is "noparens".
+std::string dumpDefinition(ast_node_t node) {
+	std::string text = std::string("(def ") + node->as.func_def.name;
+	if (node->as.func_def.is_main) {
+		text += " @main";
+	}
+	if (!node->as.func_def.has_parens) {
+		text += " noparens";
+	} else {
+		text += " ";
+		for (ast_node_t list = node->as.func_def.param_lists.head; list != nullptr;
+			 list = list->next) {
+			text += "(";
+			for (ast_node_t param = list->as.param_list.params.head; param != nullptr;
+				 param = param->next) {
+				text += std::string(param == list->as.param_list.params.head ? "" : " ") +
+						param->as.param.name + ":" + param->as.param.type_name;
+			}
+			text += ")";
+		}
+	}
+	if (node->as.func_def.return_type != nullptr) {
+		text += std::string(" -> ") + node->as.func_def.return_type;
+	}
+	return text + " " + dump(node->as.func_def.body) + ")";
+}
+
+// Prefix form of the top-level definitions of a program (functions and extensions).
+std::string dumpDefinitions(ast_node_t root) {
+	std::string text = "(program";
+	for (ast_node_t item = root->as.program.items.head; item != nullptr; item = item->next) {
+		if (item->type == NODE_EXTENSION) {
+			text += std::string(" (extension ") + item->as.extension.receiver_name + " " +
+					item->as.extension.receiver_type;
+			for (ast_node_t method = item->as.extension.methods.head; method != nullptr;
+				 method = method->next) {
+				text += " " + dumpDefinition(method);
+			}
+			text += ")";
+		} else {
+			text += " " + dumpDefinition(item);
+		}
+	}
+	return text + ")";
+}
+
 // Result of one run: the tree (empty when the parser reported an error).
 struct Outcome {
 	bool ok = false;
@@ -143,7 +199,7 @@ struct Outcome {
 };
 
 // Runs lexer, grammar and expression parser the way main does and cleans up.
-Outcome compile(const std::string &body) {
+Outcome compile(const std::string &body, bool definitions = false) {
 	Outcome outcome;
 	std::string text = "import ifj26.*\n" + body;
 
@@ -157,7 +213,7 @@ Outcome compile(const std::string &body) {
 	ast_node_t root = parse_program(); // owned by the parser, freed by parser_cleanup
 	if (root != nullptr) {
 		outcome.ok = true;
-		outcome.tree = dump(root);
+		outcome.tree = definitions ? dumpDefinitions(root) : dump(root);
 	}
 
 	parser_cleanup();
@@ -171,16 +227,17 @@ struct Case {
 	const char *tree;
 };
 
-template <size_t N> void expectTrees(const Case (&cases)[N]) {
+template <size_t N> void expectTrees(const Case (&cases)[N], bool definitions = false) {
 	for (const Case &current : cases) {
 		SCOPED_TRACE(current.source);
-		Outcome outcome = compile(current.source);
+		Outcome outcome = compile(current.source, definitions);
 		EXPECT_TRUE(outcome.ok);
 		EXPECT_EQ(outcome.tree, current.tree);
 	}
 }
 
 #define EXPECT_TREES(cases) expectTrees(cases)
+#define EXPECT_TREES_OF_DEFINITIONS(cases) expectTrees(cases, true)
 
 TEST(FrontEnd, ParsesFunctionsAndStatements) {
 	const Case cases[] = {
@@ -199,6 +256,86 @@ TEST(FrontEnd, ParsesFunctionsAndStatements) {
 		{"def main() =\n    f(1)(2)\n", "(program (def main (block (stmt (call (call f 1) 2)))))"},
 	};
 	EXPECT_TREES(cases);
+}
+
+TEST(FrontEnd, ParsesFunctionDefinitionsAndParameterLists) {
+	const Case cases[] = {
+		{"def answer: Int = 42\n", "(program (def answer noparens -> Int 42))"},
+		{"def answer = 42\n", "(program (def answer noparens 42))"},
+		{"def f(): Int = 1\n", "(program (def f () -> Int 1))"},
+		{"def f() = 1\n", "(program (def f () 1))"},
+		{"def greet(name: String, times: Int) = name\n",
+		 "(program (def greet (name:String times:Int) name))"},
+		{"def add(a: Int)(b: Int): Int = a + b\n",
+		 "(program (def add (a:Int)(b:Int) -> Int (+ a b)))"},
+		{"def f(a: Double)(): Unit = a\n", "(program (def f (a:Double)() -> Unit a))"},
+		// a trailing comma is allowed when a line break separates it from the closing parenthesis
+		{"def f(a: Int,\n      ): Int = a\n", "(program (def f (a:Int) -> Int a))"},
+		{"def f(\n    a: Int,\n    b: Int,\n    ): Int = a\n",
+		 "(program (def f (a:Int b:Int) -> Int a))"},
+		{"def ok(flag: Boolean): Boolean = flag\n",
+		 "(program (def ok (flag:Boolean) -> Boolean flag))"},
+		{"@main\ndef main() =\n    return 1\n", "(program (def main @main () (block (return 1))))"},
+		{"@main\ndef main(): Unit =\n    val x = 1\n",
+		 "(program (def main @main () -> Unit (block (val x 1))))"},
+		{"def f() = 1\n\n// a comment\ndef g() = 2 // another one\n\ndef h() = 3\n",
+		 "(program (def f () 1) (def g () 2) (def h () 3))"},
+	};
+	EXPECT_TREES_OF_DEFINITIONS(cases);
+}
+
+TEST(FrontEnd, ParsesExtensionDefinitions) {
+	const Case cases[] = {
+		{"extension (value: Int)\n    def twice: Int = value * 2\n",
+		 "(program (extension value Int (def twice noparens -> Int (* value 2))))"},
+		{"extension (value: Int)\n"
+		 "    def twice: Int = value * 2\n"
+		 "    def plus(n: Int): Int = value + n\n"
+		 "    def both(a: Int)(b: Int): Int = a + b\n"
+		 "    def nothing(): Unit = value\n",
+		 "(program (extension value Int (def twice noparens -> Int (* value 2)) "
+		 "(def plus (n:Int) -> Int (+ value n)) (def both (a:Int)(b:Int) -> Int (+ a b)) "
+		 "(def nothing () -> Unit value)))"},
+		{"extension (text: String)\n    def shout: String = text\n\ndef f() = 1\n",
+		 "(program (extension text String (def shout noparens -> String text)) (def f () 1))"},
+		{"def f() = 1\nextension (x: Double)\n    def half: Double = x / 2\n",
+		 "(program (def f () 1) (extension x Double (def half noparens -> Double (/ x 2))))"},
+	};
+	EXPECT_TREES_OF_DEFINITIONS(cases);
+}
+
+TEST(FrontEnd, ParsesTypedVariableDefinitions) {
+	const Case cases[] = {
+		{"def main() =\n    val a: Int = 1\n    var b: Double = 2\n    val c: String = \"x\"\n"
+		 "    var d: Boolean = true\n    val e: Unit = ()\n",
+		 "(program (def main (block (val a:Int 1) (var b:Double 2) (val c:String \"x\") "
+		 "(var d:Boolean true) (val e:Unit ()))))"},
+		{"def main() =\n    val a = 1\n    var b = a\n",
+		 "(program (def main (block (val a 1) (var b a))))"},
+	};
+	EXPECT_TREES(cases);
+}
+
+TEST(FrontEnd, RejectsInvalidDefinitions) {
+	const char *sources[] = {
+		"def f(a Int) = 1\n",					   // parameter without a colon
+		"def f(a: Int,) = 1\n",					   // trailing comma on the same line
+		"def f() 1\n",							   // no equals sign
+		"def = 1\n",							   // no name
+		"def f(): = 1\n",						   // return type without a name
+		"def f(a: Foo) = 1\n",					   // not a type of the language
+		"def f() =\n",							   // no body
+		"extension (value: Int)\n",				   // an extension without a method
+		"extension (value)\n    def f() = 1\n",	   // receiver without a type
+		"extension value: Int\n    def f() = 1\n", // receiver without parentheses
+		"def main() =\n    val x: = 1\n",		   // variable type without a name
+		"def main() =\n    val = 1\n",			   // variable without a name
+		"def main() =\n    val x 1\n",			   // no equals sign
+	};
+	for (const char *source : sources) {
+		SCOPED_TRACE(source);
+		EXPECT_FALSE(compile(source).ok);
+	}
 }
 
 TEST(FrontEnd, ParsesOperatorPrecedenceInsideStatements) {
@@ -244,6 +381,78 @@ TEST(FrontEnd, ParsesForLoopsWithRangesAndGuards) {
 		 "    do\n        foo(i)\n",
 		 "(program (def main (block (for i until 0 n if (!= i 3) if (< i 8) "
 		 "(block (stmt (call foo i)))))))"},
+	};
+	EXPECT_TREES(cases);
+}
+
+TEST(FrontEnd, ParsesMemberAccessAndMethodCalls) {
+	const Case cases[] = {
+		{"def main() =\n    val n = \"abc\".length\n",
+		 "(program (def main (block (val n (member \"abc\" length)))))"},
+		{"def main() =\n    val n = number.floor.toInt\n",
+		 "(program (def main (block (val n (member (member number floor) toInt)))))"},
+		{"def main() =\n    val s = (1.5).toString\n",
+		 "(program (def main (block (val s (member 1.5 toString)))))"},
+		{"def main() =\n    val s = 5.toString\n",
+		 "(program (def main (block (val s (member 5 toString)))))"},
+		{"def main() =\n    val v = -x.toString\n",
+		 "(program (def main (block (val v (- (member x toString))))))"},
+		{"def main() =\n    val v = a.length + b.length * 2\n",
+		 "(program (def main (block (val v (+ (member a length) (* (member b length) 2))))))"},
+		{"def main() =\n    val v = x.foo()\n",
+		 "(program (def main (block (val v (method x foo)))))"},
+		{"def main() =\n    val v = x.plus(12)\n",
+		 "(program (def main (block (val v (method x plus 12)))))"},
+		{"def main() =\n    val v = x.plus(a + 1, b.length)\n",
+		 "(program (def main (block (val v (method x plus (+ a 1) (member b length))))))"},
+		{"def main() =\n    val v = x.foo(a)(b)\n",
+		 "(program (def main (block (val v (call (method x foo a) b)))))"},
+		{"def main() =\n    val v = f(1).x\n",
+		 "(program (def main (block (val v (member (call f 1) x)))))"},
+		{"def main() =\n    val v = a.b.c(1).d\n",
+		 "(program (def main (block (val v (member (method (member a b) c 1) d)))))"},
+		{"def main() =\n    foo(a.b, c.d)\n",
+		 "(program (def main (block (stmt (call foo (member a b) (member c d))))))"},
+		{"def main() =\n    val v = if s.length > 3 then s.length else 0\n",
+		 "(program (def main (block (val v (ifexpr (> (member s length) 3) "
+		 "(stmt (member s length)) (stmt 0))))))"},
+		{"def main() =\n    for i <- 0 until s.length do\n        foo(i)\n",
+		 "(program (def main (block (for i until 0 (member s length) "
+		 "(block (stmt (call foo i)))))))"},
+	};
+	EXPECT_TREES(cases);
+}
+
+TEST(FrontEnd, ParsesInterpolatedStrings) {
+	// Empty text between the parts is dropped, an empty list is the empty string.
+	const Case cases[] = {
+		{"def main() =\n    val s = s\"hello\"\n",
+		 "(program (def main (block (val s (interp \"hello\")))))"},
+		{"def main() =\n    val s = s\"$name\"\n",
+		 "(program (def main (block (val s (interp name)))))"},
+		{"def main() =\n    val s = s\"\"\n", "(program (def main (block (val s (interp)))))"},
+		{"def main() =\n    val s = s\"$name${n + 1} costs $$0\"\n",
+		 "(program (def main (block (val s (interp name (+ n 1) \" costs $0\")))))"},
+		{"def main() =\n    val s = s\"a ${f(1)} z\"\n",
+		 "(program (def main (block (val s (interp \"a \" (call f 1) \" z\")))))"},
+		{"def main() =\n    val s = s\"x ${f(s\"y\")} z\"\n",
+		 "(program (def main (block (val s (interp \"x \" (call f (interp \"y\")) \" z\")))))"},
+		{"def main() =\n    val s = s\"${x.length}\"\n",
+		 "(program (def main (block (val s (interp (member x length))))))"},
+		{"def main() =\n    val s = s\"a\".length\n",
+		 "(program (def main (block (val s (member (interp \"a\") length)))))"},
+		{"def main() =\n    val s = s\"a\" + s\"b\"\n",
+		 "(program (def main (block (val s (+ (interp \"a\") (interp \"b\"))))))"},
+		{"def main() =\n    print(s\"v=$v\", w)\n",
+		 "(program (def main (block (stmt (call print (interp \"v=\" v) w)))))"},
+		{"def main() =\n    return s\"x\"\n",
+		 "(program (def main (block (return (interp \"x\")))))"},
+		{"def f() = s\"x\"\n", "(program (def f (interp \"x\")))"},
+		// a statement and the one-line branches of an if may start with an interpolated string
+		{"def main() =\n    s\"x\"\n", "(program (def main (block (stmt (interp \"x\")))))"},
+		{"def main() =\n    val s = if a then s\"1\" else s\"2\"\n",
+		 "(program (def main (block (val s (ifexpr a (stmt (interp \"1\")) (stmt (interp "
+		 "\"2\")))))))"},
 	};
 	EXPECT_TREES(cases);
 }
@@ -308,10 +517,17 @@ TEST(FrontEnd, ParsesAnIfExpressionAsAOneLineBranchOfAnotherIf) {
 
 TEST(FrontEnd, RejectsInvalidExpressions) {
 	const char *sources[] = {
-		"def main() =\n    val x = 1 +\n",
-		"def main() =\n    val x = 1 < 2 < 3\n",
-		"def main() =\n    val x = 1 2\n",
-		"def main() =\n    val x = f(1 2)\n",
+		"def main() =\n    val x = 1 +\n", "def main() =\n    val x = 1 < 2 < 3\n",
+		"def main() =\n    val x = 1 2\n", "def main() =\n    val x = f(1 2)\n",
+		"def main() =\n    val x = a.\n",	 // no member name
+		"def main() =\n    val x = a.(b)\n", // a member name is an identifier
+		"def main() =\n    val x = a.1\n",	 // a digit after the dot is a number
+		"def main() =\n    val x = .a\n",	 // no expression before the dot
+		"def main() =\n    val x = a.b(1 2)\n",
+		"def main() =\n    val x = s\"${}\"\n",		// an empty expression in an interpolated string
+		"def main() =\n    val x = s\"${1 +}\"\n",	// an incomplete expression in it
+		"def main() =\n    val x = s\"${1 + 2\"\n", // the expression is not closed // an error
+													// inside the arguments
 		"def main() =\n    val x = if a then 1\n",
 		"def main() =\n    val x = if a 1 else 2\n", // the condition is not a valid expression
 		"def main() =\n    val x = if a then 1 else if b then 3\n",

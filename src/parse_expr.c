@@ -329,7 +329,6 @@ static ast_node_t expr_build_node(expr_entry_t *handle[], size_t count) {
 		expr_is_node(handle[1]) && expr_is_terminal(handle[2], EXPR_SYMBOL_RIGHT_PAREN)) {
 		return expr_take_node(handle[1]);
 	}
-	// TODO function calls, member access
 	return nullptr;
 }
 
@@ -443,6 +442,140 @@ static bool expr_parse_call(stack_t stk, parser_t *p) {
 }
 
 /**
+ * @brief Helper function: Turns the expression on top of the stack into the target of a member
+ * access
+ * @param stk Expression stack, a node entry must be on top
+ * @param p Parser, its current token is the "." that follows the expression
+ * @return true on success, false on a syntax error (it is printed)
+ * @note "x.name" and "x.name(arguments)" both build a NODE_MEMBER_ACCESS, is_call tells them apart
+ */
+static bool expr_parse_member(stack_t stk, parser_t *p) {
+	parser_advance(p); // "."
+	if (!peek_token_type(p, TOKEN_IDENTIFIER)) {
+		print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected a member name after '.'");
+		return false;
+	}
+
+	// The target stays on the stack until the node exists, so an allocation failure frees it there.
+	ast_node_t member = expr_create_node(NODE_MEMBER_ACCESS, p->curr_tkn.line_num);
+	if (member == nullptr) {
+		return false;
+	}
+	member->as.member_access.member_name = p->curr_tkn.attribute.string_val;
+	p->curr_tkn.attribute.string_val = nullptr;
+	expr_entry_t *entry = expr_stack_top(stk);
+	stack_pop(stk);
+	member->as.member_access.target = expr_take_node(entry);
+	expr_entry_free(entry);
+	parser_advance(p); // the member name
+
+	// From here on the member node owns the target, so freeing it on an error frees both.
+	if (peek_token_type(p, TOKEN_LPAREN)) {
+		member->as.member_access.is_call = true;
+		parser_advance(p); // "("
+		if (!expr_parse_arguments(p, &member->as.member_access.args)) {
+			ast_dtor(member);
+			return false;
+		}
+	}
+	return expr_stack_push(stk, expr_entry_new_node(member));
+}
+
+/**
+ * @brief Helper function: Appends a part to the interpolated string, frees the part on failure
+ * @param interp NODE_STRING_INTERP node
+ * @param part Node to be appended, nullptr (an earlier failure) makes the call fail
+ * @return true on success, false on failure (the error is printed)
+ */
+static bool expr_interp_append(ast_node_t interp, ast_node_t part) {
+	if (part == nullptr) {
+		return false;
+	}
+	if (!ast_list_append(&interp->as.string_interp.parts, part)) {
+		ast_dtor(part);
+		print_error(ERR_INTERNAL, 0, "Failed to append a part of an interpolated string");
+		return false;
+	}
+	return true;
+}
+
+/**
+ * @brief Helper function: Parses one part of an interpolated string and appends it
+ * @param p Parser, its current token is the first token of the part
+ * @param interp NODE_STRING_INTERP node that receives the part
+ * @return true on success, false on a syntax error (it is printed)
+ * @note The lexer sends the text between the parts as STRING tokens, an empty one carries no text
+ * and is dropped
+ */
+static bool expr_parse_interp_part(parser_t *p, ast_node_t interp) {
+	if (peek_token_type(p, TOKEN_STRING)) {
+		const char *text = p->curr_tkn.attribute.string_val;
+		if (text == nullptr || text[0] == '\0') {
+			parser_advance(p);
+			return true;
+		}
+		ast_node_t part = expr_create_node(NODE_LIT_STRING, p->curr_tkn.line_num);
+		if (part == nullptr) {
+			return false;
+		}
+		part->as.string_val = p->curr_tkn.attribute.string_val;
+		p->curr_tkn.attribute.string_val = nullptr;
+		parser_advance(p);
+		return expr_interp_append(interp, part);
+	}
+	if (peek_token_type(p, TOKEN_IDENTIFIER)) {
+		// "$name" is the value of a variable
+		ast_node_t part = expr_create_node(NODE_IDENTIFIER, p->curr_tkn.line_num);
+		if (part == nullptr) {
+			return false;
+		}
+		part->as.id.name = p->curr_tkn.attribute.string_val;
+		p->curr_tkn.attribute.string_val = nullptr;
+		parser_advance(p);
+		return expr_interp_append(interp, part);
+	}
+	if (peek_token_type(p, TOKEN_INTRPLTDS_EXP_START)) {
+		// "${expression}", the expression ends by itself at the closing brace
+		parser_advance(p);
+		ast_node_t part = parse_expression(p);
+		if (part == nullptr) {
+			return false;
+		}
+		if (!peek_token_type(p, TOKEN_INTRPLTDS_EXP_END)) {
+			ast_dtor(part);
+			print_error(ERR_SYNTACTIC, p->curr_tkn.line_num,
+						"Expected the end of the expression in an interpolated string");
+			return false;
+		}
+		parser_advance(p);
+		return expr_interp_append(interp, part);
+	}
+	print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Unexpected token in an interpolated string");
+	return false;
+}
+
+/**
+ * @brief Helper function: Parses an interpolated string
+ * @param p Parser, its current token is the start of the interpolated string
+ * @return pointer to the NODE_STRING_INTERP node, nullptr on a syntax error (it is printed)
+ */
+static ast_node_t expr_parse_interpolated(parser_t *p) {
+	ast_node_t interp = expr_create_node(NODE_STRING_INTERP, p->curr_tkn.line_num);
+	if (interp == nullptr) {
+		return nullptr;
+	}
+	parser_advance(p); // the start of the interpolated string
+	while (!peek_token_type(p, TOKEN_INTRPLTDS_END)) {
+		if (!expr_parse_interp_part(p, interp)) {
+			ast_dtor(interp);
+			return nullptr;
+		}
+	}
+	parser_advance(p); // the end of the interpolated string
+	return interp;
+}
+
+/**
  * @brief Helper function: Parses an if expression with the grammar rule for if
  * @param p Parser, its current token is "if"
  * @return pointer to the NODE_IF node, nullptr on a syntax error (it is printed)
@@ -490,6 +623,19 @@ ast_node_t parse_expression(parser_t *p) {
 	while (true) {
 		expr_symbol_t input = expr_input_symbol(p, expects_operand, paren_depth);
 
+		if (expects_operand && peek_token_type(p, TOKEN_INTRPLTDS_START)) {
+			// An interpolated string is an operand like any other.
+			ast_node_t node = expr_parse_interpolated(p);
+			if (node == nullptr) {
+				goto done;
+			}
+			if (!expr_stack_push(stk, expr_entry_new_node(node))) {
+				goto done;
+			}
+			expects_operand = false;
+			continue;
+		}
+
 		if (expects_operand && peek_keyword(p, KW_IF)) {
 			// "if" used as an expression is parsed by the grammar rule for if, and the node it
 			// returns is an operand like any other.
@@ -514,6 +660,20 @@ ast_node_t parse_expression(parser_t *p) {
 					goto done;
 				}
 			} else if (!expr_parse_call(stk, p)) {
+				goto done;
+			}
+			continue;
+		}
+
+		if (peek_operator(p, OPERATOR_DOT) && !expects_operand) {
+			// A '.' right after an operand or ')' starts a member access. Like a call it binds
+			// tighter than every operator and is applied straight to the finished expression on
+			// top of the stack, so the table is not consulted and "-x.y" is "-(x.y)".
+			if (!expr_is_node(expr_stack_top(stk))) {
+				if (!expr_reduce(stk, p)) {
+					goto done;
+				}
+			} else if (!expr_parse_member(stk, p)) {
 				goto done;
 			}
 			continue;

@@ -200,7 +200,9 @@ struct ast_node {
 
 		// NODE_STRING_INTERP
 		struct {
-			ast_list_t parts; // Linked list of string literals and expressions
+			// Linked list of string literals and expressions, in order. Empty text between the
+			// parts is dropped, so an empty list is the empty string.
+			ast_list_t parts;
 		} string_interp;
 
 		// NODE_TYPE_CAST

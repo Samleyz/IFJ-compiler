@@ -50,7 +50,10 @@ typedef enum state {
 	B_EOL_STATE,
 	O_SQUARE_BRACKET,
 	C_SQUARE_BRACKET,
+	STRING_ENTRY,
 	STRING,
+	TWO_QUOTATION_MARKS,
+	STRING_INTERUPT,
 	STRING_END,
 	BLOCK_STRING,
 	BLOCK_STRING_END,
@@ -87,6 +90,11 @@ typedef enum state {
 	ALERT_COM_OUT_1,
 	ALERT_COM_OUT2,
 	AFTER_MULTILINE_COMMENT,
+	S_STATE,
+	C_CURLY_BRACKET,
+	DOLLAR,
+	INTRPLTDS_UNDERSCORE,
+	INTRPLTDS_IDENTIFIER,
 	STATE_CNT
 } state_t;
 
@@ -105,6 +113,11 @@ typedef struct {
 									 line is lexical error */
 	int indentation_token_value;  /**< The value shows, how many indent or dedent tokens should be
 									 sent (-1 for dedent, 1 for indent)*/
+	size_t interpolateds_substate; /**< Stores substate flag, where is stored whether the lexer is
+								in interpolated string (1), interpolated block string (2) or in
+								normal function (0) */
+	stack_t interpolateds_substate_stack; /**< Stack to store the interpolated substates in nested
+													  interpolated strings */
 
 	unsigned comment_start_line; /**< Line where the outermost block comment started */
 	unsigned string_start_line;	 /**< The line number where the string started */
