@@ -130,13 +130,12 @@ ast_node_t ast_dtor(ast_node_t root) {
 
 		case NODE_FUNC_CALL:
 			ast_dtor(root->as.func_call.callee);
-			ast_dtor(root->as.func_call.args.head);
+			ast_dtor(root->as.func_call.arg_lists.head);
 			break;
 
 		case NODE_MEMBER_ACCESS:
 			ast_dtor(root->as.member_access.target);
 			free(root->as.member_access.member_name);
-			ast_dtor(root->as.member_access.args.head);
 			break;
 
 		case NODE_STRING_INTERP:
@@ -163,7 +162,9 @@ ast_node_t ast_dtor(ast_node_t root) {
 		case NODE_LIT_STRING:
 			free(root->as.string_val);
 			break;
-
+		case NODE_ARG_LIST:
+			ast_dtor(root->as.arg_lists.args.head);
+			break;
 		case NODE_LIT_INT:
 		case NODE_LIT_DOUBLE:
 		case NODE_LIT_BOOL:
