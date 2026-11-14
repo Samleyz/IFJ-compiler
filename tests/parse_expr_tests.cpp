@@ -78,6 +78,14 @@ std::string dump(ast_node_t node) {
 		return node->as.bool_val ? "true" : "false";
 	case NODE_LIT_UNIT:
 		return "()";
+	case NODE_STRING_INTERP: {
+		std::string text = "(interp";
+		for (ast_node_t part = node->as.string_interp.parts.head; part != nullptr;
+			 part = part->next) {
+			text += " " + dump(part);
+		}
+		return text + ")";
+	}
 	case NODE_MEMBER_ACCESS: {
 		std::string text = std::string(node->as.member_access.is_call ? "(method " : "(member ") +
 						   dump(node->as.member_access.target) + " " +
@@ -177,6 +185,15 @@ TEST(ParseExpression, BuildsTreesWithCorrectPrecedenceAndAssociativity) {
 		{"f(a + 1, b)", "(call f (+ a 1) b)"},
 		{"f(g(x), h())", "(call f (call g x) (call h))"},
 		{"f(a)(b)", "(call (call f a) b)"},
+		{"s\"hello\"", "(interp \"hello\")"},
+		{"s\"$name\"", "(interp name)"},
+		{"s\"\"", "(interp)"},
+		{"s\"$name${n + 1} costs $$0\"", "(interp name (+ n 1) \" costs $0\")"},
+		{"s\"x ${f(s\"y\")} z\"", "(interp \"x \" (call f (interp \"y\")) \" z\")"},
+		{"s\"${a.b}\"", "(interp (member a b))"},
+		{"s\"a\".length", "(member (interp \"a\") length)"},
+		{"s\"a\" + s\"b\" == c", "(== (+ (interp \"a\") (interp \"b\")) c)"},
+		{"f(s\"x $y\", z)", "(call f (interp \"x \" y) z)"},
 		{"a.length", "(member a length)"},
 		{"a.b.c", "(member (member a b) c)"},
 		{"\"abc\".length", "(member \"abc\" length)"},
@@ -222,22 +239,25 @@ TEST(ParseExpression, BuildsTreesWithCorrectPrecedenceAndAssociativity) {
 
 TEST(ParseExpression, RejectsInvalidExpressions) {
 	const char *sources[] = {
-		"a < b < c",   // relational operators are not associative
-		"a == b != c", // neither are equality operators
-		"1 2",		   // two operands in a row (two literals)
-		"* 3",		   // operator without a left operand
-		"a +",		   // operator without a right operand
-		"a + * b",	   // operator after an operator
-		"a !b",		   // prefix operator after an operand
-		"a.",		   // no member name
-		"a.(b)",	   // a member name is an identifier
-		"a.1",		   // a digit after the dot is a number, not a member
-		".a",		   // nothing before the dot
-		"a.b(1 2)",	   // an error inside the arguments of a method
-		"f(a,)",	   // trailing comma on the same line as ")"
-		"f(,a)",	   // missing argument
-		"f(a b)",	   // two operands in one argument
-		"f(a +)",	   // incomplete argument
+		"a < b < c",	// relational operators are not associative
+		"a == b != c",	// neither are equality operators
+		"1 2",			// two operands in a row (two literals)
+		"* 3",			// operator without a left operand
+		"a +",			// operator without a right operand
+		"a + * b",		// operator after an operator
+		"a !b",			// prefix operator after an operand
+		"s\"${}\"",		// an empty expression in an interpolated string
+		"s\"${1 +}\"",	// an incomplete expression in it
+		"s\"${1 + 2\"", // the expression is not closed
+		"a.",			// no member name
+		"a.(b)",		// a member name is an identifier
+		"a.1",			// a digit after the dot is a number, not a member
+		".a",			// nothing before the dot
+		"a.b(1 2)",		// an error inside the arguments of a method
+		"f(a,)",		// trailing comma on the same line as ")"
+		"f(,a)",		// missing argument
+		"f(a b)",		// two operands in one argument
+		"f(a +)",		// incomplete argument
 		// An error in the middle of a call: everything built so far must be freed (Valgrind).
 		"f(a, b +)",
 		"f(a, b, c +)",

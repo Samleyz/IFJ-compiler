@@ -110,6 +110,8 @@ std::string dump(ast_node_t node) {
 		return "(stmt " + dump(node->as.expr_stmt.expr) + ")";
 	case NODE_FUNC_CALL:
 		return "(call " + dump(node->as.func_call.callee) + dumpList(node->as.func_call.args) + ")";
+	case NODE_STRING_INTERP:
+		return "(interp" + dumpList(node->as.string_interp.parts) + ")";
 	case NODE_MEMBER_ACCESS:
 		return std::string(node->as.member_access.is_call ? "(method " : "(member ") +
 			   dump(node->as.member_access.target) + " " + node->as.member_access.member_name +
@@ -290,6 +292,40 @@ TEST(FrontEnd, ParsesMemberAccessAndMethodCalls) {
 	EXPECT_TREES(cases);
 }
 
+TEST(FrontEnd, ParsesInterpolatedStrings) {
+	// Empty text between the parts is dropped, an empty list is the empty string.
+	const Case cases[] = {
+		{"def main() =\n    val s = s\"hello\"\n",
+		 "(program (def main (block (val s (interp \"hello\")))))"},
+		{"def main() =\n    val s = s\"$name\"\n",
+		 "(program (def main (block (val s (interp name)))))"},
+		{"def main() =\n    val s = s\"\"\n", "(program (def main (block (val s (interp)))))"},
+		{"def main() =\n    val s = s\"$name${n + 1} costs $$0\"\n",
+		 "(program (def main (block (val s (interp name (+ n 1) \" costs $0\")))))"},
+		{"def main() =\n    val s = s\"a ${f(1)} z\"\n",
+		 "(program (def main (block (val s (interp \"a \" (call f 1) \" z\")))))"},
+		{"def main() =\n    val s = s\"x ${f(s\"y\")} z\"\n",
+		 "(program (def main (block (val s (interp \"x \" (call f (interp \"y\")) \" z\")))))"},
+		{"def main() =\n    val s = s\"${x.length}\"\n",
+		 "(program (def main (block (val s (interp (member x length))))))"},
+		{"def main() =\n    val s = s\"a\".length\n",
+		 "(program (def main (block (val s (member (interp \"a\") length)))))"},
+		{"def main() =\n    val s = s\"a\" + s\"b\"\n",
+		 "(program (def main (block (val s (+ (interp \"a\") (interp \"b\"))))))"},
+		{"def main() =\n    print(s\"v=$v\", w)\n",
+		 "(program (def main (block (stmt (call print (interp \"v=\" v) w)))))"},
+		{"def main() =\n    return s\"x\"\n",
+		 "(program (def main (block (return (interp \"x\")))))"},
+		{"def f() = s\"x\"\n", "(program (def f (interp \"x\")))"},
+		// a statement and the one-line branches of an if may start with an interpolated string
+		{"def main() =\n    s\"x\"\n", "(program (def main (block (stmt (interp \"x\")))))"},
+		{"def main() =\n    val s = if a then s\"1\" else s\"2\"\n",
+		 "(program (def main (block (val s (ifexpr a (stmt (interp \"1\")) (stmt (interp "
+		 "\"2\")))))))"},
+	};
+	EXPECT_TREES(cases);
+}
+
 TEST(FrontEnd, ParsesIfExpressionsWithTheRealGrammar) {
 	// Branches of an if expression are NODE_EXPR_STMT (see the comment of if_stmt in ast.h).
 	const Case cases[] = {
@@ -350,15 +386,17 @@ TEST(FrontEnd, ParsesAnIfExpressionAsAOneLineBranchOfAnotherIf) {
 
 TEST(FrontEnd, RejectsInvalidExpressions) {
 	const char *sources[] = {
-		"def main() =\n    val x = 1 +\n",
-		"def main() =\n    val x = 1 < 2 < 3\n",
-		"def main() =\n    val x = 1 2\n",
-		"def main() =\n    val x = f(1 2)\n",
-		"def main() =\n    val x = a.\n",		// no member name
-		"def main() =\n    val x = a.(b)\n",	// a member name is an identifier
-		"def main() =\n    val x = a.1\n",		// a digit after the dot is a number
-		"def main() =\n    val x = .a\n",		// no expression before the dot
-		"def main() =\n    val x = a.b(1 2)\n", // an error inside the arguments
+		"def main() =\n    val x = 1 +\n", "def main() =\n    val x = 1 < 2 < 3\n",
+		"def main() =\n    val x = 1 2\n", "def main() =\n    val x = f(1 2)\n",
+		"def main() =\n    val x = a.\n",	 // no member name
+		"def main() =\n    val x = a.(b)\n", // a member name is an identifier
+		"def main() =\n    val x = a.1\n",	 // a digit after the dot is a number
+		"def main() =\n    val x = .a\n",	 // no expression before the dot
+		"def main() =\n    val x = a.b(1 2)\n",
+		"def main() =\n    val x = s\"${}\"\n",		// an empty expression in an interpolated string
+		"def main() =\n    val x = s\"${1 +}\"\n",	// an incomplete expression in it
+		"def main() =\n    val x = s\"${1 + 2\"\n", // the expression is not closed // an error
+													// inside the arguments
 		"def main() =\n    val x = if a then 1\n",
 		"def main() =\n    val x = if a 1 else 2\n", // the condition is not a valid expression
 		"def main() =\n    val x = if a then 1 else if b then 3\n",
