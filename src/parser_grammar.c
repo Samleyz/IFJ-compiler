@@ -343,7 +343,10 @@ ast_node_t parse_block(parser_t *p) {
 	// <line_seq>
 	// Rule 13: <line_seq> -> "EOL" <line> <line_seq>
 	// Rule 14: <line_seq> -> eps
-	while (peek_token_type(p, TOKEN_EOL) || peek_line_beg(p)) {
+	// A line directly after a nested block has no EOL, the block took it, so that is the only
+	// place where a line may start without one. Otherwise "a = 1 b = 2" would be accepted.
+	while (peek_token_type(p, TOKEN_EOL) ||
+		   (peek_line_beg(p) && p->prev_tkn_type == TOKEN_DEDENT)) {
 		// "EOL"
 		if (peek_token_type(p, TOKEN_EOL)) {
 			if (peek_next_token_type(p, TOKEN_DEDENT)) {

@@ -316,6 +316,59 @@ TEST(FrontEnd, ParsesTypedVariableDefinitions) {
 	EXPECT_TREES(cases);
 }
 
+TEST(FrontEnd, ParsesLinesAfterNestedBlocksAndSeparatedStatements) {
+	// A line directly after a block has no end-of-line token (the block took it), it is still
+	// valid.
+	const Case cases[] = {
+		{"def main() =\n    if a then\n        b = 1\n    c = 2\n",
+		 "(program (def main (block (if a (block (= b 1)) -) (= c 2))))"},
+		{"def main() =\n    while a do\n        if b then\n            c = 1\n    d = 2\n",
+		 "(program (def main (block (while a (block (if b (block (= c 1)) -))) (= d 2))))"},
+		{"def main() =\n    while a do\n        b = 1\n    for i <- 1 to 3 do\n        f(i)\n"
+		 "    g = 2\n",
+		 "(program (def main (block (while a (block (= b 1))) "
+		 "(for i to 1 3 (block (stmt (call f i)))) (= g 2))))"},
+		{"def main() =\n    val x = if a then\n        1\n    else\n        2\n    print(x)\n",
+		 "(program (def main (block (val x (ifexpr a (block (stmt 1)) (block (stmt 2)))) "
+		 "(stmt (call print x)))))"},
+		{"def main() =\n    if a then\n        b = 1\n    else if c then\n        b = 2\n"
+		 "    else\n        b = 3\n    d = 4\n",
+		 "(program (def main (block (if a (block (= b 1)) (if c (block (= b 2)) (block (= b 3)))) "
+		 "(= d 4))))"},
+		// several statements on one line are separated by a semicolon
+		{"def main() =\n    a = 1; b = 2\n    if c then\n        d = 1\n    e = 2; f = 3\n",
+		 "(program (def main (block (= a 1) (= b 2) (if c (block (= d 1)) -) (= e 2) (= f 3))))"},
+		{"def main() =\n    a = 1\n\n    // a comment\n    b = 2 // another one\n",
+		 "(program (def main (block (= a 1) (= b 2))))"},
+	};
+	EXPECT_TREES(cases);
+}
+
+TEST(FrontEnd, RejectsStatementsWithoutASeparator) {
+	// Statements are separated by a new logical line or by a semicolon. An expression ends at an
+	// identifier after an operand (the words to, until and by of a for loop), so these programs
+	// must be rejected by the rules that call it.
+	const char *sources[] = {
+		"def main() =\n    a = 1 b = 2\n",
+		"def main() =\n    x y\n",
+		"def main() =\n    val x = 1 y\n",
+		"def main() =\n    f(1) g(2)\n",
+		"def main() =\n    return 1 x\n",
+		"def main() =\n    if a then b c\n",
+		"def main() =\n    while a do b c\n",
+		"def main() =\n    if a then\n        b = 1\n    c = 2 d = 3\n",
+		"def f() = 1 x\n",
+	};
+	for (const char *source : sources) {
+		SCOPED_TRACE(source);
+		EXPECT_FALSE(compile(source).ok);
+	}
+
+	// The same words still end the expressions of a for loop.
+	EXPECT_TRUE(compile("def main() =\n    for i <- 1 to 10 by 2 do\n        f(i)\n").ok);
+	EXPECT_TRUE(compile("def main() =\n    for i <- 0 until n do\n        f(i)\n").ok);
+}
+
 TEST(FrontEnd, RejectsInvalidDefinitions) {
 	const char *sources[] = {
 		"def f(a Int) = 1\n",					   // parameter without a colon
