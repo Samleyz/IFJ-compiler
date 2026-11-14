@@ -31,6 +31,7 @@ typedef enum state {
 	EX_NUM,
 	EXP_SIGN,
 	DOT_STATE,
+	DOT_PENDING,
 	DOT_STATE_2,
 	D_RETURN,
 	UND_FOR_DOUBLES,
