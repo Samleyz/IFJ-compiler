@@ -16,7 +16,7 @@ class StackTest : public ::testing::Test {
   protected:
 	my_stack_t stk; // cpp keyword confilict with "stack_t"
 
-	void SetUp() override { stk = stack_init(); }
+	void SetUp() override { stk = stack_init(nullptr); }
 
 	void TearDown() override {
 		if (stk != nullptr) {

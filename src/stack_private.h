@@ -22,7 +22,8 @@ typedef struct stack_item {
  * @brief Linked list stack structure
  */
 typedef struct stack {
-	stack_item *top; // Item stored on top of the stack, NULL if empty
+	stack_item *top;			  // Item stored on top of the stack, NULL if empty
+	void (*dstr_data_cb)(void *); // callback dstr function for data stored in items
 } stack;
 
 /**
@@ -35,8 +36,9 @@ static stack_item_t s_item_ctor(void);
 /**
  * @brief Helper function: Frees the item struct
  * @param itm Target item
+ * @param dstr_data_cb callback function of stack called on each items value
  * @return true Succesfully freed
  */
-static bool s_item_dtor(stack_item_t itm);
+static bool s_item_dtor(stack_item_t itm, void (*dstr_data_cb)(void *));
 
 #endif

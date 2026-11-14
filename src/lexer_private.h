@@ -11,7 +11,6 @@
 #define LEXER_PRIVATE_H
 
 #include "dynamic_string.h"
-#include "lexer.h"
 #include "stack.h"
 #include "token.h"
 #include <stdint.h>
@@ -32,13 +31,14 @@ typedef enum state {
 	EX_NUM,
 	EXP_SIGN,
 	DOT_STATE,
+	DOT_PENDING,
 	DOT_STATE_2,
 	D_RETURN,
 	UND_FOR_DOUBLES,
 	UND_FOR_EXP,
 	EOL_STATE,
 	EOF_STATE,
-	HANDLE_INDENT,
+	INDENT,
 	TAB_STATE,
 	MAIN_AT,
 	MAIN_M,
@@ -50,7 +50,10 @@ typedef enum state {
 	B_EOL_STATE,
 	O_SQUARE_BRACKET,
 	C_SQUARE_BRACKET,
+	STRING_ENTRY,
 	STRING,
+	TWO_QUOTATION_MARKS,
+	STRING_INTERUPT,
 	STRING_END,
 	BLOCK_STRING,
 	BLOCK_STRING_END,
@@ -87,7 +90,11 @@ typedef enum state {
 	ALERT_COM_OUT_1,
 	ALERT_COM_OUT2,
 	AFTER_MULTILINE_COMMENT,
-	COMMENT_ENTRY,
+	S_STATE,
+	C_CURLY_BRACKET,
+	DOLLAR,
+	INTRPLTDS_UNDERSCORE,
+	INTRPLTDS_IDENTIFIER,
 	STATE_CNT
 } state_t;
 
@@ -95,28 +102,44 @@ typedef struct {
 	FILE *source_file; /**< Input file */
 	state_t fsm_state; /**< Current state a the fsm */
 	unsigned line_num; /**< The number of the line currently beeíng read */
+	bool failed;
 
-	int bracket_cnt;			 /**< Brackent depth counter */
-	int comment_depth_cnt;		 /**< Current depth of the comment */
-	bool line_has_code;			 /**< Whether the current logical line contains a code token */
+	int bracket_cnt;	   /**< Brackent depth counter */
+	int comment_depth_cnt; /**< Current depth of the comment */
+
+	size_t leading_space_counter; /**< Number of leading spaces in the current line */
+	bool line_has_code;			  /**< Whether the current logical line contains a code token */
+	bool line_cant_have_code;	  /**< Indicates when tab was there after indentation - code on such
+									 line is lexical error */
+	int indentation_token_value;  /**< The value shows, how many indent or dedent tokens should be
+									 sent (-1 for dedent, 1 for indent)*/
+	size_t interpolateds_substate; /**< Stores substate flag, where is stored whether the lexer is
+								in interpolated string (1), interpolated block string (2) or in
+								normal function (0) */
+	stack_t interpolateds_substate_stack; /**< Stack to store the interpolated substates in nested
+													  interpolated strings */
+
 	unsigned comment_start_line; /**< Line where the outermost block comment started */
+	unsigned string_start_line;	 /**< The line number where the string started */
 
-	unsigned string_start_line; /**< The line number where the string started */
-	dstring_t dynamic_string;	/**< Dynamic string used to store lexemes */
-	stack_t indent_stack;		/**< Stack used to store indentation levels */
+	dstring_t dynamic_string; /**< Dynamic string used to store lexemes */
+	stack_t indent_stack;	  /**< Stack used to store indentation levels */
 } lexer_state_t;
 
 /**
- * @brief Determines what tokens regarding indentations should be sent (if any)
+ * @brief Checks the indentation of the current line and sets the leading space counter
  *
  * @param[in] lexer_state Current state of the lexer
- * @return 0 Indentation is resolved, move to next state
- * @return 1 Indentation is deeper, send INDENT
- * @return -1 Indentation is shallower, send DEDENT
- * @return -2 Indentation error
- * @return -3 Internal error (failed malloc)
  */
-int handle_indent(lexer_state_t *lexer_state);
+void check_indent(lexer_state_t *lexer_state);
+
+/**
+ * @brief Sets to lexer_state what indentation tokens should be sent (if any)
+ *
+ * @param[in] lexer_state Current state of the lexer
+ * @return true on success, false on invalid indentation
+ */
+bool handle_indent(lexer_state_t *lexer_state);
 
 /**
  * @brief Converts an integer from a string in the Scala int format to a 32-bit C variable

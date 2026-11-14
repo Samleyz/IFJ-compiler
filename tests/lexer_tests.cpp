@@ -160,6 +160,9 @@ LexerResult runLexer(const std::string &source) {
 
 		while (true) {
 			token current = lexer_get_token();
+			if (current.type == TOKEN_ERR) {
+				error_exit();
+			}
 			WireToken wire{
 				.type = static_cast<int32_t>(current.type),
 				.line_num = current.line_num,
@@ -306,26 +309,27 @@ TEST(LexerIdentifiers, RecognizesTheCompleteKeywordVocabulary) {
 		 keyword(KW_STRING), keyword(KW_THEN),		keyword(KW_UNIT),	 keyword(KW_VAL),
 		 keyword(KW_VAR),	 keyword(KW_WHILE),		keyword(KW_BOOLEAN), keyword(KW_CASE),
 		 keyword(KW_CLASS),	 keyword(KW_EXTENSION), keyword(KW_FOR),	 keyword(KW_LIST),
-		 keyword(KW_MATCH),	 keyword(KW_TYPE),		plain(TOKEN_EOF)});
+		 keyword(KW_MATCH),	 keyword(KW_TYPE),		plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerIdentifiers, KeywordMatchingIsCaseSensitiveAndRequiresWholeIdentifier) {
 	expectTokens("Def Double double iffy Booleanx",
 				 {identifier("Def"), keyword(KW_DOUBLE), identifier("double"), identifier("iffy"),
-				  identifier("Booleanx"), plain(TOKEN_EOF)});
+				  identifier("Booleanx"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerIdentifiers, AcceptsLettersDigitsAndUnderscores) {
 	expectTokens("a A z Z a0 A_1 _name name_ _ __ _1",
 				 {identifier("a"), identifier("A"), identifier("z"), identifier("Z"),
 				  identifier("a0"), identifier("A_1"), identifier("_name"), identifier("name_"),
-				  plain(TOKEN_UNDERSCORE), identifier("__"), identifier("_1"), plain(TOKEN_EOF)});
+				  plain(TOKEN_UNDERSCORE), identifier("__"), identifier("_1"), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
 }
 
 TEST(LexerIdentifiers, RecognizesOnlyExactBooleanLiterals) {
 	expectTokens("true false True TRUE falsehood",
 				 {boolean(true), boolean(false), identifier("True"), identifier("TRUE"),
-				  identifier("falsehood"), plain(TOKEN_EOF)});
+				  identifier("falsehood"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerIdentifiers, RejectsUnsupportedIdentifierCharacters) {
@@ -335,34 +339,87 @@ TEST(LexerIdentifiers, RejectsUnsupportedIdentifierCharacters) {
 }
 
 TEST(LexerNumbers, RecognizesZeroAndDecimalIntegers) {
-	expectTokens("0 1 42 2147483647",
-				 {integer(0), integer(1), integer(42), integer(2147483647), plain(TOKEN_EOF)});
+	expectTokens("0 1 42 2147483647", {integer(0), integer(1), integer(42), integer(2147483647),
+									   plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerNumbers, RecognizesIntegerDigitSeparators) {
-	expectTokens("1_000 12_34 9_8_7 1__2",
-				 {integer(1000), integer(1234), integer(987), integer(12), plain(TOKEN_EOF)});
+	expectTokens("1_000 12_34 9_8_7 1__2", {integer(1000), integer(1234), integer(987), integer(12),
+											plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerNumbers, RecognizesDecimalAndExponentDoubles) {
 	expectTokens(".5 1.0 12.34 1e3 1e+3 1e-3 1.5E-2",
 				 {doubleToken(0.5), doubleToken(1.0), doubleToken(12.34), doubleToken(1000.0),
-				  doubleToken(1000.0), doubleToken(0.001), doubleToken(0.015), plain(TOKEN_EOF)});
+				  doubleToken(1000.0), doubleToken(0.001), doubleToken(0.015), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
 }
 
 TEST(LexerNumbers, RecognizesDoubleSuffixes) {
-	expectTokens("12d 1.5D 2e3d",
-				 {doubleToken(12.0), doubleToken(1.5), doubleToken(2000.0), plain(TOKEN_EOF)});
+	expectTokens("12d 1.5D 2e3d", {doubleToken(12.0), doubleToken(1.5), doubleToken(2000.0),
+								   plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerNumbers, RecognizesDigitSeparatorsInFractionAndExponent) {
-	expectTokens("1_000.2_5 2.5e1_0",
-				 {doubleToken(1000.25), doubleToken(2.5e10), plain(TOKEN_EOF)});
+	expectTokens("1_000.2_5 2.5e1_0", {doubleToken(1000.25), doubleToken(2.5e10),
+									   plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
+}
+
+// Tool: Claude Code
+// Prompt: Fix the lexer tests that failed after allowing a letter or underscore after
+// a dot; "1._2" and "._2" are now a dot followed by the identifier "_2", so add a positive test.
+TEST(LexerNumbers, DotFollowedByUnderscoreIdentifierIsMemberAccess) {
+	expectTokens("1._2 ._2", {integer(1), op(OPERATOR_DOT), identifier("_2"), op(OPERATOR_DOT),
+							  identifier("_2"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
+}
+
+// Tool: Claude Code
+// Prompt: Add more lexer tests for member access after number literals, identifiers and
+// parentheses (5.toString, chaining, doubles, exponents, suffixes) and for invalid dot usage.
+TEST(LexerNumbers, DotAfterIntegerLiteralIsMemberAccess) {
+	expectTokens("5.toString 1_000.floor 7.x_1", {integer(5), op(OPERATOR_DOT), identifier("toString"),
+												  integer(1000), op(OPERATOR_DOT), identifier("floor"),
+												  integer(7), op(OPERATOR_DOT), identifier("x_1"),
+												  plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, ChainedMemberAccessAfterInteger) {
+	expectTokens("1.floor.toInt", {integer(1), op(OPERATOR_DOT), identifier("floor"),
+								   op(OPERATOR_DOT), identifier("toInt"), plain(TOKEN_EOL, 1),
+								   plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterDoubleLiteralIsMemberAccess) {
+	expectTokens("1.5.toString 1e5.toInt 1.5e3.floor 1.5d.toString 5d.toString",
+				 {doubleToken(1.5), op(OPERATOR_DOT), identifier("toString"), doubleToken(100000.0),
+				  op(OPERATOR_DOT), identifier("toInt"), doubleToken(1500.0), op(OPERATOR_DOT),
+				  identifier("floor"), doubleToken(1.5), op(OPERATOR_DOT), identifier("toString"),
+				  doubleToken(5.0), op(OPERATOR_DOT), identifier("toString"), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterIdentifierParenthesisAndString) {
+	expectTokens("x.length (a).toString \"abc\".length",
+				 {identifier("x"), op(OPERATOR_DOT), identifier("length"), plain(TOKEN_LPAREN),
+				  identifier("a"), plain(TOKEN_RPAREN), op(OPERATOR_DOT), identifier("toString"),
+				  stringToken("abc"), op(OPERATOR_DOT), identifier("length"), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterIntegerFollowedByUnderscoreIdentifier) {
+	expectTokens("5._a", {integer(5), op(OPERATOR_DOT), identifier("_a"), plain(TOKEN_EOL, 1),
+						  plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterIntegerWithoutDigitOrIdentifierIsError) {
+	for (const std::string &source : {"5.", "5.(", "5.+", "5. x"}) {
+		expectLexicalError(source);
+	}
 }
 
 TEST(LexerNumbers, SignsAreSeparateOperators) {
 	expectTokens("-12 +.5", {op(OPERATOR_MINUS), integer(12), op(OPERATOR_PLUS), doubleToken(0.5),
-							 plain(TOKEN_EOF)});
+							 plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerNumbers, RejectsLeadingZeroes) {
@@ -372,7 +429,7 @@ TEST(LexerNumbers, RejectsLeadingZeroes) {
 }
 
 TEST(LexerNumbers, RejectsIncompleteOrMisplacedSeparators) {
-	for (const std::string &source : {"1_", "1._2", "1.2_", "1e_2", "1e2_"}) {
+	for (const std::string &source : {"1_", "1.2_", "1e_2", "1e2_"}) {
 		expectLexicalError(source);
 	}
 }
@@ -392,45 +449,32 @@ TEST(LexerNumbers, RejectsUnsupportedBasesAndSuffixes) {
 }
 
 TEST(LexerNumbers, RejectsMisplacedUnderscoresNearDotAndExp) {
-	for (const std::string &source : {"1_.2", "._2", ".2_", "1_e2", "0_123", "0_"}) {
+	for (const std::string &source : {"1_.2", ".2_", "1_e2", "0_123", "0_"}) {
 		expectLexicalError(source);
 	}
 }
 
 TEST(LexerOperators, RecognizesEveryOperatorAndDelimiter) {
 	expectTokens("&& || + + - * / ; , : ! != < <= <- > >= = == => | . ( ) [ ]",
-				 {op(OPERATOR_AND),
-				  op(OPERATOR_OR),
-				  op(OPERATOR_PLUS),
-				  op(OPERATOR_PLUS),
-				  op(OPERATOR_MINUS),
-				  op(OPERATOR_STAR),
-				  op(OPERATOR_SLASH),
-				  op(OPERATOR_SEMICOLON),
-				  op(OPERATOR_COMMA),
-				  op(OPERATOR_COLON),
-				  op(OPERATOR_EX_MARK),
-				  op(OPERATOR_NOT_EQUAL),
-				  op(OPERATOR_LESS),
-				  op(OPERATOR_LESS_EQUAL),
-				  op(OPERATOR_LEFT_ARROW),
-				  op(OPERATOR_GREATER),
-				  op(OPERATOR_GREATER_EQUAL),
-				  op(OPERATOR_ASSIGN),
-				  op(OPERATOR_EQUAL),
-				  op(OPERATOR_RIGHT_DOUBLE_ARROW),
-				  op(OPERATOR_VERTICAL_BAR),
-				  op(OPERATOR_DOT),
-				  plain(TOKEN_LPAREN),
-				  plain(TOKEN_RPAREN),
-				  plain(TOKEN_LSQUARE),
-				  plain(TOKEN_RSQUARE),
-				  plain(TOKEN_EOF)});
+				 {op(OPERATOR_AND),			  op(OPERATOR_OR),
+				  op(OPERATOR_PLUS),		  op(OPERATOR_PLUS),
+				  op(OPERATOR_MINUS),		  op(OPERATOR_STAR),
+				  op(OPERATOR_SLASH),		  op(OPERATOR_SEMICOLON),
+				  op(OPERATOR_COMMA),		  op(OPERATOR_COLON),
+				  op(OPERATOR_EX_MARK),		  op(OPERATOR_NOT_EQUAL),
+				  op(OPERATOR_LESS),		  op(OPERATOR_LESS_EQUAL),
+				  op(OPERATOR_LEFT_ARROW),	  op(OPERATOR_GREATER),
+				  op(OPERATOR_GREATER_EQUAL), op(OPERATOR_ASSIGN),
+				  op(OPERATOR_EQUAL),		  op(OPERATOR_RIGHT_DOUBLE_ARROW),
+				  op(OPERATOR_VERTICAL_BAR),  op(OPERATOR_DOT),
+				  plain(TOKEN_LPAREN),		  plain(TOKEN_RPAREN),
+				  plain(TOKEN_LSQUARE),		  plain(TOKEN_RSQUARE),
+				  plain(TOKEN_EOL, 1),		  plain(TOKEN_EOF)});
 }
 
 TEST(LexerOperators, RecognizesDotAndProlog) {
 	expectTokens("import ifj26.*", {keyword(KW_IMPORT), identifier("ifj26"), op(OPERATOR_DOT),
-									op(OPERATOR_STAR), plain(TOKEN_EOF)});
+									op(OPERATOR_STAR), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerOperators, RecognizesCompoundExpressionsWithoutSpaces) {
@@ -439,17 +483,17 @@ TEST(LexerOperators, RecognizesCompoundExpressionsWithoutSpaces) {
 				  identifier("c"), op(OPERATOR_EQUAL), identifier("d"), op(OPERATOR_NOT_EQUAL),
 				  identifier("e"), op(OPERATOR_RIGHT_DOUBLE_ARROW), identifier("f"),
 				  op(OPERATOR_LEFT_ARROW), identifier("g"), op(OPERATOR_PLUS_PLUS), identifier("h"),
-				  plain(TOKEN_EOF)});
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerOperators, RecognizesListConcatenationOperator) {
-	expectTokens("++ + +",
-				 {op(OPERATOR_PLUS_PLUS), op(OPERATOR_PLUS), op(OPERATOR_PLUS), plain(TOKEN_EOF)});
+	expectTokens("++ + +", {op(OPERATOR_PLUS_PLUS), op(OPERATOR_PLUS), op(OPERATOR_PLUS),
+							plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerOperators, RecognizesMainAnnotation) {
-	expectTokens("@main @main()", {plain(TOKEN_MAIN), plain(TOKEN_MAIN), plain(TOKEN_LPAREN),
-								   plain(TOKEN_RPAREN), plain(TOKEN_EOF)});
+	expectTokens("@main @main",
+				 {plain(TOKEN_MAIN), plain(TOKEN_MAIN), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerOperators, RejectsMalformedMainAnnotation) {
@@ -459,42 +503,46 @@ TEST(LexerOperators, RejectsMalformedMainAnnotation) {
 }
 
 TEST(LexerStrings, RecognizesEmptyAndOrdinaryStrings) {
-	expectTokens("\"\" \"plain text\"",
-				 {stringToken(""), stringToken("plain text"), plain(TOKEN_EOF)});
+	expectTokens("\"\" \"plain text\"", {stringToken(""), stringToken("plain text"),
+										 plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerStrings, DecodesAllSpecifiedEscapes) {
 	expectTokens("\"slash\\\\quote\\\"newline\\nreturn\\rtab\\t\"",
-				 {stringToken("slash\\quote\"newline\nreturn\rtab\t"), plain(TOKEN_EOF)});
+				 {stringToken("slash\\quote\"newline\nreturn\rtab\t"), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
 }
 
 TEST(LexerStrings, StringContentsDoNotStartComments) {
-	expectTokens("\"// not a comment /* still text */\"",
-				 {stringToken("// not a comment /* still text */"), plain(TOKEN_EOF)});
+	expectTokens(
+		"\"// not a comment /* still text */\"",
+		{stringToken("// not a comment /* still text */"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerStrings, RecognizesMultilineTripleQuotedStrings) {
 	expectTokens("\"\"\"first line\nsecond line\"\"\"\nnext",
 				 {stringToken("first line\nsecond line"), plain(TOKEN_EOL, 2),
-				  identifier("next", 3), plain(TOKEN_EOF, 3)});
+				  identifier("next", 3), plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 3)});
 }
 
 TEST(LexerStrings, PreservesQuotesInsideTripleQuotedStrings) {
-	expectTokens("\"\"\"say \"\"hello\"\"\"", {stringToken("say \"\"hello"), plain(TOKEN_EOF)});
+	expectTokens("\"\"\"say \"\"hello\"\"\"",
+				 {stringToken("say \"\"hello"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerStrings, DoesNotInterpretEscapesInTripleQuotedStrings) {
 	expectTokens("\"\"\"back\\nslash\\\\\"\"\"",
-				 {stringToken("back\\nslash\\\\"), plain(TOKEN_EOF)});
+				 {stringToken("back\\nslash\\\\"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerStrings, RecognizesEmptyMultilineString) {
-	expectTokens("\"\"\"\"\"\"", {stringToken(""), plain(TOKEN_EOF)});
+	expectTokens("\"\"\"\"\"\"", {stringToken(""), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerStrings, GrowsStorageForLongStrings) {
 	std::string contents(2048, 'x');
-	expectTokens("\"" + contents + "\"", {stringToken(contents), plain(TOKEN_EOF)});
+	expectTokens("\"" + contents + "\"",
+				 {stringToken(contents), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerStrings, RejectsInvalidEscapesAndUnterminatedStrings) {
@@ -509,24 +557,27 @@ TEST(LexerStrings, RejectsUnterminatedTripleQuotedStrings) {
 }
 
 TEST(LexerComments, SkipsLineCommentsAndKeepsFollowingTokens) {
-	expectTokens("first // ignored text\nsecond", {identifier("first"), plain(TOKEN_EOL, 1),
-												   identifier("second", 2), plain(TOKEN_EOF, 2)});
+	expectTokens("first // ignored text\nsecond",
+				 {identifier("first"), plain(TOKEN_EOL, 1), identifier("second", 2),
+				  plain(TOKEN_EOL, 2), plain(TOKEN_EOF, 2)});
 }
 
 TEST(LexerComments, SkipsNestedBlockComments) {
-	expectTokens("before /* outer /* inner */ outer */ after",
-				 {identifier("before"), identifier("after"), plain(TOKEN_EOF)});
+	expectTokens(
+		"before /* outer /* inner */ outer */ after",
+		{identifier("before"), identifier("after"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerComments, TreatsMultilineBlockCommentAsOneLogicalLineEnd) {
-	expectTokens(
-		"before /* first\n/* nested */\nlast */\nafter",
-		{identifier("before"), plain(TOKEN_EOL, 1), identifier("after", 4), plain(TOKEN_EOF, 4)});
+	expectTokens("before /* first\n/* nested */\nlast */\nafter",
+				 {identifier("before"), plain(TOKEN_EOL, 1), identifier("after", 4),
+				  plain(TOKEN_EOL, 4), plain(TOKEN_EOF, 4)});
 }
 
 TEST(LexerComments, CommentMarkersInStringsAreNotComments) {
 	expectTokens("\"/* text */ // text\" next",
-				 {stringToken("/* text */ // text"), identifier("next"), plain(TOKEN_EOF)});
+				 {stringToken("/* text */ // text"), identifier("next"), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
 }
 
 TEST(LexerComments, RejectsUnterminatedBlockComments) {
@@ -540,14 +591,14 @@ TEST(LexerComments, MultilineBlockCommentEndsItsLogicalLine) {
 }
 
 TEST(LexerComments, SingleLineBlockCommentSeparatesTokensWithoutSpaces) {
-	expectTokens("first/*comment*/second",
-				 {identifier("first"), identifier("second"), plain(TOKEN_EOF)});
+	expectTokens("first/*comment*/second", {identifier("first"), identifier("second"),
+											plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerComments, MultilineBlockCommentAllowsTrailingSpaces) {
-	expectTokens(
-		"first /* block\ncomment */   \nsecond",
-		{identifier("first"), plain(TOKEN_EOL, 1), identifier("second", 3), plain(TOKEN_EOF, 3)});
+	expectTokens("first /* block\ncomment */   \nsecond",
+				 {identifier("first"), plain(TOKEN_EOL, 1), identifier("second", 3),
+				  plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 3)});
 }
 
 TEST(LexerComments, OnlyCommentsProduceEof) {
@@ -562,9 +613,9 @@ TEST(LexerLines, EmitsEndOfLineForNonblankLinesOnly) {
 }
 
 TEST(LexerLines, TracksLinesAcrossBlankLinesAndComments) {
-	expectTokens(
-		"// first line\n\nvalue // trailing comment\nnext",
-		{identifier("value", 3), plain(TOKEN_EOL, 3), identifier("next", 4), plain(TOKEN_EOF, 4)});
+	expectTokens("// first line\n\nvalue // trailing comment\nnext",
+				 {identifier("value", 3), plain(TOKEN_EOL, 3), identifier("next", 4),
+				  plain(TOKEN_EOL, 4), plain(TOKEN_EOF, 4)});
 }
 
 TEST(LexerIndentation, EmitsIndentAndDedentForNestedBlocks) {
@@ -585,13 +636,15 @@ TEST(LexerIndentation, UsesSpacesAndRejectsLeadingTabsOnNonemptyLines) {
 }
 
 TEST(LexerWhitespace, AllowsTabsBetweenTokens) {
-	expectTokens("left\tright", {identifier("left"), identifier("right"), plain(TOKEN_EOF)});
+	expectTokens("left\tright",
+				 {identifier("left"), identifier("right"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerIndentation, ClosesOpenBlocksAtEndOfInput) {
 	expectTokens("root\n    child",
 				 {identifier("root"), plain(TOKEN_EOL, 1), plain(TOKEN_INDENT, 2),
-				  identifier("child", 2), plain(TOKEN_DEDENT, 2), plain(TOKEN_EOF, 2)});
+				  identifier("child", 2), plain(TOKEN_EOL, 2), plain(TOKEN_DEDENT, 2),
+				  plain(TOKEN_EOF, 2)});
 }
 
 TEST(LexerIndentation, EmitsMultipleDedentsInSingleStep) {
@@ -603,14 +656,15 @@ TEST(LexerIndentation, EmitsMultipleDedentsInSingleStep) {
 }
 
 TEST(LexerBrackets, RecognizesParenthesesAndSquareBrackets) {
-	expectTokens("f([x])",
-				 {identifier("f"), plain(TOKEN_LPAREN), plain(TOKEN_LSQUARE), identifier("x"),
-				  plain(TOKEN_RSQUARE), plain(TOKEN_RPAREN), plain(TOKEN_EOF)});
+	expectTokens("f([x])", {identifier("f"), plain(TOKEN_LPAREN), plain(TOKEN_LSQUARE),
+							identifier("x"), plain(TOKEN_RSQUARE), plain(TOKEN_RPAREN),
+							plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
 TEST(LexerBrackets, AllowsLineBreaksInsideParentheses) {
-	expectTokens("f(\n  value\n  )", {identifier("f"), plain(TOKEN_LPAREN), identifier("value", 2),
-									  plain(TOKEN_RPAREN, 3), plain(TOKEN_EOF, 3)});
+	expectTokens("f(\n  value\n  )",
+				 {identifier("f"), plain(TOKEN_LPAREN), identifier("value", 2),
+				  plain(TOKEN_RPAREN, 3), plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 3)});
 }
 
 TEST(LexerBrackets, RejectsInsufficientIndentationInsideBrackets) {
@@ -633,4 +687,407 @@ TEST(LexerErrors, RejectsNonAsciiSourceAndStringCharacters) {
 	const std::string non_ascii("\xC3\xA9", 2);
 	expectLexicalError(non_ascii);
 	expectLexicalError("\"" + non_ascii + "\"");
+}
+
+// Tests batch after indent fix
+
+TEST(LexerAdditional, MultipleStatementsWithNewlines) {
+	expectTokens("val x = 1\nval y = 2",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), keyword(KW_VAL, 2), identifier("y", 2),
+				  op(OPERATOR_ASSIGN, 2), integer(2, 2), plain(TOKEN_EOL, 2), plain(TOKEN_EOF, 2)});
+}
+
+TEST(LexerAdditional, IndentedBlockAfterColon) {
+	expectTokens("def foo():\n  val x = 1",
+				 {keyword(KW_DEF, 1), identifier("foo", 1), plain(TOKEN_LPAREN, 1),
+				  plain(TOKEN_RPAREN, 1), op(OPERATOR_COLON, 1), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_INDENT, 2), keyword(KW_VAL, 2), identifier("x", 2),
+				  op(OPERATOR_ASSIGN, 2), integer(1, 2), plain(TOKEN_EOL, 2),
+				  plain(TOKEN_DEDENT, 2), plain(TOKEN_EOF, 2)});
+}
+
+TEST(LexerAdditional, IndentedBlockWithBlankLines) {
+	expectTokens("def foo():\n\n  val x = 1\n\n",
+				 {keyword(KW_DEF, 1), identifier("foo", 1), plain(TOKEN_LPAREN, 1),
+				  plain(TOKEN_RPAREN, 1), op(OPERATOR_COLON, 1), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_INDENT, 3), keyword(KW_VAL, 3), identifier("x", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(1, 3), plain(TOKEN_EOL, 3),
+				  plain(TOKEN_DEDENT, 5), plain(TOKEN_EOF, 5)});
+}
+
+TEST(LexerAdditional, IgnoresBlankLinesWithWhitespace) {
+	expectTokens("val x = 1\n  \t \nval y = 2",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), keyword(KW_VAL, 3), identifier("y", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(2, 3), plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, RejectsTabsInIndentation) { expectLexicalError("val x = 1\n  \t val y = 2"); }
+
+TEST(LexerAdditional, BlockCommentBeforeIndentedCode) {
+	expectTokens("  /*ahoj*/\tval x = 1",
+				 {plain(TOKEN_INDENT, 1), keyword(KW_VAL, 1), identifier("x", 1),
+				  op(OPERATOR_ASSIGN, 1), integer(1, 1), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_DEDENT, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerAdditional, IgnoresLineCommentAsBlankLine) {
+	expectTokens("val x = 1\n    // Toto je jen komentar\nval y = 2",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), keyword(KW_VAL, 3), identifier("y", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(2, 3), plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, SingleIndentedOperatorAndOperand) {
+	expectTokens("  / 2", {plain(TOKEN_INDENT, 1), op(OPERATOR_SLASH, 1), integer(2, 1),
+						   plain(TOKEN_EOL, 1), plain(TOKEN_DEDENT, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerAdditional, MultilineBlockCommentActsAsLineEnd) {
+	expectTokens("val x = 1 /* koment \n radek2 */\nval y = 2",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), keyword(KW_VAL, 3), identifier("y", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(2, 3), plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, TokensAfterMultilineBlockCommentCauseError) {
+	expectLexicalError("val x = 1 /* koment \n radek2 */ val y = 2");
+}
+
+TEST(LexerAdditional, IgnoresNewlinesAndIndentationInsideParentheses) {
+	expectTokens("val x = (\n 1\n )",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1),
+				  plain(TOKEN_LPAREN, 1), integer(1, 2), plain(TOKEN_RPAREN, 3),
+				  plain(TOKEN_EOL, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, NestedIndentationWithMultipleLevels) {
+	expectTokens("  def foo():\n    val x = 1\n    val y = 2",
+				 {plain(TOKEN_INDENT, 1), keyword(KW_DEF, 1),	  identifier("foo", 1),
+				  plain(TOKEN_LPAREN, 1), plain(TOKEN_RPAREN, 1), op(OPERATOR_COLON, 1),
+				  plain(TOKEN_EOL, 1),	  plain(TOKEN_INDENT, 2), keyword(KW_VAL, 2),
+				  identifier("x", 2),	  op(OPERATOR_ASSIGN, 2), integer(1, 2),
+				  plain(TOKEN_EOL, 2),	  keyword(KW_VAL, 3),	  identifier("y", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(2, 3),		  plain(TOKEN_EOL, 3),
+				  plain(TOKEN_DEDENT, 3), plain(TOKEN_DEDENT, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, IgnoresLeadingBlankLinesWithWhitespaceAndTabs) {
+	expectTokens("\n  \n  \t \nval x = 1",
+				 {keyword(KW_VAL, 4), identifier("x", 4), op(OPERATOR_ASSIGN, 4), integer(1, 4),
+				  plain(TOKEN_EOL, 4), plain(TOKEN_EOF, 4)});
+}
+
+TEST(LexerAdditional, IgnoresNewlinesInsideParenthesesAndReadsOperators) {
+	expectTokens("val x = (\n 1 +\n 2\n )",
+				 {keyword(KW_VAL, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1),
+				  plain(TOKEN_LPAREN, 1), integer(1, 2), op(OPERATOR_PLUS, 2), integer(2, 3),
+				  plain(TOKEN_RPAREN, 4), plain(TOKEN_EOL, 4), plain(TOKEN_EOF, 4)});
+}
+
+TEST(LexerAdditional, ValidIndentationInsideParentheses) {
+	expectTokens("  val x = (\n   1\n   )",
+				 {plain(TOKEN_INDENT, 1), keyword(KW_VAL, 1), identifier("x", 1),
+				  op(OPERATOR_ASSIGN, 1), plain(TOKEN_LPAREN, 1), integer(1, 2),
+				  plain(TOKEN_RPAREN, 3), plain(TOKEN_EOL, 3), plain(TOKEN_DEDENT, 3),
+				  plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, RejectsInsufficientIndentationInsideParentheses) {
+	expectLexicalError("  val x = (\n 1\n  )");
+}
+
+TEST(LexerAdditional, RejectsTabsInsideParenthesesIndentation) {
+	expectLexicalError("val x = (\n  \t1\n)");
+}
+
+TEST(LexerAdditional, NestedParenthesesWithComplexIndentation) {
+	expectTokens("  val x = (\n   1 +\n    (\n     2\n     )\n   )",
+				 {plain(TOKEN_INDENT, 1), keyword(KW_VAL, 1), identifier("x", 1),
+				  op(OPERATOR_ASSIGN, 1), plain(TOKEN_LPAREN, 1), integer(1, 2),
+				  op(OPERATOR_PLUS, 2), plain(TOKEN_LPAREN, 3), integer(2, 4),
+				  plain(TOKEN_RPAREN, 5), plain(TOKEN_RPAREN, 6), plain(TOKEN_EOL, 6),
+				  plain(TOKEN_DEDENT, 6), plain(TOKEN_EOF, 6)});
+}
+
+TEST(LexerAdditional, MainAnnotationOnSeparateLineWithIndentation) {
+	expectTokens("  @main\n  def run():\n    val x = 1",
+				 {plain(TOKEN_INDENT, 1), plain(TOKEN_MAIN, 1), plain(TOKEN_EOL, 1),
+				  keyword(KW_DEF, 2), identifier("run", 2), plain(TOKEN_LPAREN, 2),
+				  plain(TOKEN_RPAREN, 2), op(OPERATOR_COLON, 2), plain(TOKEN_EOL, 2),
+				  plain(TOKEN_INDENT, 3), keyword(KW_VAL, 3), identifier("x", 3),
+				  op(OPERATOR_ASSIGN, 3), integer(1, 3), plain(TOKEN_EOL, 3),
+				  plain(TOKEN_DEDENT, 3), plain(TOKEN_DEDENT, 3), plain(TOKEN_EOF, 3)});
+}
+
+TEST(LexerAdditional, MultilineBlockCommentSkipsCorrectlyBeforeIndentedCode) {
+	expectTokens("def foo(): /*\nkomentar \n*/\n  x = 1",
+				 {keyword(KW_DEF, 1), identifier("foo", 1), plain(TOKEN_LPAREN, 1),
+				  plain(TOKEN_RPAREN, 1), op(OPERATOR_COLON, 1), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_INDENT, 4), identifier("x", 4), op(OPERATOR_ASSIGN, 4), integer(1, 4),
+				  plain(TOKEN_EOL, 4), plain(TOKEN_DEDENT, 4), plain(TOKEN_EOF, 4)});
+}
+
+TEST(LexerAdditional, IgnoresTabsInsideLineComment) {
+	expectTokens("  x = 1 // \t ignorovany tabulatar v komentari\n  y = 2",
+				 {plain(TOKEN_INDENT, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), identifier("y", 2), op(OPERATOR_ASSIGN, 2), integer(2, 2),
+				  plain(TOKEN_EOL, 2), plain(TOKEN_DEDENT, 2), plain(TOKEN_EOF, 2)});
+}
+
+TEST(LexerAdditional, MultilineStringRetainsLiteralContentsIncludingWhitespace) {
+	expectTokens("x = \"\"\"\n\tmulti\n  line\n\"\"\"",
+				 {identifier("x", 1), op(OPERATOR_ASSIGN, 1), stringToken("\n\tmulti\n  line\n", 1),
+				  plain(TOKEN_EOL, 4), plain(TOKEN_EOF, 4)});
+}
+
+TEST(LexerAdditional, BlockCommentWithNewlineCreatesLogicalLineEnd) {
+	expectTokens("  x = 1 /* koment s \n novym radkem */",
+				 {plain(TOKEN_INDENT, 1), identifier("x", 1), op(OPERATOR_ASSIGN, 1), integer(1, 1),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_DEDENT, 2), plain(TOKEN_EOF, 2)});
+}
+
+// ---------------------------------------------------------
+// Interpolated Strings Tests
+// ---------------------------------------------------------
+
+TEST(LexerInterpolatedStrings, EmptyString) {
+	expectTokens("s\"\"", {plain(TOKEN_INTRPLTDS_START), stringToken(""),
+						   plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, PlainText) {
+	expectTokens("s\"test\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("test"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, WhitespaceOnly) {
+	expectTokens("s\" \"", {plain(TOKEN_INTRPLTDS_START), stringToken(" "),
+							plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, SingleVariable) {
+	expectTokens("s\"$a\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, VariableAndText) {
+	expectTokens("s\"$a b\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(" b"),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, TextAndVariable) {
+	expectTokens("s\"a $b\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("a "), identifier("b"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, TextVariableText) {
+	expectTokens("s\"a $b c\"", {plain(TOKEN_INTRPLTDS_START), stringToken("a "), identifier("b"),
+								 stringToken(" c"), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+								 plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, AdjacentVariables) {
+	expectTokens("s\"$a$b\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(""),
+				  identifier("b"), stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, VariableStartingWithUnderscore) {
+	expectTokens("s\"$_val\"", {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("_val"),
+								stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+								plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, MixedVariablesWithUnderscores) {
+	expectTokens("s\"x $_val y\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("x "), identifier("_val"),
+				  stringToken(" y"), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, VariableWithDigits) {
+	expectTokens("s\"$a123\"", {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a123"),
+								stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+								plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, EscapedDollarSign) {
+	expectTokens("s\"$$\"", {plain(TOKEN_INTRPLTDS_START), stringToken("$"),
+							 plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, EscapedDollarSignWithText) {
+	expectTokens("s\"$$x\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("$x"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, EscapedDollarFollowedByVariable) {
+	expectTokens("s\"$$$x\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("$"), identifier("x"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, TextWithEscapedDollar) {
+	expectTokens("s\"a $$ b\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("a $ b"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, NormalEscapesAreProcessed) {
+	expectTokens("s\"\\n\\t\\r\\\"\\\\\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("\n\t\r\"\\"),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, SimpleIntegerExpression) {
+	expectTokens("s\"${1}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  integer(1), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, ExpressionSurroundedByText) {
+	expectTokens("s\"start ${a} end\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("start "),
+				  plain(TOKEN_INTRPLTDS_EXP_START), identifier("a"), plain(TOKEN_INTRPLTDS_EXP_END),
+				  stringToken(" end"), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, ArithmeticExpression) {
+	expectTokens("s\"${1+2}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  integer(1), op(OPERATOR_PLUS), integer(2), plain(TOKEN_INTRPLTDS_EXP_END),
+				  stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, AdjacentExpressions) {
+	expectTokens("s\"${a}${b}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  identifier("a"), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_EXP_START), identifier("b"), plain(TOKEN_INTRPLTDS_EXP_END),
+				  stringToken(""), plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedExpressions, ComplexExpressionWithMethodCall) {
+	expectTokens("s\"${1 + s\"${2}\".toInt}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  integer(1), op(OPERATOR_PLUS), plain(TOKEN_INTRPLTDS_START), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_EXP_START), integer(2), plain(TOKEN_INTRPLTDS_EXP_END),
+				  stringToken(""), plain(TOKEN_INTRPLTDS_END), op(OPERATOR_DOT),
+				  identifier("toInt"), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, NestedEmptyInterpolatedString) {
+	expectTokens("s\"${s\"\"}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, NestedTextInterpolatedString) {
+	expectTokens("s\"${s\"a\"}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  plain(TOKEN_INTRPLTDS_START), stringToken("a"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, NestedVariableInterpolatedString) {
+	expectTokens("s\"${s\"$a\"}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, InceptionNestingThreeLevels) {
+	expectTokens("s\"L1 ${s\"L2 ${s\"L3\"}\"}\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("L1 "),
+				  plain(TOKEN_INTRPLTDS_EXP_START), plain(TOKEN_INTRPLTDS_START),
+				  stringToken("L2 "), plain(TOKEN_INTRPLTDS_EXP_START),
+				  plain(TOKEN_INTRPLTDS_START), stringToken("L3"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringBasic) {
+	expectTokens("s\"\"\"abc\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("abc"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringVariable) {
+	expectTokens("s\"\"\"$a\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), identifier("a"), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringWithInternalQuotes) {
+	expectTokens("s\"\"\"a\"b\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("a\"b"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringWithDoubleInternalQuotes) {
+	expectTokens("s\"\"\"a\"\"b\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("a\"\"b"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringExpression) {
+	expectTokens("s\"\"\"${1}\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken(""), plain(TOKEN_INTRPLTDS_EXP_START),
+				  integer(1), plain(TOKEN_INTRPLTDS_EXP_END), stringToken(""),
+				  plain(TOKEN_INTRPLTDS_END), plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringEscapedDollar) {
+	expectTokens("s\"\"\"$$\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START), stringToken("$"), plain(TOKEN_INTRPLTDS_END),
+				  plain(TOKEN_EOL, 1), plain(TOKEN_EOF, 1)});
+}
+
+TEST(LexerInterpolatedStrings, BlockStringMultilineWithVariable) {
+	expectTokens("s\"\"\"a\n$b\"\"\"",
+				 {plain(TOKEN_INTRPLTDS_START, 1), stringToken("a\n", 2), identifier("b", 2),
+				  stringToken("", 1), plain(TOKEN_INTRPLTDS_END, 2), plain(TOKEN_EOL, 2),
+				  plain(TOKEN_EOF, 2)});
+}
+
+TEST(LexerInterpolatedErrors, RejectsIsolatedDollar) { expectLexicalError("s\"$\""); }
+
+TEST(LexerInterpolatedErrors, RejectsDollarFollowedBySpace) { expectLexicalError("s\"$ \""); }
+
+TEST(LexerInterpolatedErrors, RejectsDollarFollowedByInvalidChar) { expectLexicalError("s\"$!\""); }
+
+TEST(LexerInterpolatedErrors, RejectsIncompleteUnderscoreVariableEnd) {
+	expectLexicalError("s\"$_\"");
+}
+
+TEST(LexerInterpolatedErrors, RejectsIncompleteUnderscoreVariableSpace) {
+	expectLexicalError("s\"$_ \"");
+}
+
+TEST(LexerInterpolatedErrors, RejectsInvalidEscapeSequence) { expectLexicalError("s\"\\x\""); }
+
+TEST(LexerInterpolatedErrors, RejectsUnescapedNewlineInStandardString) {
+	expectLexicalError("s\"multi\nline\"");
+}
+
+TEST(LexerInterpolatedErrors, RejectsUnterminatedExpressionBlock) {
+	expectLexicalError("s\"${1\"");
 }

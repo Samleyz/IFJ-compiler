@@ -146,9 +146,14 @@ struct ast_node {
 		// NODE_IF
 		struct {
 			ast_node_t condition;
-			ast_node_t then_branch; // NODE_BLOCK or expression
-			ast_node_t else_branch; // NODE_BLOCK, expression, nested NODE_IF or NULL
-			bool is_expr;			// true if ternary, false otherwise
+			// Branch: NODE_BLOCK or a simple statement (a one-line branch is NODE_EXPR_STMT).
+			// In an if expression the value of a branch is the expr of its NODE_EXPR_STMT,
+			// or of the last NODE_EXPR_STMT in its block.
+			ast_node_t then_branch;
+			// Like then_branch, or a nested NODE_IF for "else if", or NULL (never if is_expr).
+			ast_node_t else_branch;
+			// true if the if is used as an expression, set on every link of an "else if" chain
+			bool is_expr;
 		} if_stmt;
 
 		// NODE_WHILE
@@ -195,7 +200,9 @@ struct ast_node {
 
 		// NODE_STRING_INTERP
 		struct {
-			ast_list_t parts; // Linked list of string literals and expressions
+			// Linked list of string literals and expressions, in order. Empty text between the
+			// parts is dropped, so an empty list is the empty string.
+			ast_list_t parts;
 		} string_interp;
 
 		// NODE_TYPE_CAST
