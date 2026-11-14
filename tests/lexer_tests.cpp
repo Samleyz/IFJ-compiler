@@ -373,6 +373,50 @@ TEST(LexerNumbers, DotFollowedByUnderscoreIdentifierIsMemberAccess) {
 							  identifier("_2"), plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
 }
 
+// Tool: Claude Code
+// Prompt: Add more lexer tests for member access after number literals, identifiers and
+// parentheses (5.toString, chaining, doubles, exponents, suffixes) and for invalid dot usage.
+TEST(LexerNumbers, DotAfterIntegerLiteralIsMemberAccess) {
+	expectTokens("5.toString 1_000.floor 7.x_1", {integer(5), op(OPERATOR_DOT), identifier("toString"),
+												  integer(1000), op(OPERATOR_DOT), identifier("floor"),
+												  integer(7), op(OPERATOR_DOT), identifier("x_1"),
+												  plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, ChainedMemberAccessAfterInteger) {
+	expectTokens("1.floor.toInt", {integer(1), op(OPERATOR_DOT), identifier("floor"),
+								   op(OPERATOR_DOT), identifier("toInt"), plain(TOKEN_EOL, 1),
+								   plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterDoubleLiteralIsMemberAccess) {
+	expectTokens("1.5.toString 1e5.toInt 1.5e3.floor 1.5d.toString 5d.toString",
+				 {doubleToken(1.5), op(OPERATOR_DOT), identifier("toString"), doubleToken(100000.0),
+				  op(OPERATOR_DOT), identifier("toInt"), doubleToken(1500.0), op(OPERATOR_DOT),
+				  identifier("floor"), doubleToken(1.5), op(OPERATOR_DOT), identifier("toString"),
+				  doubleToken(5.0), op(OPERATOR_DOT), identifier("toString"), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterIdentifierParenthesisAndString) {
+	expectTokens("x.length (a).toString \"abc\".length",
+				 {identifier("x"), op(OPERATOR_DOT), identifier("length"), plain(TOKEN_LPAREN),
+				  identifier("a"), plain(TOKEN_RPAREN), op(OPERATOR_DOT), identifier("toString"),
+				  stringToken("abc"), op(OPERATOR_DOT), identifier("length"), plain(TOKEN_EOL, 1),
+				  plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterIntegerFollowedByUnderscoreIdentifier) {
+	expectTokens("5._a", {integer(5), op(OPERATOR_DOT), identifier("_a"), plain(TOKEN_EOL, 1),
+						  plain(TOKEN_EOF)});
+}
+
+TEST(LexerNumbers, DotAfterIntegerWithoutDigitOrIdentifierIsError) {
+	for (const std::string &source : {"5.", "5.(", "5.+", "5. x"}) {
+		expectLexicalError(source);
+	}
+}
+
 TEST(LexerNumbers, SignsAreSeparateOperators) {
 	expectTokens("-12 +.5", {op(OPERATOR_MINUS), integer(12), op(OPERATOR_PLUS), doubleToken(0.5),
 							 plain(TOKEN_EOL, 1), plain(TOKEN_EOF)});
