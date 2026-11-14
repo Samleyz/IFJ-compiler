@@ -110,6 +110,10 @@ std::string dump(ast_node_t node) {
 		return "(stmt " + dump(node->as.expr_stmt.expr) + ")";
 	case NODE_FUNC_CALL:
 		return "(call " + dump(node->as.func_call.callee) + dumpList(node->as.func_call.args) + ")";
+	case NODE_MEMBER_ACCESS:
+		return std::string(node->as.member_access.is_call ? "(method " : "(member ") +
+			   dump(node->as.member_access.target) + " " + node->as.member_access.member_name +
+			   dumpList(node->as.member_access.args) + ")";
 	case NODE_BINARY_OP:
 		return "(" + operatorText(node->as.binary_op.operator_type) + " " +
 			   dump(node->as.binary_op.left) + " " + dump(node->as.binary_op.right) + ")";
@@ -248,6 +252,44 @@ TEST(FrontEnd, ParsesForLoopsWithRangesAndGuards) {
 	EXPECT_TREES(cases);
 }
 
+TEST(FrontEnd, ParsesMemberAccessAndMethodCalls) {
+	const Case cases[] = {
+		{"def main() =\n    val n = \"abc\".length\n",
+		 "(program (def main (block (val n (member \"abc\" length)))))"},
+		{"def main() =\n    val n = number.floor.toInt\n",
+		 "(program (def main (block (val n (member (member number floor) toInt)))))"},
+		{"def main() =\n    val s = (1.5).toString\n",
+		 "(program (def main (block (val s (member 1.5 toString)))))"},
+		{"def main() =\n    val s = 5.toString\n",
+		 "(program (def main (block (val s (member 5 toString)))))"},
+		{"def main() =\n    val v = -x.toString\n",
+		 "(program (def main (block (val v (- (member x toString))))))"},
+		{"def main() =\n    val v = a.length + b.length * 2\n",
+		 "(program (def main (block (val v (+ (member a length) (* (member b length) 2))))))"},
+		{"def main() =\n    val v = x.foo()\n",
+		 "(program (def main (block (val v (method x foo)))))"},
+		{"def main() =\n    val v = x.plus(12)\n",
+		 "(program (def main (block (val v (method x plus 12)))))"},
+		{"def main() =\n    val v = x.plus(a + 1, b.length)\n",
+		 "(program (def main (block (val v (method x plus (+ a 1) (member b length))))))"},
+		{"def main() =\n    val v = x.foo(a)(b)\n",
+		 "(program (def main (block (val v (call (method x foo a) b)))))"},
+		{"def main() =\n    val v = f(1).x\n",
+		 "(program (def main (block (val v (member (call f 1) x)))))"},
+		{"def main() =\n    val v = a.b.c(1).d\n",
+		 "(program (def main (block (val v (member (method (member a b) c 1) d)))))"},
+		{"def main() =\n    foo(a.b, c.d)\n",
+		 "(program (def main (block (stmt (call foo (member a b) (member c d))))))"},
+		{"def main() =\n    val v = if s.length > 3 then s.length else 0\n",
+		 "(program (def main (block (val v (ifexpr (> (member s length) 3) "
+		 "(stmt (member s length)) (stmt 0))))))"},
+		{"def main() =\n    for i <- 0 until s.length do\n        foo(i)\n",
+		 "(program (def main (block (for i until 0 (member s length) "
+		 "(block (stmt (call foo i)))))))"},
+	};
+	EXPECT_TREES(cases);
+}
+
 TEST(FrontEnd, ParsesIfExpressionsWithTheRealGrammar) {
 	// Branches of an if expression are NODE_EXPR_STMT (see the comment of if_stmt in ast.h).
 	const Case cases[] = {
@@ -312,6 +354,11 @@ TEST(FrontEnd, RejectsInvalidExpressions) {
 		"def main() =\n    val x = 1 < 2 < 3\n",
 		"def main() =\n    val x = 1 2\n",
 		"def main() =\n    val x = f(1 2)\n",
+		"def main() =\n    val x = a.\n",		// no member name
+		"def main() =\n    val x = a.(b)\n",	// a member name is an identifier
+		"def main() =\n    val x = a.1\n",		// a digit after the dot is a number
+		"def main() =\n    val x = .a\n",		// no expression before the dot
+		"def main() =\n    val x = a.b(1 2)\n", // an error inside the arguments
 		"def main() =\n    val x = if a then 1\n",
 		"def main() =\n    val x = if a 1 else 2\n", // the condition is not a valid expression
 		"def main() =\n    val x = if a then 1 else if b then 3\n",

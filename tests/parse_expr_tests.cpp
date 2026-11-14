@@ -78,6 +78,15 @@ std::string dump(ast_node_t node) {
 		return node->as.bool_val ? "true" : "false";
 	case NODE_LIT_UNIT:
 		return "()";
+	case NODE_MEMBER_ACCESS: {
+		std::string text = std::string(node->as.member_access.is_call ? "(method " : "(member ") +
+						   dump(node->as.member_access.target) + " " +
+						   node->as.member_access.member_name;
+		for (ast_node_t arg = node->as.member_access.args.head; arg != nullptr; arg = arg->next) {
+			text += " " + dump(arg);
+		}
+		return text + ")";
+	}
 	case NODE_FUNC_CALL: {
 		std::string text = "(call " + dump(node->as.func_call.callee);
 		for (ast_node_t arg = node->as.func_call.args.head; arg != nullptr; arg = arg->next) {
@@ -168,6 +177,23 @@ TEST(ParseExpression, BuildsTreesWithCorrectPrecedenceAndAssociativity) {
 		{"f(a + 1, b)", "(call f (+ a 1) b)"},
 		{"f(g(x), h())", "(call f (call g x) (call h))"},
 		{"f(a)(b)", "(call (call f a) b)"},
+		{"a.length", "(member a length)"},
+		{"a.b.c", "(member (member a b) c)"},
+		{"\"abc\".length", "(member \"abc\" length)"},
+		{"(1.5).toString", "(member 1.5 toString)"},
+		{"5.toString", "(member 5 toString)"},
+		{"(a + b).length", "(member (+ a b) length)"},
+		{"-a.b", "(- (member a b))"},
+		{"!a.b && c", "(&& (! (member a b)) c)"},
+		{"a.b + c.d * 2", "(+ (member a b) (* (member c d) 2))"},
+		{"a . b", "(member a b)"},
+		{"a.foo()", "(method a foo)"},
+		{"a.plus(12)", "(method a plus 12)"},
+		{"a.plus(b + 1, c.d)", "(method a plus (+ b 1) (member c d))"},
+		{"a.foo(x)(y)", "(call (method a foo x) y)"},
+		{"f(x).y", "(member (call f x) y)"},
+		{"a.b(c).d(e)", "(method (method a b c) d e)"},
+		{"f(a.b, c.d)", "(call f (member a b) (member c d))"},
 		{"add(x)(y)(1)", "(call (call (call add x) y) 1)"},
 		{"(f)(x)", "(call f x)"},
 		{"a + f(b) * c", "(+ a (* (call f b) c))"},
@@ -203,6 +229,11 @@ TEST(ParseExpression, RejectsInvalidExpressions) {
 		"a +",		   // operator without a right operand
 		"a + * b",	   // operator after an operator
 		"a !b",		   // prefix operator after an operand
+		"a.",		   // no member name
+		"a.(b)",	   // a member name is an identifier
+		"a.1",		   // a digit after the dot is a number, not a member
+		".a",		   // nothing before the dot
+		"a.b(1 2)",	   // an error inside the arguments of a method
 		"f(a,)",	   // trailing comma on the same line as ")"
 		"f(,a)",	   // missing argument
 		"f(a b)",	   // two operands in one argument

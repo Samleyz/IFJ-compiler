@@ -329,7 +329,6 @@ static ast_node_t expr_build_node(expr_entry_t *handle[], size_t count) {
 		expr_is_node(handle[1]) && expr_is_terminal(handle[2], EXPR_SYMBOL_RIGHT_PAREN)) {
 		return expr_take_node(handle[1]);
 	}
-	// TODO function calls, member access
 	return nullptr;
 }
 
@@ -443,6 +442,46 @@ static bool expr_parse_call(stack_t stk, parser_t *p) {
 }
 
 /**
+ * @brief Helper function: Turns the expression on top of the stack into the target of a member
+ * access
+ * @param stk Expression stack, a node entry must be on top
+ * @param p Parser, its current token is the "." that follows the expression
+ * @return true on success, false on a syntax error (it is printed)
+ * @note "x.name" and "x.name(arguments)" both build a NODE_MEMBER_ACCESS, is_call tells them apart
+ */
+static bool expr_parse_member(stack_t stk, parser_t *p) {
+	parser_advance(p); // "."
+	if (!peek_token_type(p, TOKEN_IDENTIFIER)) {
+		print_error(ERR_SYNTACTIC, p->curr_tkn.line_num, "Expected a member name after '.'");
+		return false;
+	}
+
+	// The target stays on the stack until the node exists, so an allocation failure frees it there.
+	ast_node_t member = expr_create_node(NODE_MEMBER_ACCESS, p->curr_tkn.line_num);
+	if (member == nullptr) {
+		return false;
+	}
+	member->as.member_access.member_name = p->curr_tkn.attribute.string_val;
+	p->curr_tkn.attribute.string_val = nullptr;
+	expr_entry_t *entry = expr_stack_top(stk);
+	stack_pop(stk);
+	member->as.member_access.target = expr_take_node(entry);
+	expr_entry_free(entry);
+	parser_advance(p); // the member name
+
+	// From here on the member node owns the target, so freeing it on an error frees both.
+	if (peek_token_type(p, TOKEN_LPAREN)) {
+		member->as.member_access.is_call = true;
+		parser_advance(p); // "("
+		if (!expr_parse_arguments(p, &member->as.member_access.args)) {
+			ast_dtor(member);
+			return false;
+		}
+	}
+	return expr_stack_push(stk, expr_entry_new_node(member));
+}
+
+/**
  * @brief Helper function: Parses an if expression with the grammar rule for if
  * @param p Parser, its current token is "if"
  * @return pointer to the NODE_IF node, nullptr on a syntax error (it is printed)
@@ -514,6 +553,20 @@ ast_node_t parse_expression(parser_t *p) {
 					goto done;
 				}
 			} else if (!expr_parse_call(stk, p)) {
+				goto done;
+			}
+			continue;
+		}
+
+		if (peek_operator(p, OPERATOR_DOT) && !expects_operand) {
+			// A '.' right after an operand or ')' starts a member access. Like a call it binds
+			// tighter than every operator and is applied straight to the finished expression on
+			// top of the stack, so the table is not consulted and "-x.y" is "-(x.y)".
+			if (!expr_is_node(expr_stack_top(stk))) {
+				if (!expr_reduce(stk, p)) {
+					goto done;
+				}
+			} else if (!expr_parse_member(stk, p)) {
 				goto done;
 			}
 			continue;
