@@ -102,7 +102,12 @@ typedef enum {
 	TOKEN_RPAREN,	  /**< right parenthesis */
 	TOKEN_LSQUARE,	  /**< left square parenthesis */
 	TOKEN_RSQUARE,	  /**< right square parenthesis */
-	TOKEN_MAIN,		  /**< @main token */
+	TOKEN_INTRPLTDS_START,	   /**< start of interpolated string */
+	TOKEN_INTRPLTDS_END,	   /**< end of interpolated string */
+	TOKEN_INTRPLTDS_EXP_START, /**< start of expression that should be interpolated */
+	TOKEN_INTRPLTDS_EXP_END,   /**< end of expression that should be interpolated */
+	TOKEN_MAIN,				   /**< @main token */
+	TOKEN_ERR				   /**< token returned when error occurs */
 } token_type;
 
 /**
@@ -127,5 +132,12 @@ token *create_token(token_type tkn_type, token_attr_t attribute, unsigned line_n
  * @param token pointer of token to be freed
  */
 void free_token(token *tkn);
+
+/**
+ * @brief Frees dynamically allocated attribute memory of a token (string_val)
+ *
+ * @param[in,out] tkn Pointer to token whose attribute memory will be freed
+ */
+void free_token_attr(token *tkn);
 
 #endif
