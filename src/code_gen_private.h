@@ -70,6 +70,16 @@ FILE *gen_get_output_file(void);
  */
 char *get_modified_name(const char *prefix, const char *name, const char *suffix);
 
-bool get_unique_label();
+/**
+ * @brief Creates a dynamically allocated unique label and increments the label counter
+ *
+ * The label has the form prefix + name + counter + suffix.
+ *
+ * @param[in] prefix Prefix string
+ * @param[in] name Base label name
+ * @param[in] suffix Suffix string
+ * @return Allocated string (must be freed), or nullptr on error
+ */
+char *get_unique_label(const char *prefix, const char *name, const char *suffix);
 
 #endif
