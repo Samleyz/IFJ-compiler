@@ -10,6 +10,18 @@
 #include "code_gen_private.h"
 #include "instruction_set.h"
 
+static bool generate_expr_stmt(ast_node_t current_node);
+
+static bool generate_while(ast_node_t current_node);
+
+static bool generate_for(ast_node_t current_node);
+
+static bool generate_if(ast_node_t current_node);
+
+static bool generate_assign(ast_node_t current_node);
+
+static bool generate_var_def(ast_node_t current_node);
+
 static bool generate_block(ast_node_t current_node);
 
 static bool generate_return(ast_node_t current_node);
@@ -32,7 +44,9 @@ bool generate_function_body(ast_node_t current_node) {
 static bool generate_block(ast_node_t current_node) {
 	ast_node_t curr_node = current_node->as.block.statements.head;
 	while (curr_node) {
-		generate_statement(curr_node);
+		if (!generate_statement(curr_node)) {
+			return false;
+		}
 		curr_node = curr_node->next;
 	}
 
@@ -42,25 +56,22 @@ static bool generate_block(ast_node_t current_node) {
 static bool generate_statement(ast_node_t current_node) {
 	switch (current_node->type) {
 	case NODE_VAR_DEF:
-		break;
+		return generate_var_def(current_node);
 	case NODE_ASSIGN:
-		break;
+		return generate_assign(current_node);
 	case NODE_IF:
-		break;
+		return generate_if(current_node);
 	case NODE_WHILE:
-		break;
+		return generate_while(current_node);
 	case NODE_FOR:
-		break;
+		return generate_for(current_node);
 	case NODE_RETURN:
 		return generate_return(current_node);
 	case NODE_EXPR_STMT:
-		break;
-	case NODE_BLOCK:
-		return generate_block(current_node);
+		return generate_expr_stmt(current_node);
 	default:
 		return false;
 	}
-	return false;
 }
 
 static bool generate_return(ast_node_t current_node) {
@@ -77,4 +88,34 @@ static bool generate_return(ast_node_t current_node) {
 	generate_function_epilogue();
 
 	return true;
+}
+
+static bool generate_expr_stmt(ast_node_t current_node) {
+	// TODO
+	return false;
+}
+
+static bool generate_while(ast_node_t current_node) {
+	// TODO
+	return false;
+}
+
+static bool generate_for(ast_node_t current_node) {
+	// TODO
+	return false;
+}
+
+static bool generate_if(ast_node_t current_node) {
+	// TODO
+	return false;
+}
+
+static bool generate_assign(ast_node_t current_node) {
+	// TODO
+	return false;
+}
+
+static bool generate_var_def(ast_node_t current_node) {
+	// TODO
+	return false;
 }
