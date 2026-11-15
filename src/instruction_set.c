@@ -187,3 +187,8 @@ void print_inst_3(instruction_t instruction_type, operand_t operand_1, operand_t
 	print_operand(operand_3);
 	fputc('\n', output_file);
 }
+
+void print_comment(const char *comment_message) {
+	fprintf(output_file, "#%s", comment_message);
+	fputc('\n', output_file);
+}

@@ -167,4 +167,11 @@ void print_inst_2(instruction_t instruction_type, operand_t operand_1, operand_t
 void print_inst_3(instruction_t instruction_type, operand_t operand_1, operand_t operand_2,
 				  operand_t operand_3);
 
+/**
+ * @brief Prints a comment line
+ *
+ * @param[in] comment_message Comment text without the leading '#'
+ */
+void print_comment(const char *comment_message);
+
 #endif
