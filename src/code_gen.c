@@ -128,9 +128,7 @@ static bool generate_ext_def(ast_node_t current_node, const char *receiver_name,
 	}
 
 	operand_t parameter = {
-		.operand_type = OP_TYPE_VAR,
-		.frame = FT_LOCAL,
-		.value = {.var_name = receiver_name}}; // TODO: switch to sym_entry unique name
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = receiver_name}};
 
 	print_inst_1(INST_DEFVAR, parameter);
 	print_inst_1(INST_POPS, parameter);
@@ -152,7 +150,7 @@ static bool generate_ext_def(ast_node_t current_node, const char *receiver_name,
 static bool generate_extension(ast_node_t current_node) {
 	ast_node_t curr_node = current_node->as.extension.methods.head;
 	while (curr_node) { // cycle over all extension methods
-		if (!generate_ext_def(curr_node, current_node->as.extension.receiver_name,
+		if (!generate_ext_def(curr_node, current_node->as.extension.unique_receiver_name,
 							  current_node->as.extension.receiver_type)) {
 			return false;
 		}
@@ -172,10 +170,9 @@ static bool generate_reverse_params(ast_node_t param) {
 		return false;
 	}
 
-	operand_t parameter = {
-		.operand_type = OP_TYPE_VAR,
-		.frame = FT_LOCAL,
-		.value = {.var_name = param->as.param.name}}; // TODO: switch to sym_entry unique name
+	operand_t parameter = {.operand_type = OP_TYPE_VAR,
+						   .frame = FT_LOCAL,
+						   .value = {.var_name = param->as.param.unique_name}};
 
 	print_inst_1(INST_DEFVAR, parameter);
 	print_inst_1(INST_POPS, parameter);
