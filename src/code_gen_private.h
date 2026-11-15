@@ -18,16 +18,39 @@ typedef struct code_generator {
 	int label_counter;
 } code_gen_t;
 
+/**
+ * @brief Generates the function label and creates and pushes its frame
+ *
+ * @param[in] label_name Name of the function label
+ */
 void generate_function_prologue(const char *label_name);
 
+/**
+ * @brief Generates the frame pop and the return from the function
+ */
 void generate_function_epilogue(void);
 
+/**
+ * @brief Generates definitions of all built-in functions
+ */
 void generate_builtins_definitions(void);
 
 bool generate_expression(ast_node_t current_node);
 
+/**
+ * @brief Generates the body of a function
+ *
+ * @param[in] current_node Function body (NODE_BLOCK or NODE_RETURN)
+ * @return true on success, false otherwise
+ */
 bool generate_function_body(ast_node_t current_node);
 
+/**
+ * @brief Emits DEFVAR for all local variables in a function body
+ *
+ * @param[in] current_node Function body, may be nullptr
+ * @return true on success, false otherwise
+ */
 bool generate_locals_decl(ast_node_t current_node);
 
 /**

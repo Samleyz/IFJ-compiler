@@ -10,6 +10,12 @@
 #include "code_gen_private.h"
 #include "instruction_set.h"
 
+/**
+ * @brief Generates code for an expression used as a statement
+ *
+ * @param[in] current_node NODE_EXPR_STMT node
+ * @return true on success, false otherwise
+ */
 static bool generate_expr_stmt(ast_node_t current_node);
 
 static bool generate_while(ast_node_t current_node);
@@ -22,10 +28,28 @@ static bool generate_assign(ast_node_t current_node);
 
 static bool generate_var_def(ast_node_t current_node);
 
+/**
+ * @brief Generates code for all statements of a block
+ *
+ * @param[in] current_node NODE_BLOCK node
+ * @return true on success, false otherwise
+ */
 static bool generate_block(ast_node_t current_node);
 
+/**
+ * @brief Generates code for a return statement
+ *
+ * @param[in] current_node NODE_RETURN node
+ * @return true on success, false otherwise
+ */
 static bool generate_return(ast_node_t current_node);
 
+/**
+ * @brief Generates code for a single statement according to its node type
+ *
+ * @param[in] current_node Statement node
+ * @return true on success, false otherwise
+ */
 static bool generate_statement(ast_node_t current_node);
 
 bool generate_function_body(ast_node_t current_node) {
@@ -42,6 +66,7 @@ bool generate_function_body(ast_node_t current_node) {
 }
 
 bool generate_locals_decl(ast_node_t current_node) {
+	// Missing optional node (else branch, step)
 	if (!current_node) {
 		return true;
 	}
@@ -57,6 +82,7 @@ bool generate_locals_decl(ast_node_t current_node) {
 		}
 		break;
 	case NODE_VAR_DEF:
+		// Only declaration, the value is assigned in generate_var_def
 		operand_t operand_var_def = {.operand_type = OP_TYPE_VAR,
 									 .frame = FT_LOCAL,
 									 .value = {.var_name = current_node->as.var_def.unique_name}};
@@ -91,6 +117,7 @@ bool generate_locals_decl(ast_node_t current_node) {
 		}
 		break;
 	case NODE_FOR:
+		// Loop variable
 		operand_t operand_for_def = {
 			.operand_type = OP_TYPE_VAR,
 			.frame = FT_LOCAL,
@@ -147,6 +174,7 @@ bool generate_locals_decl(ast_node_t current_node) {
 		if (!generate_locals_decl(current_node->as.func_call.callee)) {
 			return false;
 		}
+		// List of argument lists
 		ast_node_t curr_arg_list = current_node->as.func_call.arg_lists.head;
 		while (curr_arg_list) {
 			ast_node_t curr_arg = curr_arg_list->as.arg_list.args.head;
@@ -179,6 +207,7 @@ bool generate_locals_decl(ast_node_t current_node) {
 		}
 		break;
 	default:
+		// Leaf nodes
 		break;
 	}
 
@@ -220,6 +249,7 @@ static bool generate_statement(ast_node_t current_node) {
 
 static bool generate_return(ast_node_t current_node) {
 
+	// Return without an expression returns Unit (nil)
 	if (current_node->as.return_stmt.expr == NULL) {
 		operand_t operand = {.operand_type = OP_TYPE_NIL, .frame = FT_NO_FRAME, .value = {0}};
 		print_inst_1(INST_PUSHS, operand);
