@@ -338,14 +338,82 @@ static bool generate_while(ast_node_t current_node) {
 }
 
 static bool generate_for(ast_node_t current_node) {
-	/*operand_t from_operand = {.operand_type = OP_TYPE_VAR,
-							  .frame = FT_LOCAL,
-							  .value = {.var_name = current_node->as.for_stmt.unique_var_name}};
-	print_inst_1(INST_DEFVAR, from_operand);
+	// local variable operands assembly
+	operand_t operand_inter_var = {
+		.operand_type = OP_TYPE_VAR,
+		.frame = FT_LOCAL,
+		.value = {.var_name = current_node->as.for_stmt.unique_var_name}};
 
-	operand_t to_operand = {.operand_type = OP_TYPE_VAR,
-							.frame = FT_LOCAL,
-							.value = {.var_name = current_node->as.for_stmt.}};*/
+	char *to_name = get_modified_name("%", current_node->as.for_stmt.unique_var_name, "$to");
+	operand_t operand_to = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = to_name}};
+
+	if (!to_name) {
+		return false;
+	}
+
+	char *step_name = get_modified_name("%", current_node->as.for_stmt.unique_var_name, "$step");
+	operand_t operand_step = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = step_name}};
+
+	if (!step_name) {
+		free(to_name);
+		return false;
+	}
+
+	// from, by, to statements evaluation and assignment
+	if (!generate_expression(current_node->as.for_stmt.from_expr)) {
+		free(to_name);
+		free(step_name);
+		return false;
+	}
+
+	print_inst_1(INST_POPS, operand_inter_var);
+
+	if (!generate_expression(current_node->as.for_stmt.to_expr)) {
+		free(to_name);
+		free(step_name);
+		return false;
+	}
+
+	print_inst_1(INST_POPS, operand_to);
+
+	if (current_node->as.for_stmt.step_expr) {
+		if (!generate_expression(current_node->as.for_stmt.step_expr)) {
+			free(to_name);
+			free(step_name);
+			return false;
+		}
+	} else {
+		operand_t int_1_operand = {
+			.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 1}};
+		print_inst_1(INST_PUSHS, int_1_operand);
+	}
+
+	print_inst_1(INST_POPS, operand_step);
+
+	// cycle body
+	char *top_label = get_unique_label("$", "forstmt", "$top");
+
+	if (!top_label) {
+		free(to_name);
+		free(step_name);
+		return false;
+	}
+
+	operand_t operand_top_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = top_label}};
+
+	print_inst_1(INST_LABEL, operand_top_label);
+
+	if (current_node->as.for_stmt.is_inclusive) {
+
+	} else {
+	}
+
+	free(top_label);
+	free(to_name);
+	free(step_name);
 }
 
 static bool generate_if(ast_node_t current_node) {
