@@ -24,8 +24,20 @@ static bool generate_for(ast_node_t current_node);
 
 static bool generate_if(ast_node_t current_node);
 
+/**
+ * @brief Generates code for an assignment to an already declared variable
+ *
+ * @param[in] current_node NODE_ASSIGN node
+ * @return true on success, false otherwise
+ */
 static bool generate_assign(ast_node_t current_node);
 
+/**
+ * @brief Generates code for a variable definition, the variable is declared by generate_locals_decl
+ *
+ * @param[in] current_node NODE_VAR_DEF node
+ * @return true on success, false otherwise
+ */
 static bool generate_var_def(ast_node_t current_node);
 
 /**
@@ -284,12 +296,23 @@ static bool generate_if(ast_node_t current_node) {
 }
 
 static bool generate_assign(ast_node_t current_node) {
-	/*operand_t operand = {OP_TYPE_VAR,
-	print_inst_1(INST_, operand_t operand);*/
-	return false;
+	if (!generate_expression(current_node->as.assign.expr)) {
+		return false;
+	}
+	operand_t operand = {.operand_type = OP_TYPE_VAR,
+						 .frame = FT_LOCAL,
+						 .value = {.var_name = current_node->as.assign.unique_target_id}};
+	print_inst_1(INST_POPS, operand);
+	return true;
 }
 
 static bool generate_var_def(ast_node_t current_node) {
-	// TODO
-	return false;
+	if (!generate_expression(current_node->as.var_def.init_expr)) {
+		return false;
+	}
+	operand_t operand = {.operand_type = OP_TYPE_VAR,
+						 .frame = FT_LOCAL,
+						 .value = {.var_name = current_node->as.var_def.unique_name}};
+	print_inst_1(INST_POPS, operand);
+	return true;
 }
