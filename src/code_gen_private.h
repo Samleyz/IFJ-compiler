@@ -73,7 +73,7 @@ char *get_modified_name(const char *prefix, const char *name, const char *suffix
 /**
  * @brief Creates a dynamically allocated unique label and increments the label counter
  *
- * The label has the form prefix + name + counter + suffix.
+ * The label has the form prefix + name + "$" + counter + suffix.
  *
  * @param[in] prefix Prefix string
  * @param[in] name Base label name

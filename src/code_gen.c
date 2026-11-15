@@ -309,7 +309,7 @@ char *get_unique_label(const char *prefix, const char *name, const char *suffix)
 		return nullptr;
 	}
 	int label_len =
-		snprintf(nullptr, 0, "%s%s%d%s", prefix, name, code_generator.label_counter, suffix);
+		snprintf(nullptr, 0, "%s%s$%d%s", prefix, name, code_generator.label_counter, suffix);
 	if (label_len < 0) {
 		return nullptr;
 	}
@@ -322,7 +322,7 @@ char *get_unique_label(const char *prefix, const char *name, const char *suffix)
 		return nullptr;
 	}
 
-	snprintf(buffer, label_len, "%s%s%d%s", prefix, name, code_generator.label_counter, suffix);
+	snprintf(buffer, label_len, "%s%s$%d%s", prefix, name, code_generator.label_counter, suffix);
 
 	code_generator.label_counter++;
 	return buffer;

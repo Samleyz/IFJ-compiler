@@ -302,7 +302,7 @@ static bool generate_expr_stmt_keep(ast_node_t current_node) {
 }
 
 static bool generate_while(ast_node_t current_node) {
-	char *top_label = get_unique_label("$", "whilestmt", "top");
+	char *top_label = get_unique_label("$", "whilestmt", "$top");
 	operand_t operand_top_label = {
 		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = top_label}};
 
@@ -310,7 +310,7 @@ static bool generate_while(ast_node_t current_node) {
 		return false;
 	}
 
-	char *end_label = get_unique_label("$", "whilestmt", "end");
+	char *end_label = get_unique_label("$", "whilestmt", "$end");
 	operand_t operand_end_label = {
 		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = end_label}};
 
@@ -372,7 +372,7 @@ static bool generate_if(ast_node_t current_node) {
 	if (!generate_expression(current_node->as.if_stmt.condition)) {
 		return false;
 	}
-	char *then_label = get_unique_label("$", "ifstmt", "then");
+	char *then_label = get_unique_label("$", "ifstmt", "$then");
 	operand_t operand_then_label = {
 		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = then_label}};
 
@@ -380,7 +380,7 @@ static bool generate_if(ast_node_t current_node) {
 		return false;
 	}
 
-	char *else_label = get_unique_label("$", "ifstmt", "else");
+	char *else_label = get_unique_label("$", "ifstmt", "$else");
 	operand_t operand_else_label = {
 		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = else_label}};
 
@@ -388,7 +388,7 @@ static bool generate_if(ast_node_t current_node) {
 		free(then_label);
 		return false;
 	}
-	char *end_label = get_unique_label("$", "ifstmt", "end");
+	char *end_label = get_unique_label("$", "ifstmt", "$end");
 
 	if (!end_label) {
 		free(then_label);
