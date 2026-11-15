@@ -135,6 +135,10 @@ static bool generate_ext_def(ast_node_t current_node, const char *receiver_name,
 	print_inst_1(INST_DEFVAR, parameter);
 	print_inst_1(INST_POPS, parameter);
 
+	if (!generate_locals_decl(current_node->as.func_def.body)) {
+		return false;
+	}
+
 	// Function body
 	if (current_node->as.func_def.body) {
 		if (!generate_function_body(current_node->as.func_def.body)) {
@@ -211,6 +215,10 @@ static bool generate_function_def(ast_node_t current_node) {
 		if (!generate_reverse_paramlists(current_param_list)) {
 			return false;
 		}
+	}
+
+	if (!generate_locals_decl(current_node->as.func_def.body)) {
+		return false;
 	}
 
 	// Function body

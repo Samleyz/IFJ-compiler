@@ -28,6 +28,8 @@ bool generate_expression(ast_node_t current_node);
 
 bool generate_function_body(ast_node_t current_node);
 
+bool generate_locals_decl(ast_node_t current_node);
+
 /**
  * @brief Returns the output file the code generator writes to
  *
