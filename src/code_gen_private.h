@@ -26,12 +26,13 @@ void generate_builtins_definitions(void);
 
 bool generate_expression(ast_node_t current_node);
 
-bool generate_statements(ast_node_t current_node);
+bool generate_function_body(ast_node_t current_node);
 
 /**
  * @brief Returns the output file the code generator writes to
  *
- * @return Output file set by code_gen_setup (owned by the caller of code_gen_setup, do not close it)
+ * @return Output file set by code_gen_setup (owned by the caller of code_gen_setup, do not close
+ * it)
  */
 FILE *gen_get_output_file(void);
 

@@ -137,13 +137,10 @@ static bool generate_ext_def(ast_node_t current_node, const char *receiver_name,
 
 	// Function body
 	if (current_node->as.func_def.body) {
-		if (!generate_statements(current_node->as.func_def.body)) {
+		if (!generate_function_body(current_node->as.func_def.body)) {
 			return false;
 		}
 	}
-
-	// Epilogue
-	generate_function_epilogue();
 
 	return true;
 }
@@ -218,13 +215,10 @@ static bool generate_function_def(ast_node_t current_node) {
 
 	// Function body
 	if (current_node->as.func_def.body) {
-		if (!generate_statements(current_node->as.func_def.body)) {
+		if (!generate_function_body(current_node->as.func_def.body)) {
 			return false;
 		}
 	}
-
-	// Epilogue
-	generate_function_epilogue();
 
 	return true;
 }
