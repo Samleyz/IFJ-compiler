@@ -81,8 +81,37 @@ static bool generate_return(ast_node_t current_node);
  */
 static bool generate_statement(ast_node_t current_node);
 
+/**
+ * @brief Emits DEFVAR for a local variable
+ *
+ * @param[in] var_name Name of the variable
+ */
+static void generate_local_defvar(const char *var_name);
+
+/**
+ * @brief Emits DEFVAR for all local variables in a list of nodes
+ *
+ * @param[in] head First node of the list, may be nullptr
+ * @return true on success, false otherwise
+ */
+static bool generate_locals_decl_list(ast_node_t head);
+
+/**
+ * @brief Emits DEFVAR for the loop variable and the helper variables of a for loop, and for all
+ * local variables in its subtree
+ *
+ * @param[in] for_node NODE_FOR node
+ * @return true on success, false otherwise
+ */
+static bool generate_for_locals(ast_node_t for_node);
+
 bool generate_function_body(ast_node_t current_node) { return generate_statement(current_node); }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Cases NODE_FUNC_CALL to NODE_TYPE_CAST and the split of generate_locals_decl into smaller
+// functions implemented with AI assistance.
+// Prompt: Complete the remaining cases of the switch in the same style as the existing ones.
+// Prompt: Refactor the switch by splitting it into smaller functions.
 bool generate_locals_decl(ast_node_t current_node) {
 	// Missing optional node (else branch, step)
 	if (!current_node) {
@@ -91,145 +120,92 @@ bool generate_locals_decl(ast_node_t current_node) {
 
 	switch (current_node->type) {
 	case NODE_BLOCK:
-		ast_node_t curr_node_while = current_node->as.block.statements.head;
-		while (curr_node_while) {
-			if (!generate_locals_decl(curr_node_while)) {
-				return false;
-			}
-			curr_node_while = curr_node_while->next;
-		}
-		break;
+		return generate_locals_decl_list(current_node->as.block.statements.head);
 	case NODE_VAR_DEF:
 		// Only declaration, the value is assigned in generate_var_def
-		operand_t operand_var_def = {.operand_type = OP_TYPE_VAR,
-									 .frame = FT_LOCAL,
-									 .value = {.var_name = current_node->as.var_def.unique_name}};
-		print_inst_1(INST_DEFVAR, operand_var_def);
-
-		if (!generate_locals_decl(current_node->as.var_def.init_expr)) {
-			return false;
-		}
-		break;
+		generate_local_defvar(current_node->as.var_def.unique_name);
+		return generate_locals_decl(current_node->as.var_def.init_expr);
 	case NODE_ASSIGN:
-		if (!generate_locals_decl(current_node->as.assign.expr)) {
-			return false;
-		}
-		break;
+		return generate_locals_decl(current_node->as.assign.expr);
 	case NODE_IF:
-		if (!generate_locals_decl(current_node->as.if_stmt.condition)) {
-			return false;
-		}
-		if (!generate_locals_decl(current_node->as.if_stmt.then_branch)) {
-			return false;
-		}
-		if (!generate_locals_decl(current_node->as.if_stmt.else_branch)) {
-			return false;
-		}
-		break;
+		return (bool)(generate_locals_decl(current_node->as.if_stmt.condition) &&
+					  generate_locals_decl(current_node->as.if_stmt.then_branch) &&
+					  generate_locals_decl(current_node->as.if_stmt.else_branch));
 	case NODE_WHILE:
-		if (!generate_locals_decl(current_node->as.while_stmt.condition)) {
-			return false;
-		}
-		if (!generate_locals_decl(current_node->as.while_stmt.body)) {
-			return false;
-		}
-		break;
+		return (bool)(generate_locals_decl(current_node->as.while_stmt.condition) &&
+					  generate_locals_decl(current_node->as.while_stmt.body));
 	case NODE_FOR:
-		// Loop variable
-		operand_t operand_for_def = {
-			.operand_type = OP_TYPE_VAR,
-			.frame = FT_LOCAL,
-			.value = {.var_name = current_node->as.for_stmt.unique_var_name}};
-		print_inst_1(INST_DEFVAR, operand_for_def);
-
-		if (!generate_locals_decl(current_node->as.for_stmt.from_expr)) {
-			return false;
-		}
-		if (!generate_locals_decl(current_node->as.for_stmt.to_expr)) {
-			return false;
-		}
-		if (!generate_locals_decl(current_node->as.for_stmt.step_expr)) {
-			return false;
-		}
-		ast_node_t curr_node_for = current_node->as.for_stmt.guards.head;
-		while (curr_node_for) {
-			if (!generate_locals_decl(curr_node_for)) {
-				return false;
-			}
-			curr_node_for = curr_node_for->next;
-		}
-		if (!generate_locals_decl(current_node->as.for_stmt.body)) {
-			return false;
-		}
-		break;
+		return generate_for_locals(current_node);
 	case NODE_RETURN:
-		if (!generate_locals_decl(current_node->as.return_stmt.expr)) {
-			return false;
-		}
-		break;
+		return generate_locals_decl(current_node->as.return_stmt.expr);
 	case NODE_EXPR_STMT:
-		if (!generate_locals_decl(current_node->as.expr_stmt.expr)) {
-			return false;
-		}
-		break;
+		return generate_locals_decl(current_node->as.expr_stmt.expr);
 	case NODE_BINARY_OP:
-		if (!generate_locals_decl(current_node->as.binary_op.left)) {
-			return false;
-		}
-		if (!generate_locals_decl(current_node->as.binary_op.right)) {
-			return false;
-		}
-		break;
+		return (bool)(generate_locals_decl(current_node->as.binary_op.left) &&
+					  generate_locals_decl(current_node->as.binary_op.right));
 	case NODE_UNARY_OP:
-		if (!generate_locals_decl(current_node->as.unary_op.operand)) {
-			return false;
-		}
-		break;
-	// Tool: Claude Code (Claude Sonnet 5.5)
-	// Cases NODE_FUNC_CALL to NODE_TYPE_CAST implemented with AI assistance.
-	// Prompt: Complete the remaining cases of the switch in the same style as the existing ones.
+		return generate_locals_decl(current_node->as.unary_op.operand);
 	case NODE_FUNC_CALL:
-		if (!generate_locals_decl(current_node->as.func_call.callee)) {
-			return false;
-		}
-		// List of argument lists
-		ast_node_t curr_arg_list = current_node->as.func_call.arg_lists.head;
-		while (curr_arg_list) {
-			ast_node_t curr_arg = curr_arg_list->as.arg_list.args.head;
-			while (curr_arg) {
-				if (!generate_locals_decl(curr_arg)) {
-					return false;
-				}
-				curr_arg = curr_arg->next;
-			}
-			curr_arg_list = curr_arg_list->next;
-		}
-		break;
+		// arg_lists is a list of NODE_ARG_LIST
+		return (bool)(generate_locals_decl(current_node->as.func_call.callee) &&
+					  generate_locals_decl_list(current_node->as.func_call.arg_lists.head));
+	case NODE_ARG_LIST:
+		return generate_locals_decl_list(current_node->as.arg_list.args.head);
 	case NODE_MEMBER_ACCESS:
-		if (!generate_locals_decl(current_node->as.member_access.target)) {
-			return false;
-		}
-		break;
+		return generate_locals_decl(current_node->as.member_access.target);
 	case NODE_STRING_INTERP:
-		ast_node_t curr_part = current_node->as.string_interp.parts.head;
-		while (curr_part) {
-			if (!generate_locals_decl(curr_part)) {
-				return false;
-			}
-			curr_part = curr_part->next;
-		}
-		break;
+		return generate_locals_decl_list(current_node->as.string_interp.parts.head);
 	case NODE_TYPE_CAST:
-		if (!generate_locals_decl(current_node->as.type_cast.operand)) {
-			return false;
-		}
-		break;
+		return generate_locals_decl(current_node->as.type_cast.operand);
 	default:
 		// Leaf nodes
-		break;
+		return true;
+	}
+}
+
+static void generate_local_defvar(const char *var_name) {
+	operand_t operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = var_name}};
+	print_inst_1(INST_DEFVAR, operand);
+}
+
+static bool generate_locals_decl_list(ast_node_t head) {
+	ast_node_t curr_node = head;
+	while (curr_node) {
+		if (!generate_locals_decl(curr_node)) {
+			return false;
+		}
+		curr_node = curr_node->next;
 	}
 
 	return true;
+}
+
+static bool generate_for_locals(ast_node_t for_node) {
+	// Loop from variable
+	generate_local_defvar(for_node->as.for_stmt.unique_var_name);
+
+	// Loop step variable
+	char *step_var_name = get_modified_name("%", for_node->as.for_stmt.unique_var_name, "$step");
+	if (!step_var_name) {
+		return false;
+	}
+	generate_local_defvar(step_var_name);
+	free(step_var_name);
+
+	// Loop to variable
+	char *to_var_name = get_modified_name("%", for_node->as.for_stmt.unique_var_name, "$to");
+	if (!to_var_name) {
+		return false;
+	}
+	generate_local_defvar(to_var_name);
+	free(to_var_name);
+
+	return (bool)(generate_locals_decl(for_node->as.for_stmt.from_expr) &&
+				  generate_locals_decl(for_node->as.for_stmt.to_expr) &&
+				  generate_locals_decl(for_node->as.for_stmt.step_expr) &&
+				  generate_locals_decl_list(for_node->as.for_stmt.guards.head) &&
+				  generate_locals_decl(for_node->as.for_stmt.body));
 }
 
 static bool generate_block(ast_node_t current_node) {
@@ -362,8 +338,14 @@ static bool generate_while(ast_node_t current_node) {
 }
 
 static bool generate_for(ast_node_t current_node) {
-	// TODO
-	return false;
+	/*operand_t from_operand = {.operand_type = OP_TYPE_VAR,
+							  .frame = FT_LOCAL,
+							  .value = {.var_name = current_node->as.for_stmt.unique_var_name}};
+	print_inst_1(INST_DEFVAR, from_operand);
+
+	operand_t to_operand = {.operand_type = OP_TYPE_VAR,
+							.frame = FT_LOCAL,
+							.value = {.var_name = current_node->as.for_stmt.}};*/
 }
 
 static bool generate_if(ast_node_t current_node) {
