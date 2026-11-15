@@ -268,6 +268,7 @@ static bool generate_statement(ast_node_t current_node) {
 }
 
 static bool generate_return(ast_node_t current_node) {
+	print_comment("return");
 
 	// Return without an expression returns Unit (nil)
 	if (current_node->as.return_stmt.expr == NULL) {
@@ -322,6 +323,7 @@ static bool generate_while(ast_node_t current_node) {
 		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
 
 	// top label
+	print_comment("while");
 	print_inst_1(INST_LABEL, operand_top_label);
 
 	if (!generate_expression(current_node->as.while_stmt.condition)) {
@@ -330,8 +332,6 @@ static bool generate_while(ast_node_t current_node) {
 		return false;
 	}
 
-	fputc('\n', gen_get_output_file());
-
 	// condition
 	print_inst_1(INST_PUSHS, operand_eq);
 	print_inst_1(INST_JUMPIFNEQS, operand_end_label);
@@ -339,6 +339,7 @@ static bool generate_while(ast_node_t current_node) {
 	fputc('\n', gen_get_output_file());
 
 	// body
+	print_comment("while body");
 	if (!generate_statement(current_node->as.while_stmt.body)) {
 		free(top_label);
 		free(end_label);
@@ -350,6 +351,7 @@ static bool generate_while(ast_node_t current_node) {
 	// jump to the top
 	print_inst_1(INST_JUMP, operand_top_label);
 
+	print_comment("end while");
 	print_inst_1(INST_LABEL, operand_end_label);
 
 	fputc('\n', gen_get_output_file());
@@ -365,6 +367,8 @@ static bool generate_for(ast_node_t current_node) {
 }
 
 static bool generate_if(ast_node_t current_node) {
+	print_comment("if");
+
 	if (!generate_expression(current_node->as.if_stmt.condition)) {
 		return false;
 	}
@@ -404,6 +408,7 @@ static bool generate_if(ast_node_t current_node) {
 	fputc('\n', gen_get_output_file());
 
 	// else branch
+	print_comment("else");
 	print_inst_1(INST_LABEL, operand_else_label);
 
 	if (current_node->as.if_stmt.else_branch) {
@@ -419,6 +424,7 @@ static bool generate_if(ast_node_t current_node) {
 	fputc('\n', gen_get_output_file());
 
 	// then branch
+	print_comment("then");
 	print_inst_1(INST_LABEL, operand_then_label);
 
 	if (!generate_statement(current_node->as.if_stmt.then_branch)) {
@@ -430,6 +436,7 @@ static bool generate_if(ast_node_t current_node) {
 
 	fputc('\n', gen_get_output_file());
 
+	print_comment("end if");
 	print_inst_1(INST_LABEL, operand_end_label);
 
 	fputc('\n', gen_get_output_file());
@@ -442,6 +449,8 @@ static bool generate_if(ast_node_t current_node) {
 }
 
 static bool generate_assign(ast_node_t current_node) {
+	print_comment("assign");
+
 	if (!generate_expression(current_node->as.assign.expr)) {
 		return false;
 	}
@@ -453,6 +462,8 @@ static bool generate_assign(ast_node_t current_node) {
 }
 
 static bool generate_var_def(ast_node_t current_node) {
+	print_comment("val/var definition");
+
 	if (!generate_expression(current_node->as.var_def.init_expr)) {
 		return false;
 	}

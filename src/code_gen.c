@@ -65,6 +65,7 @@ void code_gen_setup(FILE *output_file) {
 }
 
 void generate_function_prologue(const char *label_name) {
+	print_comment("function");
 	operand_t label = {
 		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = label_name}};
 	print_inst_1(INST_LABEL, label);
@@ -120,6 +121,7 @@ static bool generate_ext_def(ast_node_t current_node, const char *receiver_name,
 	free(ext_def_name);
 
 	// Retrieve arguments from stack into local variables
+	print_comment("parameters");
 	if (current_node->as.func_def.has_parens) {
 		ast_node_t current_param_list = current_node->as.func_def.param_lists.head;
 		if (!generate_reverse_paramlists(current_param_list)) {
@@ -133,11 +135,13 @@ static bool generate_ext_def(ast_node_t current_node, const char *receiver_name,
 	print_inst_1(INST_DEFVAR, parameter);
 	print_inst_1(INST_POPS, parameter);
 
+	print_comment("locals");
 	if (!generate_locals_decl(current_node->as.func_def.body)) {
 		return false;
 	}
 
 	// Function body
+	print_comment("body");
 	if (current_node->as.func_def.body) {
 		if (!generate_function_body(current_node->as.func_def.body)) {
 			return false;
@@ -207,6 +211,7 @@ static bool generate_function_def(ast_node_t current_node) {
 	free(function_name);
 
 	// Retrieve arguments from stack into local variables
+	print_comment("parameters");
 	if (current_node->as.func_def.has_parens) {
 		ast_node_t current_param_list = current_node->as.func_def.param_lists.head;
 		if (!generate_reverse_paramlists(current_param_list)) {
@@ -214,11 +219,13 @@ static bool generate_function_def(ast_node_t current_node) {
 		}
 	}
 
+	print_comment("locals");
 	if (!generate_locals_decl(current_node->as.func_def.body)) {
 		return false;
 	}
 
 	// Function body
+	print_comment("body");
 	if (current_node->as.func_def.body) {
 		if (!generate_function_body(current_node->as.func_def.body)) {
 			return false;
