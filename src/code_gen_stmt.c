@@ -11,12 +11,22 @@
 #include "instruction_set.h"
 
 /**
- * @brief Generates code for an expression used as a statement
+ * @brief Generates code for an expression used as a statement, keep the expression value on the
+ * stack
  *
  * @param[in] current_node NODE_EXPR_STMT node
  * @return true on success, false otherwise
  */
-static bool generate_expr_stmt(ast_node_t current_node);
+static bool generate_expr_stmt_keep(ast_node_t current_node);
+
+/**
+ * @brief Generates code for an expression used as a statement, discards the expression value on the
+ * stack
+ *
+ * @param[in] current_node NODE_EXPR_STMT node
+ * @return true on success, false otherwise
+ */
+static bool generate_expr_stmt_discard(ast_node_t current_node);
 
 static bool generate_while(ast_node_t current_node);
 
@@ -253,7 +263,7 @@ static bool generate_statement(ast_node_t current_node) {
 	case NODE_RETURN:
 		return generate_return(current_node);
 	case NODE_EXPR_STMT:
-		return generate_expr_stmt(current_node);
+		return generate_expr_stmt_discard(current_node);
 	default:
 		return false;
 	}
@@ -276,7 +286,19 @@ static bool generate_return(ast_node_t current_node) {
 	return true;
 }
 
-static bool generate_expr_stmt(ast_node_t current_node) {
+static bool generate_expr_stmt_discard(ast_node_t current_node) {
+	if (!generate_expression(current_node->as.expr_stmt.expr)) {
+		return false;
+	}
+	operand_t operand_dis = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%discard"}};
+
+	print_inst_1(INST_POPS, operand_dis);
+
+	return true;
+}
+
+static bool generate_expr_stmt_keep(ast_node_t current_node) {
 	return generate_expression(current_node->as.expr_stmt.expr);
 }
 

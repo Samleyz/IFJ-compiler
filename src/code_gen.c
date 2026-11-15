@@ -231,6 +231,11 @@ static bool generate_function_def(ast_node_t current_node) {
 static bool generate_prologue(ast_node_t root) {
 	fprintf(code_generator.output_file, ".IFJcode26\n\n");
 
+	operand_t operand_dis = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%discard"}};
+
+	print_inst_1(INST_DEFVAR, operand_dis);
+
 	// find the @main entry function
 	char *main_label = nullptr;
 	ast_node_t current_node = root->as.program.items.head;
