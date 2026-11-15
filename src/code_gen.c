@@ -18,8 +18,8 @@ static code_gen_t code_generator;
 /**
  * @brief Emits the IFJcode26 header and the program bootstrap sequence
  *
- * Finds the entry function annotated with @main
- * calls the main function, and terminates the program with EXIT 0.
+ * Defines the global variable used to discard values, finds the entry function annotated with
+ * @main, calls the main function, and terminates the program with EXIT 0.
  *
  * @param[in] root Root of the AST program
  * @return true on success, false otherwise

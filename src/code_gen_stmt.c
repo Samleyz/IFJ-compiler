@@ -9,6 +9,7 @@
 #include "ast.h"
 #include "code_gen_private.h"
 #include "instruction_set.h"
+#include <stdlib.h>
 
 /**
  * @brief Generates code for an expression used as a statement, keep the expression value on the
@@ -32,6 +33,12 @@ static bool generate_while(ast_node_t current_node);
 
 static bool generate_for(ast_node_t current_node);
 
+/**
+ * @brief Generates code for an if statement
+ *
+ * @param[in] current_node NODE_IF node
+ * @return true on success, false otherwise
+ */
 static bool generate_if(ast_node_t current_node);
 
 /**
@@ -67,25 +74,14 @@ static bool generate_block(ast_node_t current_node);
 static bool generate_return(ast_node_t current_node);
 
 /**
- * @brief Generates code for a single statement according to its node type
+ * @brief Generates code for a statement or a block according to its node type
  *
- * @param[in] current_node Statement node
+ * @param[in] current_node Statement or block node
  * @return true on success, false otherwise
  */
 static bool generate_statement(ast_node_t current_node);
 
-bool generate_function_body(ast_node_t current_node) {
-	if (current_node->type == NODE_BLOCK) {
-		if (!generate_block(current_node)) {
-			return false;
-		}
-	} else {
-		if (!generate_return(current_node)) {
-			return false;
-		}
-	}
-	return true;
-}
+bool generate_function_body(ast_node_t current_node) { return generate_statement(current_node); }
 
 bool generate_locals_decl(ast_node_t current_node) {
 	// Missing optional node (else branch, step)
@@ -264,6 +260,8 @@ static bool generate_statement(ast_node_t current_node) {
 		return generate_return(current_node);
 	case NODE_EXPR_STMT:
 		return generate_expr_stmt_discard(current_node);
+	case NODE_BLOCK:
+		return generate_block(current_node);
 	default:
 		return false;
 	}
@@ -313,8 +311,80 @@ static bool generate_for(ast_node_t current_node) {
 }
 
 static bool generate_if(ast_node_t current_node) {
-	// TODO
-	return false;
+	if (!generate_expression(current_node->as.if_stmt.condition)) {
+		return false;
+	}
+	char *then_label = get_unique_label("$", "ifstmt", "then");
+	operand_t operand_then_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = then_label}};
+
+	if (!then_label) {
+		return false;
+	}
+
+	char *else_label = get_unique_label("$", "ifstmt", "else");
+	operand_t operand_else_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = else_label}};
+
+	if (!else_label) {
+		free(then_label);
+		return false;
+	}
+	char *end_label = get_unique_label("$", "ifstmt", "end");
+
+	if (!end_label) {
+		free(then_label);
+		free(else_label);
+		return false;
+	}
+	operand_t operand_end_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = end_label}};
+
+	operand_t operand_eq = {
+		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
+
+	// condition
+	print_inst_1(INST_PUSHS, operand_eq);
+	print_inst_1(INST_JUMPIFEQS, operand_then_label);
+
+	putc('\n', gen_get_output_file());
+
+	// else branch
+	print_inst_1(INST_LABEL, operand_else_label);
+
+	if (current_node->as.if_stmt.else_branch) {
+		if (!generate_statement(current_node->as.if_stmt.else_branch)) {
+			free(then_label);
+			free(else_label);
+			free(end_label);
+			return false;
+		}
+	}
+	print_inst_1(INST_JUMP, operand_end_label);
+
+	putc('\n', gen_get_output_file());
+
+	// then branch
+	print_inst_1(INST_LABEL, operand_then_label);
+
+	if (!generate_statement(current_node->as.if_stmt.then_branch)) {
+		free(then_label);
+		free(else_label);
+		free(end_label);
+		return false;
+	}
+
+	putc('\n', gen_get_output_file());
+
+	print_inst_1(INST_LABEL, operand_end_label);
+
+	putc('\n', gen_get_output_file());
+
+	free(then_label);
+	free(else_label);
+	free(end_label);
+
+	return true;
 }
 
 static bool generate_assign(ast_node_t current_node) {
