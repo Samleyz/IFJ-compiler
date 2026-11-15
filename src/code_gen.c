@@ -75,7 +75,7 @@ void generate_function_prologue(const char *label_name) {
 void generate_function_epilogue(void) {
 	print_inst_0(INST_POPFRAME);
 	print_inst_0(INST_RETURN);
-	putc('\n', code_generator.output_file);
+	fputc('\n', code_generator.output_file);
 }
 
 bool generate_program(ast_node_t root) {

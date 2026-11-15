@@ -124,7 +124,7 @@ static void print_operand(operand_t operand) {
 				character == '\\') { // if the character has to be escaped
 				fprintf(output_file, "\\%03d", character);
 			} else {
-				putc(character, output_file);
+				fputc(character, output_file);
 			}
 		}
 		break;

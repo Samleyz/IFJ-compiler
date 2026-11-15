@@ -301,8 +301,62 @@ static bool generate_expr_stmt_keep(ast_node_t current_node) {
 }
 
 static bool generate_while(ast_node_t current_node) {
-	// TODO
-	return false;
+	char *top_label = get_unique_label("$", "whilestmt", "top");
+	operand_t operand_top_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = top_label}};
+
+	if (!top_label) {
+		return false;
+	}
+
+	char *end_label = get_unique_label("$", "whilestmt", "end");
+	operand_t operand_end_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = end_label}};
+
+	if (!end_label) {
+		free(top_label);
+		return false;
+	}
+
+	operand_t operand_eq = {
+		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
+
+	// top label
+	print_inst_1(INST_LABEL, operand_top_label);
+
+	if (!generate_expression(current_node->as.while_stmt.condition)) {
+		free(top_label);
+		free(end_label);
+		return false;
+	}
+
+	fputc('\n', gen_get_output_file());
+
+	// condition
+	print_inst_1(INST_PUSHS, operand_eq);
+	print_inst_1(INST_JUMPIFNEQS, operand_end_label);
+
+	fputc('\n', gen_get_output_file());
+
+	// body
+	if (!generate_statement(current_node->as.while_stmt.body)) {
+		free(top_label);
+		free(end_label);
+		return false;
+	}
+
+	fputc('\n', gen_get_output_file());
+
+	// jump to the top
+	print_inst_1(INST_JUMP, operand_top_label);
+
+	print_inst_1(INST_LABEL, operand_end_label);
+
+	fputc('\n', gen_get_output_file());
+
+	free(top_label);
+	free(end_label);
+	return true;
 }
 
 static bool generate_for(ast_node_t current_node) {
@@ -347,7 +401,7 @@ static bool generate_if(ast_node_t current_node) {
 	print_inst_1(INST_PUSHS, operand_eq);
 	print_inst_1(INST_JUMPIFEQS, operand_then_label);
 
-	putc('\n', gen_get_output_file());
+	fputc('\n', gen_get_output_file());
 
 	// else branch
 	print_inst_1(INST_LABEL, operand_else_label);
@@ -362,7 +416,7 @@ static bool generate_if(ast_node_t current_node) {
 	}
 	print_inst_1(INST_JUMP, operand_end_label);
 
-	putc('\n', gen_get_output_file());
+	fputc('\n', gen_get_output_file());
 
 	// then branch
 	print_inst_1(INST_LABEL, operand_then_label);
@@ -374,11 +428,11 @@ static bool generate_if(ast_node_t current_node) {
 		return false;
 	}
 
-	putc('\n', gen_get_output_file());
+	fputc('\n', gen_get_output_file());
 
 	print_inst_1(INST_LABEL, operand_end_label);
 
-	putc('\n', gen_get_output_file());
+	fputc('\n', gen_get_output_file());
 
 	free(then_label);
 	free(else_label);
