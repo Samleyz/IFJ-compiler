@@ -11,15 +11,25 @@
 #include "instruction_set.h"
 #include <stdlib.h>
 
+/** @brief Integer constant 1  */
 static const operand_t int_1_operand = {
 	.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 1}};
+/** @brief Integer constant 0 */
 static const operand_t int_0_operand = {
 	.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 0}};
+/** @brief Boolean constant true */
 static const operand_t bool_true_operand = {
 	.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
+/** @brief Exit code of a runtime error */
 static const operand_t err_40_operand = {
 	.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = ERR_RUNTIME_SEMANTICS}};
 
+/**
+ * @brief State shared by the functions generating a single for loop
+ *
+ * The structure owns the allocated name strings (freed by the owner of the structure, see
+ * generate_for), the operands only point to them and must not outlive them.
+ */
 typedef struct for_ctx {
 	// name strings
 	char *to_name;
@@ -43,18 +53,56 @@ typedef struct for_ctx {
 	operand_t operand_inter_var;
 	operand_t operand_to;
 	operand_t operand_step;
-
 } for_ctx_t;
 
+/**
+ * @brief Generates the end of a loop iteration: the next label, the increment of the loop
+ * variable, the jump to the top of the loop and the end label
+ *
+ * @param[in] for_info Context of the for loop
+ */
 static void for_generate_epilogue(const for_ctx_t *for_info);
 
+/**
+ * @brief Generates the guards, the body is skipped (jump to the next label) if any guard is false
+ *
+ * @param[in] for_info Context of the for loop
+ * @param[in] current_node NODE_FOR node
+ * @return true on success, false otherwise
+ */
 static bool for_generate_guards(const for_ctx_t *for_info, ast_node_t current_node);
 
+/**
+ * @brief Generates the loop condition, jumps to the end label if the loop is finished
+ *
+ * The direction of the comparison depends on the sign of the step.
+ *
+ * @param[in] for_info Context of the for loop
+ * @param[in] current_node NODE_FOR node
+ */
 static void for_generate_condition(const for_ctx_t *for_info, ast_node_t current_node);
 
+/**
+ * @brief Generates the evaluation of the from, to and step expressions (once, before the first
+ * iteration) and the check of a zero step (exit with error 40)
+ *
+ * @param[in] for_info Context of the for loop
+ * @param[in] current_node NODE_FOR node
+ * @return true on success, false otherwise
+ */
 static bool for_generate_init(const for_ctx_t *for_info, ast_node_t current_node);
 
+/**
+ * @brief Allocates the names and labels of a for loop and fills the operands
+ *
+ * On failure the already allocated names are left in the context, the caller frees them.
+ *
+ * @param[out] for_info Context of the for loop, zero-initialized by the caller
+ * @param[in] current_node NODE_FOR node
+ * @return true on success, false if an allocation failed
+ */
 static bool for_fill_ctx(for_ctx_t *for_info, ast_node_t current_node);
+
 /**
  * @brief Generates code for an expression used as a statement, keep the expression value on the
  * stack
@@ -73,8 +121,20 @@ static bool generate_expr_stmt_keep(ast_node_t current_node);
  */
 static bool generate_expr_stmt_discard(ast_node_t current_node);
 
+/**
+ * @brief Generates code for a while statement
+ *
+ * @param[in] current_node NODE_WHILE node
+ * @return true on success, false otherwise
+ */
 static bool generate_while(ast_node_t current_node);
 
+/**
+ * @brief Generates code for a for statement with an integer range, a step and guards
+ *
+ * @param[in] current_node NODE_FOR node
+ * @return true on success, false otherwise
+ */
 static bool generate_for(ast_node_t current_node);
 
 /**
