@@ -23,6 +23,9 @@ static const operand_t bool_true_operand = {
 /** @brief Exit code of a runtime error */
 static const operand_t err_40_operand = {
 	.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = ERR_RUNTIME_SEMANTICS}};
+/** @brief Nil constant */
+static const operand_t nil_operand = {
+	.operand_type = OP_TYPE_NIL, .frame = FT_NO_FRAME, .value = {0}};
 
 /**
  * @brief State shared by the functions generating a single for loop
@@ -167,7 +170,7 @@ static bool generate_var_def(ast_node_t current_node);
  * @param[in] current_node NODE_BLOCK node
  * @return true on success, false otherwise
  */
-static bool generate_block(ast_node_t current_node);
+static bool generate_block(ast_node_t current_node, bool keep_value);
 
 /**
  * @brief Generates code for a return statement
@@ -181,9 +184,10 @@ static bool generate_return(ast_node_t current_node);
  * @brief Generates code for a statement or a block according to its node type
  *
  * @param[in] current_node Statement or block node
+ * @param[in] keep_value Whether to keep the value of the statement on the stack
  * @return true on success, false otherwise
  */
-static bool generate_statement(ast_node_t current_node);
+static bool generate_statement(ast_node_t current_node, bool keep_value);
 
 /**
  * @brief Emits DEFVAR for a local variable
@@ -209,7 +213,9 @@ static bool generate_locals_decl_list(ast_node_t head);
  */
 static bool generate_for_locals(ast_node_t for_node);
 
-bool generate_function_body(ast_node_t current_node) { return generate_statement(current_node); }
+bool generate_function_body(ast_node_t current_node) {
+	return generate_statement(current_node, false);
+}
 
 // Tool: Claude Code (Claude Sonnet 5.5)
 // Cases NODE_FUNC_CALL to NODE_TYPE_CAST and the split of generate_locals_decl into smaller
@@ -312,10 +318,10 @@ static bool generate_for_locals(ast_node_t for_node) {
 				  generate_locals_decl(for_node->as.for_stmt.body));
 }
 
-static bool generate_block(ast_node_t current_node) {
+static bool generate_block(ast_node_t current_node, bool keep_value) {
 	ast_node_t curr_node = current_node->as.block.statements.head;
 	while (curr_node) {
-		if (!generate_statement(curr_node)) {
+		if (!generate_statement(curr_node, (bool)(keep_value && curr_node->next == nullptr))) {
 			return false;
 		}
 		curr_node = curr_node->next;
@@ -324,27 +330,69 @@ static bool generate_block(ast_node_t current_node) {
 	return true;
 }
 
-static bool generate_statement(ast_node_t current_node) {
+static bool generate_statement(ast_node_t current_node, bool keep_value) {
 	switch (current_node->type) {
 	case NODE_VAR_DEF:
-		return generate_var_def(current_node);
+		if (!generate_var_def(current_node)) {
+			return false;
+		}
+		if (keep_value) {
+			print_inst_1(INST_PUSHS, nil_operand);
+		}
+		break;
 	case NODE_ASSIGN:
-		return generate_assign(current_node);
+		if (!generate_assign(current_node)) {
+			return false;
+		}
+		if (keep_value) {
+			print_inst_1(INST_PUSHS, nil_operand);
+		}
+		break;
 	case NODE_IF:
-		return generate_if(current_node);
+		if (!generate_if(current_node)) {
+			return false;
+		}
+		if (keep_value && !current_node->as.if_stmt.is_expr) {
+			print_inst_1(INST_PUSHS, nil_operand);
+		}
+		break;
 	case NODE_WHILE:
-		return generate_while(current_node);
+		if (!generate_while(current_node)) {
+			return false;
+		}
+		if (keep_value) {
+			print_inst_1(INST_PUSHS, nil_operand);
+		}
+		break;
 	case NODE_FOR:
-		return generate_for(current_node);
+		if (!generate_for(current_node)) {
+			return false;
+		}
+		if (keep_value) {
+			print_inst_1(INST_PUSHS, nil_operand);
+		}
+		break;
 	case NODE_RETURN:
 		return generate_return(current_node);
 	case NODE_EXPR_STMT:
-		return generate_expr_stmt_discard(current_node);
+		if (keep_value) {
+			return generate_expr_stmt_keep(current_node);
+		} else {
+			return generate_expr_stmt_discard(current_node);
+		}
 	case NODE_BLOCK:
-		return generate_block(current_node);
+		if (!generate_block(current_node, keep_value)) {
+			return false;
+		}
+		if (keep_value && (current_node->as.block.statements.head == nullptr)) {
+			print_inst_1(INST_PUSHS, nil_operand);
+		}
+		break;
 	default:
 		return false;
 	}
+
+	return true;
 }
 
 static bool generate_return(ast_node_t current_node) {
@@ -352,8 +400,7 @@ static bool generate_return(ast_node_t current_node) {
 
 	// Return without an expression returns Unit (nil)
 	if (current_node->as.return_stmt.expr == NULL) {
-		operand_t operand = {.operand_type = OP_TYPE_NIL, .frame = FT_NO_FRAME, .value = {0}};
-		print_inst_1(INST_PUSHS, operand);
+		print_inst_1(INST_PUSHS, nil_operand);
 	} else {
 		if (!generate_expression(current_node->as.return_stmt.expr)) {
 			return false;
@@ -414,7 +461,7 @@ static bool generate_while(ast_node_t current_node) {
 
 	// body
 	print_comment("while body");
-	if (!generate_statement(current_node->as.while_stmt.body)) {
+	if (!generate_statement(current_node->as.while_stmt.body, false)) {
 		success = false;
 		goto cleanup;
 	}
@@ -635,7 +682,7 @@ static bool generate_for(ast_node_t current_node) {
 	}
 
 	// generate for body
-	if (!generate_statement(current_node->as.for_stmt.body)) {
+	if (!generate_statement(current_node->as.for_stmt.body, false)) {
 		success = false;
 		goto cleanup;
 	}
@@ -692,7 +739,8 @@ static bool generate_if(ast_node_t current_node) {
 	print_inst_1(INST_LABEL, operand_else_label);
 
 	if (current_node->as.if_stmt.else_branch) {
-		if (!generate_statement(current_node->as.if_stmt.else_branch)) {
+		if (!generate_statement(current_node->as.if_stmt.else_branch,
+								current_node->as.if_stmt.is_expr)) {
 			success = false;
 			goto cleanup;
 		}
@@ -704,8 +752,8 @@ static bool generate_if(ast_node_t current_node) {
 	// then branch
 	print_comment("then");
 	print_inst_1(INST_LABEL, operand_then_label);
-
-	if (!generate_statement(current_node->as.if_stmt.then_branch)) {
+	if (!generate_statement(current_node->as.if_stmt.then_branch,
+							current_node->as.if_stmt.is_expr)) {
 		success = false;
 		goto cleanup;
 	}
