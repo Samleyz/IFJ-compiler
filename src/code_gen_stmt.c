@@ -649,6 +649,8 @@ static void for_generate_epilogue(const for_ctx_t *for_info) {
 
 	print_inst_1(INST_JUMP, for_info->operand_top_label);
 
+	print_comment("end for");
+
 	print_inst_1(INST_LABEL, for_info->operand_end_label);
 }
 
@@ -662,6 +664,10 @@ static bool generate_for(ast_node_t current_node) {
 		goto cleanup;
 	}
 
+	fputc('\n', gen_get_output_file());
+
+	print_comment("for");
+
 	// generate for init
 	if (!for_generate_init(&for_info, current_node)) {
 		success = false;
@@ -670,9 +676,13 @@ static bool generate_for(ast_node_t current_node) {
 
 	print_inst_1(INST_LABEL, for_info.operand_top_label);
 
+	print_comment("for condition");
+
 	// cycle
 	// condition
 	for_generate_condition(&for_info, current_node);
+
+	print_comment("for guards");
 
 	// generate guards
 	// if false jmp next
@@ -681,13 +691,21 @@ static bool generate_for(ast_node_t current_node) {
 		goto cleanup;
 	}
 
+	fputc('\n', gen_get_output_file());
+
+	print_comment("for body");
+
 	// generate for body
 	if (!generate_statement(current_node->as.for_stmt.body, false)) {
 		success = false;
 		goto cleanup;
 	}
 
+	fputc('\n', gen_get_output_file());
+
 	for_generate_epilogue(&for_info);
+
+	fputc('\n', gen_get_output_file());
 
 cleanup:
 	free(for_info.top_label);
