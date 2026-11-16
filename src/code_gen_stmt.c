@@ -392,6 +392,8 @@ static bool generate_for(ast_node_t current_node) {
 
 	print_inst_1(INST_POPS, operand_step);
 
+	// if step == 0 exit 40
+
 	// cycle body
 	char *top_label = get_unique_label("$", "forstmt", "$top");
 
@@ -406,14 +408,47 @@ static bool generate_for(ast_node_t current_node) {
 
 	print_inst_1(INST_LABEL, operand_top_label);
 
-	if (current_node->as.for_stmt.is_inclusive) {
+	print_inst_1(INST_PUSHS, operand_inter_var);
+	print_inst_1(INST_PUSHS, operand_to);
 
+	if (current_node->as.for_stmt.is_inclusive) {
+		// step > 0
+		// false jmp label_negative
+		// iter <= to
+		// if false jmp label_end
+		// jmp label_cond_end
+		// label_negative
+		// iter >= to
+		// if false jmp label_end
+		// label_cond_end
 	} else {
+		// iter < to
+		// if false jmp label_end
 	}
+
+	// generate guards
+	// if false jmp next
+
+	if (!generate_statement(current_node->as.for_stmt.body)) {
+		free(top_label);
+		free(to_name);
+		free(step_name);
+		return false;
+	}
+
+	// label next
+
+	// next incrementation/decrementation
+
+	// jmp top
+
+	// label end
 
 	free(top_label);
 	free(to_name);
 	free(step_name);
+
+	return true;
 }
 
 static bool generate_if(ast_node_t current_node) {
