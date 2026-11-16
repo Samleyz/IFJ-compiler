@@ -656,36 +656,30 @@ cleanup:
 }
 
 static bool generate_if(ast_node_t current_node) {
+	bool success = true;
+
+	char *then_label = get_unique_label("$", "ifstmt", "$then");
+	char *else_label = get_unique_label("$", "ifstmt", "$else");
+	char *end_label = get_unique_label("$", "ifstmt", "$end");
+
+	operand_t operand_then_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = then_label}};
+	operand_t operand_else_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = else_label}};
+	operand_t operand_end_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = end_label}};
+
+	if (!then_label || !else_label || !end_label) {
+		success = false;
+		goto cleanup;
+	}
+
 	print_comment("if");
 
 	if (!generate_expression(current_node->as.if_stmt.condition)) {
-		return false;
+		success = false;
+		goto cleanup;
 	}
-	char *then_label = get_unique_label("$", "ifstmt", "$then");
-	operand_t operand_then_label = {
-		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = then_label}};
-
-	if (!then_label) {
-		return false;
-	}
-
-	char *else_label = get_unique_label("$", "ifstmt", "$else");
-	operand_t operand_else_label = {
-		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = else_label}};
-
-	if (!else_label) {
-		free(then_label);
-		return false;
-	}
-	char *end_label = get_unique_label("$", "ifstmt", "$end");
-
-	if (!end_label) {
-		free(then_label);
-		free(else_label);
-		return false;
-	}
-	operand_t operand_end_label = {
-		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = end_label}};
 
 	// condition
 	print_inst_1(INST_PUSHS, bool_true_operand);
@@ -699,10 +693,8 @@ static bool generate_if(ast_node_t current_node) {
 
 	if (current_node->as.if_stmt.else_branch) {
 		if (!generate_statement(current_node->as.if_stmt.else_branch)) {
-			free(then_label);
-			free(else_label);
-			free(end_label);
-			return false;
+			success = false;
+			goto cleanup;
 		}
 	}
 	print_inst_1(INST_JUMP, operand_end_label);
@@ -714,10 +706,8 @@ static bool generate_if(ast_node_t current_node) {
 	print_inst_1(INST_LABEL, operand_then_label);
 
 	if (!generate_statement(current_node->as.if_stmt.then_branch)) {
-		free(then_label);
-		free(else_label);
-		free(end_label);
-		return false;
+		success = false;
+		goto cleanup;
 	}
 
 	fputc('\n', gen_get_output_file());
@@ -727,11 +717,12 @@ static bool generate_if(ast_node_t current_node) {
 
 	fputc('\n', gen_get_output_file());
 
+cleanup:
 	free(then_label);
 	free(else_label);
 	free(end_label);
 
-	return true;
+	return success;
 }
 
 static bool generate_assign(ast_node_t current_node) {
