@@ -11,6 +11,50 @@
 #include "instruction_set.h"
 #include <stdlib.h>
 
+static const operand_t int_1_operand = {
+	.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 1}};
+static const operand_t int_0_operand = {
+	.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 0}};
+static const operand_t bool_true_operand = {
+	.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
+static const operand_t err_40_operand = {
+	.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = ERR_RUNTIME_SEMANTICS}};
+
+typedef struct for_ctx {
+	// name strings
+	char *to_name;
+	char *step_name;
+	char *top_label;
+	char *step_ok_label;
+	char *negative_step_label;
+	char *cond_end_label;
+	char *end_label;
+	char *next_label;
+
+	// label operands
+	operand_t operand_top_label;
+	operand_t operand_step_ok_label;
+	operand_t operand_negative_step_label;
+	operand_t operand_cond_end_label;
+	operand_t operand_end_label;
+	operand_t operand_next_label;
+
+	// variables
+	operand_t operand_inter_var;
+	operand_t operand_to;
+	operand_t operand_step;
+
+} for_ctx_t;
+
+static void for_generate_epilogue(const for_ctx_t *for_info);
+
+static bool for_generate_guards(const for_ctx_t *for_info, ast_node_t current_node);
+
+static void for_generate_condition(const for_ctx_t *for_info, ast_node_t current_node);
+
+static bool for_generate_init(const for_ctx_t *for_info, ast_node_t current_node);
+
+static bool for_fill_ctx(for_ctx_t *for_info, ast_node_t current_node);
 /**
  * @brief Generates code for an expression used as a statement, keep the expression value on the
  * stack
@@ -295,9 +339,6 @@ static bool generate_while(ast_node_t current_node) {
 		return false;
 	}
 
-	operand_t operand_eq = {
-		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
-
 	// top label
 	print_comment("while");
 	print_inst_1(INST_LABEL, operand_top_label);
@@ -309,7 +350,7 @@ static bool generate_while(ast_node_t current_node) {
 	}
 
 	// condition
-	print_inst_1(INST_PUSHS, operand_eq);
+	print_inst_1(INST_PUSHS, bool_true_operand);
 	print_inst_1(INST_JUMPIFNEQS, operand_end_label);
 
 	fputc('\n', gen_get_output_file());
@@ -337,196 +378,221 @@ static bool generate_while(ast_node_t current_node) {
 	return true;
 }
 
-static bool generate_for(ast_node_t current_node) {
-	bool success = true;
-
+static bool for_fill_ctx(for_ctx_t *for_info, ast_node_t current_node) {
 	// name strings
-	char *to_name = get_modified_name("%", current_node->as.for_stmt.unique_var_name, "$to");
-	char *step_name = get_modified_name("%", current_node->as.for_stmt.unique_var_name, "$step");
-	char *top_label = get_unique_label("$", "forstmt", "$top");
-	char *step_ok_label = get_unique_label("$", "forstmt", "$step_ok");
-	char *negative_step_label = get_unique_label("$", "forstmt", "$negative_step");
-	char *cond_end_label = get_unique_label("$", "forstmt", "$cond_end");
-	char *end_label = get_unique_label("$", "forstmt", "$end");
-	char *next_label = get_unique_label("$", "forstmt", "$next");
+	for_info->to_name = get_modified_name("%", current_node->as.for_stmt.unique_var_name, "$to");
+	for_info->step_name =
+		get_modified_name("%", current_node->as.for_stmt.unique_var_name, "$step");
+	for_info->top_label = get_unique_label("$", "forstmt", "$top");
+	for_info->step_ok_label = get_unique_label("$", "forstmt", "$step_ok");
+	for_info->negative_step_label = get_unique_label("$", "forstmt", "$negative_step");
+	for_info->cond_end_label = get_unique_label("$", "forstmt", "$cond_end");
+	for_info->end_label = get_unique_label("$", "forstmt", "$end");
+	for_info->next_label = get_unique_label("$", "forstmt", "$next");
 
 	// label operands
-	operand_t operand_top_label = {
-		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = top_label}};
-	operand_t operand_step_ok_label = {.operand_type = OP_TYPE_LABEL,
-									   .frame = FT_NO_FRAME,
-									   .value = {.label_name = step_ok_label}};
+	for_info->operand_top_label = (operand_t){.operand_type = OP_TYPE_LABEL,
+											  .frame = FT_NO_FRAME,
+											  .value = {.label_name = for_info->top_label}};
+	for_info->operand_step_ok_label = (operand_t){.operand_type = OP_TYPE_LABEL,
+												  .frame = FT_NO_FRAME,
+												  .value = {.label_name = for_info->step_ok_label}};
 
-	operand_t operand_negative_step_label = {.operand_type = OP_TYPE_LABEL,
-											 .frame = FT_NO_FRAME,
-											 .value = {.label_name = negative_step_label}};
-	operand_t operand_cond_end_label = {.operand_type = OP_TYPE_LABEL,
-										.frame = FT_NO_FRAME,
-										.value = {.label_name = cond_end_label}};
-	operand_t operand_end_label = {
-		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = end_label}};
+	for_info->operand_negative_step_label =
+		(operand_t){.operand_type = OP_TYPE_LABEL,
+					.frame = FT_NO_FRAME,
+					.value = {.label_name = for_info->negative_step_label}};
+	for_info->operand_cond_end_label =
+		(operand_t){.operand_type = OP_TYPE_LABEL,
+					.frame = FT_NO_FRAME,
+					.value = {.label_name = for_info->cond_end_label}};
+	for_info->operand_end_label = (operand_t){.operand_type = OP_TYPE_LABEL,
+											  .frame = FT_NO_FRAME,
+											  .value = {.label_name = for_info->end_label}};
 
-	operand_t operand_next_label = {
-		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = next_label}};
-
-	// constants operands
-	operand_t int_1_operand = {
-		.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 1}};
-	operand_t int_0_operand = {
-		.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = 0}};
-	operand_t bool_true_operand = {
-		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
-	operand_t err_40_operand = {.operand_type = OP_TYPE_INT,
-								.frame = FT_NO_FRAME,
-								.value = {.int_val = ERR_RUNTIME_SEMANTICS}};
-
+	for_info->operand_next_label = (operand_t){.operand_type = OP_TYPE_LABEL,
+											   .frame = FT_NO_FRAME,
+											   .value = {.label_name = for_info->next_label}};
 	// local variables operands
-	operand_t operand_inter_var = {
-		.operand_type = OP_TYPE_VAR,
-		.frame = FT_LOCAL,
-		.value = {.var_name = current_node->as.for_stmt.unique_var_name}};
-	operand_t operand_to = {
-		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = to_name}};
-	operand_t operand_step = {
-		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = step_name}};
+	for_info->operand_inter_var =
+		(operand_t){.operand_type = OP_TYPE_VAR,
+					.frame = FT_LOCAL,
+					.value = {.var_name = current_node->as.for_stmt.unique_var_name}};
+	for_info->operand_to = (operand_t){
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = for_info->to_name}};
+	for_info->operand_step = (operand_t){
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = for_info->step_name}};
 
-	if (!to_name || !step_name || !top_label || !step_ok_label || !negative_step_label ||
-		!cond_end_label || !end_label || !next_label) {
-		success = false;
-		goto cleanup;
-	}
+	return (bool)(for_info->to_name && for_info->step_name && for_info->top_label &&
+				  for_info->step_ok_label && for_info->negative_step_label &&
+				  for_info->cond_end_label && for_info->end_label && for_info->next_label);
+}
 
+static bool for_generate_init(const for_ctx_t *for_info, ast_node_t current_node) {
 	// from, by, to statements evaluation and assignment
 	if (!generate_expression(current_node->as.for_stmt.from_expr)) {
-		success = false;
-		goto cleanup;
+		return false;
 	}
 
-	print_inst_1(INST_POPS, operand_inter_var);
+	print_inst_1(INST_POPS, for_info->operand_inter_var);
 
 	if (!generate_expression(current_node->as.for_stmt.to_expr)) {
-		success = false;
-		goto cleanup;
+		return false;
 	}
 
-	print_inst_1(INST_POPS, operand_to);
+	print_inst_1(INST_POPS, for_info->operand_to);
 
 	if (current_node->as.for_stmt.step_expr) {
 		if (!generate_expression(current_node->as.for_stmt.step_expr)) {
-			success = false;
-			goto cleanup;
+			return false;
 		}
 	} else {
 		print_inst_1(INST_PUSHS, int_1_operand);
 	}
 
-	print_inst_1(INST_POPS, operand_step);
+	print_inst_1(INST_POPS, for_info->operand_step);
 
 	if (current_node->as.for_stmt.step_expr) {
 		// if step == 0 exit 40
 		print_inst_1(INST_PUSHS, int_0_operand);
 
-		print_inst_1(INST_PUSHS, operand_step);
+		print_inst_1(INST_PUSHS, for_info->operand_step);
 
 		print_inst_0(INST_EQS);
 
 		print_inst_1(INST_PUSHS, bool_true_operand);
 
-		print_inst_1(INST_JUMPIFNEQS, operand_step_ok_label);
+		print_inst_1(INST_JUMPIFNEQS, for_info->operand_step_ok_label);
 
 		print_inst_1(INST_EXIT, err_40_operand);
 
-		print_inst_1(INST_LABEL, operand_step_ok_label);
+		print_inst_1(INST_LABEL, for_info->operand_step_ok_label);
 	}
 
-	print_inst_1(INST_LABEL, operand_top_label);
+	return true;
+}
 
-	// cycle
-	// condition
+static void for_generate_condition(const for_ctx_t *for_info, ast_node_t current_node) {
 	if (current_node->as.for_stmt.is_inclusive) {
 		// step > 0
 		// false jmp label_negative
-		print_inst_1(INST_PUSHS, operand_step);
+		print_inst_1(INST_PUSHS, for_info->operand_step);
 		print_inst_1(INST_PUSHS, int_0_operand);
 
 		print_inst_0(INST_GTS);
 
 		print_inst_1(INST_PUSHS, bool_true_operand);
-		print_inst_1(INST_JUMPIFNEQS, operand_negative_step_label);
+		print_inst_1(INST_JUMPIFNEQS, for_info->operand_negative_step_label);
 		// iter <= to
 		// if false jmp label_end
-		print_inst_1(INST_PUSHS, operand_inter_var);
-		print_inst_1(INST_PUSHS, operand_to);
+		print_inst_1(INST_PUSHS, for_info->operand_inter_var);
+		print_inst_1(INST_PUSHS, for_info->operand_to);
 
 		print_inst_0(INST_GTS);
 		print_inst_1(INST_PUSHS, bool_true_operand);
-		print_inst_1(INST_JUMPIFEQS, operand_end_label);
+		print_inst_1(INST_JUMPIFEQS, for_info->operand_end_label);
 		// jmp label_cond_end
-		print_inst_1(INST_JUMP, operand_cond_end_label);
+		print_inst_1(INST_JUMP, for_info->operand_cond_end_label);
 		// label_negative
-		print_inst_1(INST_LABEL, operand_negative_step_label);
+		print_inst_1(INST_LABEL, for_info->operand_negative_step_label);
 		// iter >= to
 		// if false jmp label_end
-		print_inst_1(INST_PUSHS, operand_inter_var);
-		print_inst_1(INST_PUSHS, operand_to);
+		print_inst_1(INST_PUSHS, for_info->operand_inter_var);
+		print_inst_1(INST_PUSHS, for_info->operand_to);
 
 		print_inst_0(INST_LTS);
 		print_inst_1(INST_PUSHS, bool_true_operand);
-		print_inst_1(INST_JUMPIFEQS, operand_end_label);
+		print_inst_1(INST_JUMPIFEQS, for_info->operand_end_label);
 
 		// label_cond_end
-		print_inst_1(INST_LABEL, operand_cond_end_label);
+		print_inst_1(INST_LABEL, for_info->operand_cond_end_label);
 	} else {
 		// iter < to
 		// if false jmp label_end
-		print_inst_1(INST_PUSHS, operand_inter_var);
-		print_inst_1(INST_PUSHS, operand_to);
+		print_inst_1(INST_PUSHS, for_info->operand_inter_var);
+		print_inst_1(INST_PUSHS, for_info->operand_to);
 
 		print_inst_0(INST_LTS);
 		print_inst_1(INST_PUSHS, bool_true_operand);
-		print_inst_1(INST_JUMPIFNEQS, operand_end_label);
+		print_inst_1(INST_JUMPIFNEQS, for_info->operand_end_label);
 	}
+}
 
-	// generate guards
-	// if false jmp next
-
+static bool for_generate_guards(const for_ctx_t *for_info, ast_node_t current_node) {
 	ast_node_t curr_guard = current_node->as.for_stmt.guards.head;
 	while (curr_guard) {
 		if (!generate_expression(curr_guard)) {
-			success = false;
-			goto cleanup;
+			return false;
 		}
 		print_inst_1(INST_PUSHS, bool_true_operand);
-		print_inst_1(INST_JUMPIFNEQS, operand_next_label);
+		print_inst_1(INST_JUMPIFNEQS, for_info->operand_next_label);
 
 		curr_guard = curr_guard->next;
 	}
 
+	return true;
+}
+
+static void for_generate_epilogue(const for_ctx_t *for_info) {
+	// label next
+	print_inst_1(INST_LABEL, for_info->operand_next_label);
+
+	// next incrementation/decrementation
+
+	print_inst_3(INST_ADD, for_info->operand_inter_var, for_info->operand_inter_var,
+				 for_info->operand_step);
+
+	print_inst_1(INST_JUMP, for_info->operand_top_label);
+
+	print_inst_1(INST_LABEL, for_info->operand_end_label);
+}
+
+static bool generate_for(ast_node_t current_node) {
+	bool success = true;
+
+	for_ctx_t for_info = {0};
+
+	if (!for_fill_ctx(&for_info, current_node)) {
+		success = false;
+		goto cleanup;
+	}
+
+	// generate for init
+	if (!for_generate_init(&for_info, current_node)) {
+		success = false;
+		goto cleanup;
+	}
+
+	print_inst_1(INST_LABEL, for_info.operand_top_label);
+
+	// cycle
+	// condition
+	for_generate_condition(&for_info, current_node);
+
+	// generate guards
+	// if false jmp next
+	if (!for_generate_guards(&for_info, current_node)) {
+		success = false;
+		goto cleanup;
+	}
+
+	// generate for body
 	if (!generate_statement(current_node->as.for_stmt.body)) {
 		success = false;
 		goto cleanup;
 	}
 
-	// label next
-	print_inst_1(INST_LABEL, operand_next_label);
-
-	// next incrementation/decrementation
-
-	print_inst_3(INST_ADD, operand_inter_var, operand_inter_var, operand_step);
-
-	print_inst_1(INST_JUMP, operand_top_label);
-
-	print_inst_1(INST_LABEL, operand_end_label);
+	for_generate_epilogue(&for_info);
 
 cleanup:
-	free(top_label);
-	free(to_name);
-	free(step_name);
-	free(step_ok_label);
-	free(negative_step_label);
-	free(cond_end_label);
-	free(end_label);
-	free(next_label);
+	free(for_info.top_label);
+	free(for_info.to_name);
+	free(for_info.step_name);
+	free(for_info.step_ok_label);
+	free(for_info.negative_step_label);
+	free(for_info.cond_end_label);
+	free(for_info.end_label);
+	free(for_info.next_label);
 
 	return success;
 }
@@ -563,11 +629,8 @@ static bool generate_if(ast_node_t current_node) {
 	operand_t operand_end_label = {
 		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = end_label}};
 
-	operand_t operand_eq = {
-		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
-
 	// condition
-	print_inst_1(INST_PUSHS, operand_eq);
+	print_inst_1(INST_PUSHS, bool_true_operand);
 	print_inst_1(INST_JUMPIFEQS, operand_then_label);
 
 	fputc('\n', gen_get_output_file());
