@@ -7,6 +7,7 @@
 
 #include "ast.h"
 #include "code_gen_private.h"
+#include "instruction_set.h"
 
 static void generate_int_push(ast_node_t current_node);
 
@@ -16,9 +17,9 @@ static void generate_string_push(ast_node_t current_node);
 
 static void generate_bool_push(ast_node_t current_node);
 
-static void generate_unit_push(ast_node_t current_node);
+static void generate_unit_push(void);
 
-static bool generate_var_push(ast_node_t current_node);
+static void generate_var_push(ast_node_t current_node);
 
 static bool generate_binary_op(ast_node_t current_node);
 
@@ -47,10 +48,11 @@ bool generate_expression(ast_node_t current_node) {
 		generate_bool_push(current_node);
 		break;
 	case NODE_LIT_UNIT:
-		generate_unit_push(current_node);
+		generate_unit_push();
 		break;
 	case NODE_IDENTIFIER:
-		return generate_var_push(current_node);
+		generate_var_push(current_node);
+		break;
 	case NODE_BINARY_OP:
 		return generate_binary_op(current_node);
 	case NODE_UNARY_OP:
@@ -73,34 +75,43 @@ bool generate_expression(ast_node_t current_node) {
 }
 
 static void generate_int_push(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
+	operand_t int_operand = {.operand_type = OP_TYPE_INT,
+							 .frame = FT_NO_FRAME,
+							 .value = {.int_val = current_node->as.int_val}};
+	print_inst_1(INST_PUSHS, int_operand);
 }
 
 static void generate_double_push(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
+	operand_t double_operand = {.operand_type = OP_TYPE_FLOAT,
+								.frame = FT_NO_FRAME,
+								.value = {.double_val = current_node->as.double_val}};
+	print_inst_1(INST_PUSHS, double_operand);
 }
 
 static void generate_string_push(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
+	operand_t string_operand = {.operand_type = OP_TYPE_STRING,
+								.frame = FT_NO_FRAME,
+								.value = {.string_val = current_node->as.string_val}};
+	print_inst_1(INST_PUSHS, string_operand);
 }
 
 static void generate_bool_push(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
+	operand_t bool_operand = {.operand_type = OP_TYPE_BOOL,
+							  .frame = FT_NO_FRAME,
+							  .value = {.bool_val = current_node->as.bool_val}};
+	print_inst_1(INST_PUSHS, bool_operand);
 }
 
-static void generate_unit_push(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
+static void generate_unit_push(void) {
+	operand_t unit_operand = {.operand_type = OP_TYPE_NIL, .frame = FT_NO_FRAME, .value = {0}};
+	print_inst_1(INST_PUSHS, unit_operand);
 }
 
-static bool generate_var_push(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
-	return false;
+static void generate_var_push(ast_node_t current_node) {
+	operand_t var_operand = {.operand_type = OP_TYPE_VAR,
+							 .frame = FT_LOCAL,
+							 .value = {.var_name = current_node->as.id.unique_name}};
+	print_inst_1(INST_PUSHS, var_operand);
 }
 
 static bool generate_binary_op(ast_node_t current_node) {
