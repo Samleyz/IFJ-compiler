@@ -38,6 +38,14 @@ void generate_builtins_definitions(void);
 bool generate_expression(ast_node_t current_node);
 
 /**
+ * @brief Generates code for an if statement
+ *
+ * @param[in] current_node NODE_IF node
+ * @return true on success, false otherwise
+ */
+bool generate_if(ast_node_t current_node);
+
+/**
  * @brief Generates the body of a function
  *
  * @param[in] current_node Function body (NODE_BLOCK or NODE_RETURN)

@@ -141,14 +141,6 @@ static bool generate_while(ast_node_t current_node);
 static bool generate_for(ast_node_t current_node);
 
 /**
- * @brief Generates code for an if statement
- *
- * @param[in] current_node NODE_IF node
- * @return true on success, false otherwise
- */
-static bool generate_if(ast_node_t current_node);
-
-/**
  * @brief Generates code for an assignment to an already declared variable
  *
  * @param[in] current_node NODE_ASSIGN node
@@ -720,7 +712,7 @@ cleanup:
 	return success;
 }
 
-static bool generate_if(ast_node_t current_node) {
+bool generate_if(ast_node_t current_node) {
 	bool success = true;
 
 	char *then_label = get_unique_label("$", "ifstmt", "$then");
