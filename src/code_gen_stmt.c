@@ -382,21 +382,19 @@ static bool generate_expr_stmt_keep(ast_node_t current_node) {
 }
 
 static bool generate_while(ast_node_t current_node) {
+	bool success = true;
+
 	char *top_label = get_unique_label("$", "whilestmt", "$top");
+	char *end_label = get_unique_label("$", "whilestmt", "$end");
+
 	operand_t operand_top_label = {
 		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = top_label}};
-
-	if (!top_label) {
-		return false;
-	}
-
-	char *end_label = get_unique_label("$", "whilestmt", "$end");
 	operand_t operand_end_label = {
 		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = end_label}};
 
-	if (!end_label) {
-		free(top_label);
-		return false;
+	if (!top_label || !end_label) {
+		success = false;
+		goto cleanup;
 	}
 
 	// top label
@@ -404,9 +402,8 @@ static bool generate_while(ast_node_t current_node) {
 	print_inst_1(INST_LABEL, operand_top_label);
 
 	if (!generate_expression(current_node->as.while_stmt.condition)) {
-		free(top_label);
-		free(end_label);
-		return false;
+		success = false;
+		goto cleanup;
 	}
 
 	// condition
@@ -418,9 +415,8 @@ static bool generate_while(ast_node_t current_node) {
 	// body
 	print_comment("while body");
 	if (!generate_statement(current_node->as.while_stmt.body)) {
-		free(top_label);
-		free(end_label);
-		return false;
+		success = false;
+		goto cleanup;
 	}
 
 	fputc('\n', gen_get_output_file());
@@ -433,9 +429,11 @@ static bool generate_while(ast_node_t current_node) {
 
 	fputc('\n', gen_get_output_file());
 
+cleanup:
 	free(top_label);
 	free(end_label);
-	return true;
+
+	return success;
 }
 
 static bool for_fill_ctx(for_ctx_t *for_info, ast_node_t current_node) {
