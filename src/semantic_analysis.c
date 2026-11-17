@@ -23,9 +23,13 @@ bool perform_semantic_analysis(ast_node_t root) {
 		return false;
 	}
 
-	// TODO: Passes
+	// TODO: Pass1
+	// TODO: Checks with cleanup on error
 
-	// TODO: Checks
+	// TODO: Pass2
+	// TODO: (Checks with cleanup on error)
+
+	// TODO: (Context checks)
 
 	// Cleanup
 	semantic_context_dtor(&context);
@@ -92,7 +96,7 @@ bool prefill_builtin_global_functions(stable_t stab) {
 	ok &= register_builtin_function(stab, "readLine", TYPE_STRING, (data_type_t[]){}, 0);
 	ok &= register_builtin_function(stab, "readInt", TYPE_INT, (data_type_t[]){}, 0);
 	ok &= register_builtin_function(stab, "readDouble", TYPE_DOUBLE, (data_type_t[]){}, 0);
-	ok &= register_builtin_function(stab, "readBool", TYPE_BOOL, (data_type_t[]){}, 0);
+	ok &= register_builtin_function(stab, "readBoolean", TYPE_BOOL, (data_type_t[]){}, 0);
 	ok &= register_builtin_function(stab, "toStr", TYPE_STRING, (data_type_t[]){TYPE_ANY}, 1);
 	ok &= register_builtin_function(stab, "toInt", TYPE_INT, (data_type_t[]){TYPE_DOUBLE}, 1);
 	ok &= register_builtin_function(stab, "strLength", TYPE_INT, (data_type_t[]){TYPE_STRING}, 1);
@@ -119,8 +123,8 @@ bool prefill_builtin_global_functions(stable_t stab) {
 		if (stable_find_curlevel(stab, "readDouble")) {
 			stable_remove_symbol_curlevel(stab, "readDouble");
 		}
-		if (stable_find_curlevel(stab, "readBool")) {
-			stable_remove_symbol_curlevel(stab, "readBool");
+		if (stable_find_curlevel(stab, "readBoolean")) {
+			stable_remove_symbol_curlevel(stab, "readBoolean");
 		}
 		if (stable_find_curlevel(stab, "toStr")) {
 			stable_remove_symbol_curlevel(stab, "toStr");
@@ -163,7 +167,7 @@ bool prefill_builtin_extension_functions(stable_t stab) {
 											  TYPE_DOUBLE);
 	ok &= register_builtin_extension_function(stab, "toString$String", TYPE_STRING, nullptr, 0,
 											  TYPE_STRING);
-	ok &= register_builtin_extension_function(stab, "toString$Bool", TYPE_STRING, nullptr, 0,
+	ok &= register_builtin_extension_function(stab, "toString$Boolean", TYPE_STRING, nullptr, 0,
 											  TYPE_BOOL);
 	ok &= register_builtin_extension_function(stab, "toString$Unit", TYPE_STRING, nullptr, 0,
 											  TYPE_UNIT);
@@ -191,8 +195,8 @@ bool prefill_builtin_extension_functions(stable_t stab) {
 		if (stable_find_curlevel(stab, "toString$String")) {
 			stable_remove_symbol_curlevel(stab, "toString$String");
 		}
-		if (stable_find_curlevel(stab, "toString$Bool")) {
-			stable_remove_symbol_curlevel(stab, "toString$Bool");
+		if (stable_find_curlevel(stab, "toString$Boolean")) {
+			stable_remove_symbol_curlevel(stab, "toString$Boolean");
 		}
 		if (stable_find_curlevel(stab, "toString$Unit")) {
 			stable_remove_symbol_curlevel(stab, "toString$Unit");
@@ -296,7 +300,7 @@ bool create_parameter_list_for_builtin_function(ast_list_t *param_lists, data_ty
 		   "Called create_parameter_list_for_builtin_function with invalid parameters.");
 
 	// Create parameter list list
-	ast_list_init(&param_lists);
+	ast_list_init(param_lists);
 
 	if (!param_types) {
 		// No parameter list to create
@@ -311,12 +315,12 @@ bool create_parameter_list_for_builtin_function(ast_list_t *param_lists, data_ty
 	}
 
 	// Append the parameter list to the list of parameter lists
-	if (!ast_list_append(&param_lists, param_list_node)) {
+	if (!ast_list_append(param_lists, param_list_node)) {
 		print_error(
 			ERR_INTERNAL, 0,
 			"Failed to append parameter list node to parameter lists list for builtin function.");
 		ast_dtor(param_list_node);
-		ast_list_init(&param_lists); // Reset the list to empty
+		ast_list_init(param_lists); // Reset the list to empty
 		return false;
 	}
 
@@ -328,7 +332,7 @@ bool create_parameter_list_for_builtin_function(ast_list_t *param_lists, data_ty
 		if (!param_node) {
 			print_error(ERR_INTERNAL, 0, "Failed to create parameter node for builtin function.");
 			ast_dtor(param_list_node);
-			ast_list_init(&param_lists); // Reset the list to empty
+			ast_list_init(param_lists); // Reset the list to empty
 			return false;
 		}
 
@@ -340,7 +344,7 @@ bool create_parameter_list_for_builtin_function(ast_list_t *param_lists, data_ty
 						"Failed to allocate memory for parameter type name for builtin function.");
 			ast_dtor(param_list_node);
 			ast_dtor(param_node);
-			ast_list_init(&param_lists); // Reset the list to empty
+			ast_list_init(param_lists); // Reset the list to empty
 			return false;
 		}
 
@@ -350,7 +354,7 @@ bool create_parameter_list_for_builtin_function(ast_list_t *param_lists, data_ty
 						"Failed to append parameter to parameter list for builtin function.");
 			ast_dtor(param_list_node);
 			ast_dtor(param_node);
-			ast_list_init(&param_lists); // Reset the list to empty
+			ast_list_init(param_lists); // Reset the list to empty
 			return false;
 		}
 	}
@@ -386,25 +390,230 @@ data_type_t get_data_type_from_string(const char *type_str) {
 
 bool sem_first(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_first on nullptr.");
-	// TODO
+
+	// Check program node
+	if (node->type != NODE_PROGRAM) {
+		print_error(ERR_INTERNAL, node->line_num, "First pass called on non program node.");
+		return false;
+	}
+
+	// Go through the items in the program
+	ast_node_t current_node = node->as.program.items.head;
+	while (current_node) {
+		if (!sem_first_sub_program(current_node, context)) {
+			return false;
+		}
+		current_node = current_node->next;
+	}
+
+	// Check if main found
+	if (context->main_functions_count == 0) {
+		print_error(ERR_SEM_UNDEFINED, 0, "No main function found in the program.");
+		return false;
+	}
+
 	return true;
 }
 
 bool sem_first_sub_program(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_first_sub_program on nullptr.");
-	// TODO
-	return true;
+
+	switch (node->type) {
+	case NODE_FUNC_DEF:
+		return sem_first_node_func_def(node, context);
+	case NODE_EXTENSION:
+		return sem_first_node_extension(node, context);
+	default:
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_first_sub_program on non function or extension node.");
+		return false;
+	}
 }
 
 bool sem_first_node_func_def(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_first_node_func_def on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_first_node_func_def on non function definition node.");
+		return false;
+	}
+	if (!node->as.func_def.name) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no name.");
+		return false;
+	}
+	if (!node->as.func_def.body) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
+	}
+
+	// Create symbol
+	symbol_t symbol = stable_init_symbol();
+	if (!symbol) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to create function symbol.");
+		return false;
+	}
+
+	// Prefill symbol
+	symbol->symbol_variant = SYMBOL_FUNCTION;
+
+	// Check if not defined
+	if (stable_find_curlevel(context->symtable_functions, node->as.func_def.name)) {
+		print_error(ERR_SEM_REDEFINITION, node->line_num,
+					"Function '%s' is already defined in the current scope.",
+					node->as.func_def.name);
+		stable_destroy_symbol(symbol);
+		return false;
+	}
+
+	// Check data type of return type if explicit
+	if (node->as.func_def.return_type) {
+		symbol->function.has_explicit_return_type = true;
+		symbol->function.return_type = get_data_type_from_string(node->as.func_def.return_type);
+	}
+
+	// Main check
+	if (node->as.func_def.is_main) {
+		symbol->function.is_main = true;
+		context->main_functions_count++;
+
+		// Max 1 main
+		if (context->main_functions_count > 1) {
+			print_error(ERR_SEM_REDEFINITION, node->line_num,
+						"Multiple main functions defined in the program.");
+			stable_destroy_symbol(symbol);
+			return false;
+		}
+
+		// Main parameters
+		if (node->as.func_def.param_lists.count != 1 || // One parameter list
+			node->as.func_def.param_lists.head->as.param_list.params.count != 0) { // It is empty
+			print_error(ERR_SEM_PARAMS, node->line_num,
+						"Main function must have empty parameter list.");
+			stable_destroy_symbol(symbol);
+			return false;
+		}
+
+		// Main return type
+		if (symbol->function.return_type != TYPE_UNIT &&
+			symbol->function.has_explicit_return_type) { // If explicit return type, it must be Unit
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Main function must have return type Unit.");
+			stable_destroy_symbol(symbol);
+			return false;
+		}
+	}
+
+	// Parameter lists
+	symbol->function.parameter_lists = node->as.func_def.param_lists;
+
+	// Store symbol
+	if (!stable_write(context->symtable_functions, node->as.func_def.name, symbol)) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to write function '%s' to symbol table.",
+					node->as.func_def.name);
+		stable_destroy_symbol(symbol);
+		return false;
+	}
+
 	return true;
 }
 
 bool sem_first_node_extension(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_first_node_extension on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_EXTENSION) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_first_node_extension on non-extension node.");
+		return false;
+	}
+	if (!node->as.extension.receiver_name) {
+		print_error(ERR_INTERNAL, node->line_num, "Extension has no receiver name.");
+		return false;
+	}
+	if (!node->as.extension.receiver_type) {
+		print_error(ERR_INTERNAL, node->line_num, "Extension has no receiver type.");
+		return false;
+	}
+
+	// Go through extension functions
+	ast_node_t current_extension_node = node->as.extension.methods.head;
+	while (current_extension_node) {
+		// Node check
+		if (current_extension_node->type != NODE_FUNC_DEF) {
+			print_error(ERR_INTERNAL, current_extension_node->line_num,
+						"Invalid node type in extension methods list.");
+			return false;
+		}
+		if (!current_extension_node->as.func_def.name) {
+			print_error(ERR_INTERNAL, current_extension_node->line_num,
+						"Extension function has no name.");
+			return false;
+		}
+
+		// Make key
+		char *key = malloc(strlen(current_extension_node->as.func_def.name) +
+						   strlen(node->as.extension.receiver_type) + 2);
+		if (!key) {
+			print_error(ERR_INTERNAL, current_extension_node->line_num,
+						"Failed to allocate memory for extension function key.");
+			return false;
+		}
+		sprintf(key, "%s$%s", current_extension_node->as.func_def.name,
+				node->as.extension.receiver_type);
+
+		// Check if not defined
+		if (stable_find_curlevel(context->symtable_extension_functions, key)) {
+			print_error(
+				ERR_SEM_REDEFINITION, current_extension_node->line_num,
+				"Extension function '%s' for type '%s' is already defined in the current scope.",
+				current_extension_node->as.func_def.name, node->as.extension.receiver_type);
+			free(key);
+			return false;
+		}
+
+		// Create symbol
+		symbol_t symbol = stable_init_symbol();
+		if (!symbol) {
+			print_error(ERR_INTERNAL, current_extension_node->line_num,
+						"Failed to create extension function symbol.");
+			free(key);
+			return false;
+		}
+
+		// Prefill symbol
+		symbol->symbol_variant = SYMBOL_FUNCTION;
+
+		// Return type
+		if (current_extension_node->as.func_def.return_type) {
+			symbol->function.has_explicit_return_type = true;
+			symbol->function.return_type =
+				get_data_type_from_string(current_extension_node->as.func_def.return_type);
+		}
+
+		// Extension parameters
+		symbol->function.extension_parameter_type =
+			get_data_type_from_string(node->as.extension.receiver_type);
+		symbol->function.extension_parameter_name = node->as.extension.receiver_name;
+
+		// Parameter lists
+		symbol->function.parameter_lists = current_extension_node->as.func_def.param_lists;
+
+		// Add extension function to symbol table
+		if (!stable_write(context->symtable_extension_functions, key, symbol)) {
+			print_error(ERR_INTERNAL, current_extension_node->line_num,
+						"Failed to add extension function to symbol table.");
+			free(key);
+			stable_destroy_symbol(symbol);
+			return false;
+		}
+		free(key);
+
+		// Move to next
+		current_extension_node = current_extension_node->next;
+	}
+
 	return true;
 }
 
@@ -482,131 +691,157 @@ bool sem_second_expr(ast_node_t node, semantic_context_t *context) {
 }
 
 bool sem_second_node_program(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_program on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_block(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_block on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_extension(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_extension on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_func_def on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_var_def on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_assign(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_assign on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_if_expr(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_if_expr on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_if_stmt(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_if_stmt on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_while(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_while on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_for(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_for on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_return(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_return on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_expr_stmt(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_expr_stmt on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_binary_op(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_binary_op on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_unary_op(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_unary_op on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_func_call(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_func_call on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_member_access(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_member_access on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_string_interp(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_string_interp on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_type_cast(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_type_cast on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_param_list(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_param_list on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_param(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_param on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_identifier(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_identifier on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_lit_int(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_lit_int on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_lit_double(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_lit_double on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_lit_string(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_lit_string on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_lit_bool(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_lit_bool on nullptr.");
 	// TODO
 	return true;
 }
 
 bool sem_second_node_lit_unit(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_lit_unit on nullptr.");
 	// TODO
 	return true;
 }
