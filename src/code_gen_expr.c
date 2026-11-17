@@ -353,7 +353,14 @@ static bool generate_string_interpolation(ast_node_t current_node) {
 }
 
 static bool generate_type_cast(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
-	return false;
+	if (current_node->as.type_cast.target_type != TYPE_DOUBLE) {
+		return false;
+	}
+
+	if (!generate_expression(current_node->as.type_cast.operand)) {
+		return false;
+	}
+
+	print_inst_0(INST_INT2FLOATS);
+	return true;
 }
