@@ -8,6 +8,17 @@
 #include "ast.h"
 #include "code_gen_private.h"
 #include "instruction_set.h"
+#include <token.h>
+
+static const operand_t operand_dis = {
+	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%discard"}};
+
+static const operand_t operand_tmp_1 = {
+	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_1"}};
+static const operand_t operand_tmp_2 = {
+	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_2"}};
+static const operand_t operand_tmp_3 = {
+	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_3"}};
 
 static void generate_int_push(ast_node_t current_node);
 
@@ -20,6 +31,8 @@ static void generate_bool_push(ast_node_t current_node);
 static void generate_unit_push(void);
 
 static void generate_var_push(ast_node_t current_node);
+
+static bool generate_logical_op(ast_node_t current_node);
 
 static bool generate_binary_op(ast_node_t current_node);
 
@@ -114,10 +127,68 @@ static void generate_var_push(ast_node_t current_node) {
 	print_inst_1(INST_PUSHS, var_operand);
 }
 
-static bool generate_binary_op(ast_node_t current_node) {
+static bool generate_logical_op(ast_node_t current_node) {
 	// TODO
 	(void)current_node;
 	return false;
+}
+
+static bool generate_binary_op(ast_node_t current_node) {
+	if (current_node->as.binary_op.operator_type == OPERATOR_AND ||
+		current_node->as.binary_op.operator_type == OPERATOR_OR) {
+		return generate_logical_op(current_node);
+	}
+
+	if (!generate_expression(current_node->as.binary_op.left)) {
+		return false;
+	}
+
+	if (!generate_expression(current_node->as.binary_op.right)) {
+		return false;
+	}
+
+	switch (current_node->as.binary_op.operator_type) {
+	// relation
+	case OPERATOR_LESS_EQUAL:
+	case OPERATOR_GREATER_EQUAL:
+	case OPERATOR_EQUAL:
+	case OPERATOR_NOT_EQUAL:
+	case OPERATOR_GREATER:
+	case OPERATOR_LESS:
+
+	// arithmetic
+	case OPERATOR_PLUS:
+		if (current_node->as.binary_op.left->eval_type == TYPE_STRING ||
+			current_node->as.binary_op.right->eval_type == TYPE_STRING) {
+
+			print_inst_1(INST_POPS, operand_tmp_1);
+			print_inst_1(INST_POPS, operand_tmp_2);
+			print_inst_3(INST_CONCAT, operand_tmp_2, operand_tmp_2, operand_tmp_1);
+
+			print_inst_1(INST_PUSHS, operand_tmp_2);
+		} else {
+			print_inst_0(INST_ADDS);
+		}
+		break;
+	case OPERATOR_STAR:
+		print_inst_0(INST_MULS);
+		break;
+	case OPERATOR_MINUS:
+		print_inst_0(INST_SUBS);
+		break;
+	case OPERATOR_SLASH:
+		if (current_node->as.binary_op.left->eval_type == TYPE_DOUBLE ||
+			current_node->as.binary_op.right->eval_type == TYPE_DOUBLE) {
+			print_inst_0(INST_DIVS);
+		} else {
+			print_inst_0(INST_IDIVS);
+		}
+		break;
+	default:
+		return false;
+	}
+
+	return true;
 }
 
 static bool generate_unary_op(ast_node_t current_node) {
