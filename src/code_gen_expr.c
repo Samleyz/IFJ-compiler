@@ -134,22 +134,8 @@ static bool generate_logical_op(ast_node_t current_node) {
 	}
 }
 
-static bool generate_binary_op(ast_node_t current_node) {
-	if (current_node->as.binary_op.operator_type == OPERATOR_AND ||
-		current_node->as.binary_op.operator_type == OPERATOR_OR) {
-		return generate_logical_op(current_node);
-	}
-
-	if (!generate_expression(current_node->as.binary_op.left)) {
-		return false;
-	}
-
-	if (!generate_expression(current_node->as.binary_op.right)) {
-		return false;
-	}
-
-	switch (current_node->as.binary_op.operator_type) {
-	// relation
+static bool generate_relation_op(op_type_t operator_type) {
+	switch (operator_type) {
 	case OPERATOR_LESS_EQUAL:
 		print_inst_0(INST_GTS);
 		print_inst_0(INST_NOTS);
@@ -171,8 +157,15 @@ static bool generate_binary_op(ast_node_t current_node) {
 	case OPERATOR_LESS:
 		print_inst_0(INST_LTS);
 		break;
+	default:
+		return false;
+	}
 
-	// arithmetic
+	return true;
+}
+
+static bool generate_arithmetic_op(ast_node_t current_node) {
+	switch (current_node->as.binary_op.operator_type) {
 	case OPERATOR_PLUS:
 		if (current_node->as.binary_op.left->eval_type == TYPE_STRING ||
 			current_node->as.binary_op.right->eval_type == TYPE_STRING) {
@@ -200,6 +193,42 @@ static bool generate_binary_op(ast_node_t current_node) {
 			print_inst_0(INST_IDIVS);
 		}
 		break;
+	default:
+		return false;
+	}
+	return true;
+}
+
+static bool generate_binary_op(ast_node_t current_node) {
+	if (current_node->as.binary_op.operator_type == OPERATOR_AND ||
+		current_node->as.binary_op.operator_type == OPERATOR_OR) {
+		return generate_logical_op(current_node);
+	}
+
+	if (!generate_expression(current_node->as.binary_op.left)) {
+		return false;
+	}
+
+	if (!generate_expression(current_node->as.binary_op.right)) {
+		return false;
+	}
+
+	switch (current_node->as.binary_op.operator_type) {
+	// relation
+	case OPERATOR_LESS_EQUAL:
+	case OPERATOR_GREATER_EQUAL:
+	case OPERATOR_EQUAL:
+	case OPERATOR_NOT_EQUAL:
+	case OPERATOR_GREATER:
+	case OPERATOR_LESS:
+		return generate_relation_op(current_node->as.binary_op.operator_type);
+
+	// arithmetic
+	case OPERATOR_PLUS:
+	case OPERATOR_STAR:
+	case OPERATOR_MINUS:
+	case OPERATOR_SLASH:
+		return generate_arithmetic_op(current_node);
 	default:
 		return false;
 	}
