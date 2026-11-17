@@ -238,10 +238,22 @@ static bool generate_function_def(ast_node_t current_node) {
 static bool generate_prologue(ast_node_t root) {
 	fprintf(code_generator.output_file, ".IFJcode26\n\n");
 
+	// declaration of global variables
 	operand_t operand_dis = {
 		.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%discard"}};
 
+	operand_t operand_tmp_1 = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_1"}};
+	operand_t operand_tmp_2 = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_2"}};
+	operand_t operand_tmp_3 = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_3"}};
+
 	print_inst_1(INST_DEFVAR, operand_dis);
+
+	print_inst_1(INST_DEFVAR, operand_tmp_1);
+	print_inst_1(INST_DEFVAR, operand_tmp_2);
+	print_inst_1(INST_DEFVAR, operand_tmp_3);
 
 	// find the @main entry function
 	char *main_label = nullptr;
