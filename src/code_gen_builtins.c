@@ -64,6 +64,11 @@ static void generate_builtin_ord(void);
  */
 static void generate_builtin_chr(void);
 
+/**
+ * @brief Generates built-in function floor ($$floor), the Double member .floor
+ */
+static void generate_builtin_floor(void);
+
 static void generate_builtin_strlength(void) {
 	generate_function_prologue("$$strLength");
 

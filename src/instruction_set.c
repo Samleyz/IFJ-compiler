@@ -13,6 +13,11 @@ typedef struct {
 	int arity;
 } inst_info_t;
 
+/**
+ * @brief Prints an operand in the IFJcode26 notation (frame prefix, type and escaped value)
+ *
+ * @param[in] operand Operand to be printed
+ */
 static void print_operand(operand_t operand);
 
 static FILE *output_file;

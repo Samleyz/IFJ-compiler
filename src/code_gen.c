@@ -103,6 +103,17 @@ bool generate_program(ast_node_t root) {
 	return true;
 }
 
+/**
+ * @brief Generates one extension method, its label is $$ReceiverType$name
+ *
+ * The parameters are popped from the stack in reverse order and the receiver is popped last,
+ * because the caller pushes the receiver first.
+ *
+ * @param[in] current_node NODE_FUNC_DEF node of the method
+ * @param[in] receiver_name Name of the receiver parameter
+ * @param[in] receiver_type Name of the type the method is defined for
+ * @return true on success, false otherwise
+ */
 static bool generate_ext_def(ast_node_t current_node, const char *receiver_name,
 							 const char *receiver_type) {
 	// Function label

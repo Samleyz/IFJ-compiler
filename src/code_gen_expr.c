@@ -12,14 +12,30 @@
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * @brief Names of the types that can be a receiver of an extension method, indexed by data_type_t
+ *
+ * The names are used in the labels of extension methods ($$Type$name). Types other than Int,
+ * Double and String have no entry, so the index has to be checked first.
+ */
 static const char *const type_names[] = {
 	[TYPE_INT] = "Int",
 	[TYPE_DOUBLE] = "Double",
 	[TYPE_STRING] = "String",
 };
 
+/**
+ * @brief First temporary global variable (%tmp_1), declared in the program prologue
+ *
+ * It may hold a value only until the next generated expression or CALL.
+ */
 static const operand_t operand_tmp_1 = {
 	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_1"}};
+/**
+ * @brief Second temporary global variable (%tmp_2), declared in the program prologue
+ *
+ * It may hold a value only until the next generated expression or CALL.
+ */
 static const operand_t operand_tmp_2 = {
 	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_2"}};
 /** @brief Integer constant -1 */
@@ -28,40 +44,125 @@ static const operand_t int_neg1_operand = {
 /** @brief Double constant -1 */
 static const operand_t double_neg1_operand = {
 	.operand_type = OP_TYPE_FLOAT, .frame = FT_NO_FRAME, .value = {.double_val = -1}};
+/** @brief Empty string constant, the value of an interpolated string without any part */
 static const operand_t string_empty_operand = {
 	.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = ""}};
 
 /** @brief Boolean constant true */
 static const operand_t bool_true_operand = {
 	.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
-/** @brief Boolean constant true */
+/** @brief Boolean constant false */
 static const operand_t bool_false_operand = {
 	.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = false}};
 
+/**
+ * @brief Pushes an Int literal on the stack
+ *
+ * @param[in] current_node NODE_LIT_INT node
+ */
 static void generate_int_push(ast_node_t current_node);
 
+/**
+ * @brief Pushes a Double literal on the stack
+ *
+ * @param[in] current_node NODE_LIT_DOUBLE node
+ */
 static void generate_double_push(ast_node_t current_node);
 
+/**
+ * @brief Pushes a String literal on the stack
+ *
+ * @param[in] current_node NODE_LIT_STRING node
+ */
 static void generate_string_push(ast_node_t current_node);
 
+/**
+ * @brief Pushes a Boolean literal on the stack
+ *
+ * @param[in] current_node NODE_LIT_BOOL node
+ */
 static void generate_bool_push(ast_node_t current_node);
 
+/**
+ * @brief Pushes the Unit value (nil) on the stack
+ */
 static void generate_unit_push(void);
 
+/**
+ * @brief Pushes the value of a local variable on the stack
+ *
+ * @param[in] current_node NODE_IDENTIFIER node, its unique_name is the name of the variable
+ */
 static void generate_var_push(ast_node_t current_node);
 
+/**
+ * @brief Generates the short-circuit operators && and ||
+ *
+ * The right operand is evaluated only when the left one does not decide the result. Both paths
+ * leave exactly one Boolean on the stack.
+ *
+ * @param[in] current_node NODE_BINARY_OP node with the operator && or ||
+ * @return true on success, false otherwise
+ */
 static bool generate_logical_op(ast_node_t current_node);
 
+/**
+ * @brief Generates a binary operation, the result is left on the stack
+ *
+ * Dispatches to generate_logical_op, generate_relation_op or generate_arithmetic_op.
+ *
+ * @param[in] current_node NODE_BINARY_OP node
+ * @return true on success, false otherwise
+ */
 static bool generate_binary_op(ast_node_t current_node);
 
+/**
+ * @brief Generates a unary operation (-, + or !), the result is left on the stack
+ *
+ * @param[in] current_node NODE_UNARY_OP node
+ * @return true on success, false otherwise
+ */
 static bool generate_unary_op(ast_node_t current_node);
 
+/**
+ * @brief Generates a call of a function or of an extension method
+ *
+ * The callee is either NODE_IDENTIFIER (a function, label $$name) or NODE_MEMBER_ACCESS (an
+ * extension method, label $$Type$name, the receiver is pushed as the first argument). The
+ * arguments are evaluated from left to right and the result is left on the stack.
+ *
+ * @param[in] current_node NODE_FUNC_CALL node
+ * @return true on success, false otherwise
+ */
 static bool generate_function_call(ast_node_t current_node);
 
+/**
+ * @brief Generates a member access without a call
+ *
+ * Built-in members (toString, toInt, floor, length) call the matching built-in function, any
+ * other member is an extension method without parameters.
+ *
+ * @param[in] current_node NODE_MEMBER_ACCESS node
+ * @return true on success, false otherwise
+ */
 static bool generate_member_access(ast_node_t current_node);
 
+/**
+ * @brief Generates an interpolated string, the resulting String is left on the stack
+ *
+ * Each part is converted by $$toStr and the parts are concatenated from left to right.
+ *
+ * @param[in] current_node NODE_STRING_INTERP node
+ * @return true on success, false otherwise
+ */
 static bool generate_string_interpolation(ast_node_t current_node);
 
+/**
+ * @brief Generates the implicit conversion of an Int to a Double
+ *
+ * @param[in] current_node NODE_TYPE_CAST node, its target type has to be TYPE_DOUBLE
+ * @return true on success, false otherwise
+ */
 static bool generate_type_cast(ast_node_t current_node);
 
 bool generate_expression(ast_node_t current_node) {
@@ -210,6 +311,15 @@ cleanup:
 	return success;
 }
 
+/**
+ * @brief Generates a relational operator over the two operands already on the stack
+ *
+ * There are no stack instructions for <=, >= and !=, so they are the opposite comparison
+ * followed by NOTS.
+ *
+ * @param[in] operator_type One of <, >, <=, >=, == and !=
+ * @return true on success, false for any other operator
+ */
 static bool generate_relation_op(op_type_t operator_type) {
 	switch (operator_type) {
 	case OPERATOR_LESS_EQUAL:
@@ -240,6 +350,16 @@ static bool generate_relation_op(op_type_t operator_type) {
 	return true;
 }
 
+/**
+ * @brief Generates an arithmetic operator over the two operands already on the stack
+ *
+ * The + operator over Strings is a concatenation (CONCAT has no stack variant, so it works over
+ * the temporary variables). The / operator is the integer division for Int and the decimal
+ * division for Double.
+ *
+ * @param[in] current_node NODE_BINARY_OP node with the operator +, -, * or /
+ * @return true on success, false otherwise
+ */
 static bool generate_arithmetic_op(ast_node_t current_node) {
 	switch (current_node->as.binary_op.operator_type) {
 	case OPERATOR_PLUS:
@@ -338,6 +458,14 @@ static bool generate_unary_op(ast_node_t current_node) {
 	return true;
 }
 
+/**
+ * @brief Generates all arguments of a call, so that they are on the stack
+ *
+ * The argument lists and the arguments in them are evaluated from left to right.
+ *
+ * @param[in] current_node NODE_FUNC_CALL node
+ * @return true on success, false otherwise
+ */
 static bool func_call_push_args(ast_node_t current_node) {
 	ast_node_t current_arg_list = current_node->as.func_call.arg_lists.head;
 	while (current_arg_list) {
@@ -421,6 +549,12 @@ cleanup:
 	return success;
 }
 
+/**
+ * @brief Checks whether a member access is one of the built-in members
+ *
+ * @param[in] current_node NODE_MEMBER_ACCESS node
+ * @return true for toString, toInt, length and floor, false otherwise
+ */
 static bool is_builtin_member(ast_node_t current_node) {
 	return (bool)(strcmp(current_node->as.member_access.member_name, "toString") == 0 ||
 				  strcmp(current_node->as.member_access.member_name, "toInt") == 0 ||
@@ -428,10 +562,18 @@ static bool is_builtin_member(ast_node_t current_node) {
 				  strcmp(current_node->as.member_access.member_name, "floor") == 0);
 }
 
+/** @brief Names of the built-in members as they are written in a program */
 static char *builtin_members[] = {"toString", "toInt", "floor", "length"};
 
+/** @brief Names of the built-in functions behind the members, in the same order */
 static char *builtin_functions[] = {"toStr", "toInt", "floor", "strLength"};
 
+/**
+ * @brief Maps the name of a built-in member to the name of the built-in function behind it
+ *
+ * @param[in] function_name Name of the member, such as "toString"
+ * @return Name of the function, such as "toStr", or nullptr if it is not a built-in member
+ */
 static char *map_function_name(const char *function_name) {
 	for (int i = 0; i < 4; i++) {
 		if (strcmp(function_name, builtin_members[i]) == 0) {

@@ -35,6 +35,16 @@ void generate_function_epilogue(void);
  */
 void generate_builtins_definitions(void);
 
+/**
+ * @brief Generates code for an expression
+ *
+ * After the generated code is run, exactly one value (the value of the expression) is on the top
+ * of the stack.
+ *
+ * @param[in] current_node Expression node (a literal, an identifier, an operation, a call, a
+ * member access, an interpolated string, an if expression or a type cast)
+ * @return true on success, false otherwise
+ */
 bool generate_expression(ast_node_t current_node);
 
 /**
@@ -70,10 +80,11 @@ bool generate_locals_decl(ast_node_t current_node);
 FILE *gen_get_output_file(void);
 
 /**
- * @brief Creates a dynamically allocated string prefixed with given prefix
+ * @brief Creates a dynamically allocated string made of the prefix, the name and the suffix
  *
  * @param[in] prefix Prefix string (e.g. "$$")
  * @param[in] name Base identifier name
+ * @param[in] suffix Suffix string
  * @return Allocated string (caller is responsible for free()), or nullptr on error
  */
 char *get_modified_name(const char *prefix, const char *name, const char *suffix);
