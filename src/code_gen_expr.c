@@ -482,71 +482,78 @@ static bool func_call_push_args(ast_node_t current_node) {
 	return true;
 }
 
+static bool generate_plain_call(ast_node_t current_node) {
+	if (current_node->as.func_call.has_parens) {
+		if (!func_call_push_args(current_node)) {
+			return false;
+		}
+	}
+
+	char *function_label =
+		get_modified_name("$$", current_node->as.func_call.callee->as.id.name, "");
+	if (!function_label) {
+		return false;
+	}
+
+	operand_t function_name = {.operand_type = OP_TYPE_LABEL,
+							   .frame = FT_NO_FRAME,
+							   .value = {.label_name = function_label}};
+	print_inst_1(INST_CALL, function_name);
+
+	free(function_label);
+	return true;
+}
+
+static bool generate_method_call(ast_node_t current_node) {
+	if (!generate_expression(current_node->as.func_call.callee->as.member_access.target)) {
+		return false;
+	}
+
+	if (current_node->as.func_call.has_parens) {
+		if (!func_call_push_args(current_node)) {
+			return false;
+		}
+	}
+
+	unsigned type_idx = current_node->as.func_call.callee->as.member_access.target->eval_type;
+
+	if (type_idx < TYPE_INT || type_idx > TYPE_STRING) {
+		return false;
+	}
+
+	char *function_label_tmp = get_modified_name("$$", type_names[type_idx], "$");
+	char *function_label = get_modified_name(
+		function_label_tmp, current_node->as.func_call.callee->as.member_access.member_name, "");
+	if (!function_label || !function_label_tmp) {
+		free(function_label);
+		free(function_label_tmp);
+		return false;
+	}
+
+	operand_t function_name = {.operand_type = OP_TYPE_LABEL,
+							   .frame = FT_NO_FRAME,
+							   .value = {.label_name = function_label}};
+	print_inst_1(INST_CALL, function_name);
+
+	free(function_label);
+	free(function_label_tmp);
+	return true;
+}
+
 static bool generate_function_call(ast_node_t current_node) {
-	char *function_label = nullptr;
-	char *function_label_tmp = nullptr;
-
-	bool success = true;
-
 	if (current_node->as.func_call.callee->type == NODE_IDENTIFIER) {
-		if (current_node->as.func_call.has_parens) {
-			if (!func_call_push_args(current_node)) {
-				success = false;
-				goto cleanup;
-			}
+		if (!generate_plain_call(current_node)) {
+			return false;
 		}
-
-		function_label = get_modified_name("$$", current_node->as.func_call.callee->as.id.name, "");
-		if (!function_label) {
-			success = false;
-			goto cleanup;
-		}
-
-		operand_t function_name = {.operand_type = OP_TYPE_LABEL,
-								   .frame = FT_NO_FRAME,
-								   .value = {.label_name = function_label}};
-		print_inst_1(INST_CALL, function_name);
 	} else if (current_node->as.func_call.callee->type == NODE_MEMBER_ACCESS) {
-		if (!generate_expression(current_node->as.func_call.callee->as.member_access.target)) {
-			success = false;
-			goto cleanup;
+		if (!generate_method_call(current_node)) {
+			return false;
 		}
-
-		if (current_node->as.func_call.has_parens) {
-			if (!func_call_push_args(current_node)) {
-				success = false;
-				goto cleanup;
-			}
-		}
-
-		unsigned type_idx = current_node->as.func_call.callee->as.member_access.target->eval_type;
-
-		if (type_idx < TYPE_INT || type_idx > TYPE_STRING) {
-			success = false;
-			goto cleanup;
-		}
-
-		function_label_tmp = get_modified_name("$$", type_names[type_idx], "$");
-		function_label =
-			get_modified_name(function_label_tmp,
-							  current_node->as.func_call.callee->as.member_access.member_name, "");
-		if (!function_label || !function_label_tmp) {
-			success = false;
-			goto cleanup;
-		}
-
-		operand_t function_name = {.operand_type = OP_TYPE_LABEL,
-								   .frame = FT_NO_FRAME,
-								   .value = {.label_name = function_label}};
-		print_inst_1(INST_CALL, function_name);
 	} else {
 		return false;
 	}
 
-cleanup:
-	free(function_label);
-	free(function_label_tmp);
-	return success;
+	return true;
 }
 
 /**
