@@ -505,6 +505,16 @@ bool sem_first_node_func_def(ast_node_t node, semantic_context_t *context) {
 		}
 	}
 
+	// Validate parameters and uniqueness
+	if (!sem_first_validate_parameter_uniqueness(&node->as.func_def.param_lists, nullptr,
+												 context)) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to validate parameter uniqueness for function '%s'.",
+					node->as.func_def.name);
+		stable_destroy_symbol(symbol);
+		return false;
+	}
+
 	// Parameter lists
 	symbol->function.parameter_lists = node->as.func_def.param_lists;
 
@@ -597,6 +607,17 @@ bool sem_first_node_extension(ast_node_t node, semantic_context_t *context) {
 			get_data_type_from_string(node->as.extension.receiver_type);
 		symbol->function.extension_parameter_name = node->as.extension.receiver_name;
 
+		// Validate parameters and uniqueness
+		if (!sem_first_validate_parameter_uniqueness(
+				&current_extension_node->as.func_def.param_lists, node->as.extension.receiver_name,
+				context)) {
+			print_error(ERR_INTERNAL, current_extension_node->line_num,
+						"Failed to validate parameter uniqueness for extension function.");
+			free(key);
+			stable_destroy_symbol(symbol);
+			return false;
+		}
+
 		// Parameter lists
 		symbol->function.parameter_lists = current_extension_node->as.func_def.param_lists;
 
@@ -614,6 +635,113 @@ bool sem_first_node_extension(ast_node_t node, semantic_context_t *context) {
 		current_extension_node = current_extension_node->next;
 	}
 
+	return true;
+}
+
+bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char *receiver_name,
+											 semantic_context_t *context) {
+	assert(param_lists && context && "Called sem_first_validate_parameter_uniqueness on nullptr.");
+
+	// Make new scope for parameters
+	if (!stable_enter_scope(context->symtable_local)) {
+		print_error(ERR_INTERNAL, 0, "Failed to enter new scope for parameter uniqueness check.");
+		return false;
+	}
+
+	// Register receiver name if exists
+	if (receiver_name) {
+		symbol_t receiver_symbol = stable_init_symbol();
+		if (!receiver_symbol) {
+			print_error(ERR_INTERNAL, 0,
+						"Failed to create receiver symbol for parameter uniqueness check.");
+			stable_leave_scope(context->symtable_local);
+			return false;
+		}
+		receiver_symbol->symbol_variant = SYMBOL_VARIABLE;
+		if (!stable_write(context->symtable_local, receiver_name, receiver_symbol)) {
+			print_error(ERR_INTERNAL, 0,
+						"Failed to register receiver name '%s' in parameter uniqueness check.",
+						receiver_name);
+			stable_leave_scope(context->symtable_local);
+			return false;
+		}
+	}
+
+	// Compare parameters in all parameter lists
+	ast_node_t current_param_list_node = param_lists->head;
+	while (current_param_list_node) {
+		// Node checks
+		if (current_param_list_node->type != NODE_PARAM_LIST) {
+			print_error(ERR_INTERNAL, current_param_list_node->line_num,
+						"Invalid node type in parameter lists.");
+			stable_leave_scope(context->symtable_local);
+			return false;
+		}
+
+		ast_node_t current_param_node = current_param_list_node->as.param_list.params.head;
+		while (current_param_node) {
+			// Node checks
+			if (current_param_node->type != NODE_PARAM) {
+				print_error(ERR_INTERNAL, current_param_node->line_num,
+							"Invalid node type in parameter list.");
+				stable_leave_scope(context->symtable_local);
+				return false;
+			}
+			if (!current_param_node->as.param.name) {
+				print_error(ERR_INTERNAL, current_param_node->line_num, "Parameter has no name.");
+				stable_leave_scope(context->symtable_local);
+				return false;
+			}
+
+			// Check if aleady registered
+			if (stable_find_curlevel(context->symtable_local, current_param_node->as.param.name)) {
+				print_error(ERR_SEM_REDEFINITION, current_param_node->line_num,
+							"Parameter '%s' is already defined in the current scope.",
+							current_param_node->as.param.name);
+				stable_leave_scope(context->symtable_local);
+				return false;
+			}
+
+			// Set evaluation type of the parameter
+			current_param_node->eval_type =
+				get_data_type_from_string(current_param_node->as.param.type_name);
+			if (current_param_node->eval_type == TYPE_UNKNOWN) {
+				print_error(ERR_SEM_UNDEFINED, current_param_node->line_num,
+							"Parameter '%s' has unknown type '%s'.",
+							current_param_node->as.param.name,
+							current_param_node->as.param.type_name);
+				stable_leave_scope(context->symtable_local);
+				return false;
+			}
+
+			// Register the parameter
+			symbol_t param_symbol = stable_init_symbol();
+			if (!param_symbol) {
+				print_error(ERR_INTERNAL, current_param_node->line_num,
+							"Failed to create parameter symbol for parameter uniqueness check.");
+				stable_leave_scope(context->symtable_local);
+				return false;
+			}
+			param_symbol->symbol_variant = SYMBOL_VARIABLE;
+			param_symbol->variable.type = current_param_node->eval_type;
+			if (!stable_write(context->symtable_local, current_param_node->as.param.name,
+							  param_symbol)) {
+				print_error(ERR_INTERNAL, current_param_node->line_num,
+							"Failed to register parameter '%s' in parameter uniqueness check.",
+							current_param_node->as.param.name);
+				stable_leave_scope(context->symtable_local);
+				return false;
+			}
+
+			// Move to next parameter
+			current_param_node = current_param_node->next;
+		}
+
+		// Move to next parameter list
+		current_param_list_node = current_param_list_node->next;
+	}
+
+	stable_leave_scope(context->symtable_local);
 	return true;
 }
 

@@ -172,6 +172,18 @@ bool sem_first_node_func_def(ast_node_t node, semantic_context_t *context);
  */
 bool sem_first_node_extension(ast_node_t node, semantic_context_t *context);
 
+/**
+ * @brief Checks the uniqueness of all parameter names
+ *
+ * @param param_lists List of parameter lists to check
+ * @param receiver_name Name of the parameter before dot (nullptr if not in extension)
+ * @param context Semantic analysis context
+ * @return true Valid
+ * @return false Error
+ */
+bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char *receiver_name,
+											 semantic_context_t *context);
+
 /*
 ####################################################################################################
 # Second pass functions
