@@ -540,6 +540,52 @@ static void generate_builtin_chr(void) {
 	generate_function_epilogue();
 }
 
+// Tool: Claude Code (Sonnet 5.5)
+// Prompt: Write generate_builtin_floor, the IFJcode26 built-in $$floor for the Double member
+// .floor (rounds down, also for negative numbers).
+// Note: FLOAT2INT truncates towards zero, so 1.0 is subtracted when the truncated value is
+// greater than the argument (negative numbers with a fractional part).
+static void generate_builtin_floor(void) {
+	generate_function_prologue("$$floor");
+
+	operand_t param_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "double_num"}};
+	operand_t int_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "truncated_int"}};
+	operand_t result_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "result"}};
+	operand_t less_operand = {
+		.operand_type = OP_TYPE_VAR, .frame = FT_LOCAL, .value = {.var_name = "is_less"}};
+
+	operand_t one_operand = {
+		.operand_type = OP_TYPE_FLOAT, .frame = FT_NO_FRAME, .value = {.double_val = 1.0}};
+	operand_t false_operand = {
+		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = false}};
+	operand_t end_label = {.operand_type = OP_TYPE_LABEL,
+						   .frame = FT_NO_FRAME,
+						   .value = {.label_name = "$floor$end"}};
+
+	print_inst_1(INST_DEFVAR, param_operand);
+	print_inst_1(INST_DEFVAR, int_operand);
+	print_inst_1(INST_DEFVAR, result_operand);
+	print_inst_1(INST_DEFVAR, less_operand);
+	print_inst_1(INST_POPS, param_operand);
+
+	// truncate towards zero and convert back to Double
+	print_inst_2(INST_FLOAT2INT, int_operand, param_operand);
+	print_inst_2(INST_INT2FLOAT, result_operand, int_operand);
+
+	// the argument is below the truncated value (negative with a fraction): subtract 1.0
+	print_inst_3(INST_LT, less_operand, param_operand, result_operand);
+	print_inst_3(INST_JUMPIFEQ, end_label, less_operand, false_operand);
+	print_inst_3(INST_SUB, result_operand, result_operand, one_operand);
+
+	print_inst_1(INST_LABEL, end_label);
+	print_inst_1(INST_PUSHS, result_operand);
+
+	generate_function_epilogue();
+}
+
 void generate_builtins_definitions(void) {
 	generate_builtin_strlength();
 	generate_builtin_print();
@@ -552,4 +598,5 @@ void generate_builtins_definitions(void) {
 	generate_builtin_subStr();
 	generate_builtin_ord();
 	generate_builtin_chr();
+	generate_builtin_floor();
 }
