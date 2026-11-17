@@ -566,9 +566,8 @@ static void generate_builtin_floor(void) {
 		.operand_type = OP_TYPE_FLOAT, .frame = FT_NO_FRAME, .value = {.double_val = 1.0}};
 	operand_t false_operand = {
 		.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = false}};
-	operand_t end_label = {.operand_type = OP_TYPE_LABEL,
-						   .frame = FT_NO_FRAME,
-						   .value = {.label_name = "$floor$end"}};
+	operand_t end_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = "$floor$end"}};
 
 	print_inst_1(INST_DEFVAR, param_operand);
 	print_inst_1(INST_DEFVAR, int_operand);
