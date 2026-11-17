@@ -8,8 +8,8 @@
 #include "ast.h"
 #include "code_gen_private.h"
 #include "instruction_set.h"
+#include "token.h"
 #include <stdlib.h>
-#include <token.h>
 
 static const operand_t operand_dis = {
 	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%discard"}};
