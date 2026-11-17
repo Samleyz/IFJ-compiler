@@ -10,22 +10,26 @@
 #include "instruction_set.h"
 #include "token.h"
 #include <stdlib.h>
+#include <string.h>
 
-static const operand_t operand_dis = {
-	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%discard"}};
+static const char *const type_names[] = {
+	[TYPE_INT] = "Int",
+	[TYPE_DOUBLE] = "Double",
+	[TYPE_STRING] = "String",
+};
 
 static const operand_t operand_tmp_1 = {
 	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_1"}};
 static const operand_t operand_tmp_2 = {
 	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_2"}};
-static const operand_t operand_tmp_3 = {
-	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_3"}};
 /** @brief Integer constant -1 */
 static const operand_t int_neg1_operand = {
 	.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = -1}};
 /** @brief Double constant -1 */
 static const operand_t double_neg1_operand = {
 	.operand_type = OP_TYPE_FLOAT, .frame = FT_NO_FRAME, .value = {.double_val = -1}};
+static const operand_t string_empty_operand = {
+	.operand_type = OP_TYPE_STRING, .frame = FT_NO_FRAME, .value = {.string_val = ""}};
 
 /** @brief Boolean constant true */
 static const operand_t bool_true_operand = {
@@ -334,22 +338,197 @@ static bool generate_unary_op(ast_node_t current_node) {
 	return true;
 }
 
+static bool func_call_push_args(ast_node_t current_node) {
+	ast_node_t current_arg_list = current_node->as.func_call.arg_lists.head;
+	while (current_arg_list) {
+		ast_node_t current_arg = current_arg_list->as.arg_list.args.head;
+		while (current_arg) {
+			if (!generate_expression(current_arg)) {
+				return false;
+			}
+			current_arg = current_arg->next;
+		}
+		current_arg_list = current_arg_list->next;
+	}
+
+	return true;
+}
+
 static bool generate_function_call(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
-	return false;
+	char *function_label = nullptr;
+	char *function_label_tmp = nullptr;
+
+	bool success = true;
+
+	if (current_node->as.func_call.callee->type == NODE_IDENTIFIER) {
+		if (current_node->as.func_call.has_parens) {
+			if (!func_call_push_args(current_node)) {
+				success = false;
+				goto cleanup;
+			}
+		}
+
+		function_label = get_modified_name("$$", current_node->as.func_call.callee->as.id.name, "");
+		if (!function_label) {
+			success = false;
+			goto cleanup;
+		}
+
+		operand_t function_name = {.operand_type = OP_TYPE_LABEL,
+								   .frame = FT_NO_FRAME,
+								   .value = {.label_name = function_label}};
+		print_inst_1(INST_CALL, function_name);
+	} else if (current_node->as.func_call.callee->type == NODE_MEMBER_ACCESS) {
+		if (!generate_expression(current_node->as.func_call.callee->as.member_access.target)) {
+			success = false;
+			goto cleanup;
+		}
+
+		if (current_node->as.func_call.has_parens) {
+			if (!func_call_push_args(current_node)) {
+				success = false;
+				goto cleanup;
+			}
+		}
+
+		unsigned type_idx = current_node->as.func_call.callee->as.member_access.target->eval_type;
+
+		if (type_idx < TYPE_INT || type_idx > TYPE_STRING) {
+			success = false;
+			goto cleanup;
+		}
+
+		function_label_tmp = get_modified_name("$$", type_names[type_idx], "$");
+		function_label =
+			get_modified_name(function_label_tmp,
+							  current_node->as.func_call.callee->as.member_access.member_name, "");
+		if (!function_label || !function_label_tmp) {
+			success = false;
+			goto cleanup;
+		}
+
+		operand_t function_name = {.operand_type = OP_TYPE_LABEL,
+								   .frame = FT_NO_FRAME,
+								   .value = {.label_name = function_label}};
+		print_inst_1(INST_CALL, function_name);
+	} else {
+		return false;
+	}
+
+cleanup:
+	free(function_label);
+	free(function_label_tmp);
+	return success;
+}
+
+static bool is_builtin_member(ast_node_t current_node) {
+	return (bool)(strcmp(current_node->as.member_access.member_name, "toString") == 0 ||
+				  strcmp(current_node->as.member_access.member_name, "toInt") == 0 ||
+				  strcmp(current_node->as.member_access.member_name, "length") == 0 ||
+				  strcmp(current_node->as.member_access.member_name, "floor") == 0);
+}
+
+static char *builtin_members[] = {"toString", "toInt", "floor", "length"};
+
+static char *builtin_functions[] = {"toStr", "toInt", "floor", "strLength"};
+
+static char *map_function_name(const char *function_name) {
+	for (int i = 0; i < 4; i++) {
+		if (strcmp(function_name, builtin_members[i]) == 0) {
+			return builtin_functions[i];
+		}
+	}
+
+	return nullptr;
 }
 
 static bool generate_member_access(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
-	return false;
+	char *function_label = nullptr;
+	char *function_label_tmp = nullptr;
+
+	bool success = true;
+
+	if (!generate_expression(current_node->as.member_access.target)) {
+		success = false;
+		goto cleanup;
+	}
+
+	if (is_builtin_member(current_node)) {
+		char *function_name = map_function_name(current_node->as.member_access.member_name);
+
+		function_label = get_modified_name("$$", function_name, "");
+		if (!function_label) {
+			success = false;
+			goto cleanup;
+		}
+
+		operand_t function_name_op = {.operand_type = OP_TYPE_LABEL,
+									  .frame = FT_NO_FRAME,
+									  .value = {.label_name = function_label}};
+		print_inst_1(INST_CALL, function_name_op);
+
+	} else {
+		unsigned type_idx = current_node->as.member_access.target->eval_type;
+
+		if (type_idx < TYPE_INT || type_idx > TYPE_STRING) {
+			success = false;
+			goto cleanup;
+		}
+
+		function_label_tmp = get_modified_name("$$", type_names[type_idx], "$");
+		function_label =
+			get_modified_name(function_label_tmp, current_node->as.member_access.member_name, "");
+		if (!function_label || !function_label_tmp) {
+			success = false;
+			goto cleanup;
+		}
+
+		operand_t function_name = {.operand_type = OP_TYPE_LABEL,
+								   .frame = FT_NO_FRAME,
+								   .value = {.label_name = function_label}};
+		print_inst_1(INST_CALL, function_name);
+	}
+
+cleanup:
+	free(function_label);
+	free(function_label_tmp);
+	return success;
 }
 
 static bool generate_string_interpolation(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
-	return false;
+	char *to_str_label = get_modified_name("$$", "toStr", "");
+	if (!to_str_label) {
+		return false;
+	}
+	operand_t operand_to_str_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = to_str_label}};
+	ast_node_t curr_part = current_node->as.string_interp.parts.head;
+
+	if (curr_part == nullptr) {
+		print_inst_1(INST_PUSHS, string_empty_operand);
+		free(to_str_label);
+		return true;
+	}
+
+	while (curr_part) {
+		if (!generate_expression(curr_part)) {
+			free(to_str_label);
+			return false;
+		}
+
+		print_inst_1(INST_CALL, operand_to_str_label);
+		if (curr_part != current_node->as.string_interp.parts.head) {
+			print_inst_1(INST_POPS, operand_tmp_2);
+			print_inst_1(INST_POPS, operand_tmp_1);
+			print_inst_3(INST_CONCAT, operand_tmp_1, operand_tmp_1, operand_tmp_2);
+			print_inst_1(INST_PUSHS, operand_tmp_1);
+		}
+
+		curr_part = curr_part->next;
+	}
+
+	free(to_str_label);
+	return true;
 }
 
 static bool generate_type_cast(ast_node_t current_node) {
