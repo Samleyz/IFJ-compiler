@@ -4,6 +4,7 @@
  * @brief Implementation of symtable data type using hashtable
  */
 
+#include "ast.h"
 #include "hashtable.h"
 #include "symtable_private.h"
 #include <assert.h>
@@ -13,15 +14,25 @@
 symbol_t stable_init_symbol() { return calloc(1, sizeof(struct symbol)); }
 
 void stable_destroy_symbol(symbol_t sym) {
-	if (sym)
+	if (sym) {
+		if (sym->symbol_variant == SYMBOL_VARIABLE) {
+			free(sym->variable.unique_name);
+		} else if (sym->symbol_variant == SYMBOL_FUNCTION) {
+			if (sym->function.is_builtin) {
+				// Only builtin functions own this, the rest is owned by ast tree
+				ast_dtor(sym->function.parameter_lists.head);
+			}
+			// extension_parameter_name is owned by ast tree
+		}
 		free(sym);
+	}
 }
 
 stable_t stable_init() {
 	// Alloc
 	stable_t stab = malloc(sizeof(struct stable));
 	struct stable_layer *slayer = malloc(sizeof(struct stable_layer));
-	htable_t htab = htable_init(stable_destroy_symbol);
+	htable_t htab = htable_init((void (*)(void *))stable_destroy_symbol);
 	if (stab && slayer && htab) {
 		// Success
 		stab->top = slayer;
@@ -73,6 +84,14 @@ bool stable_write(stable_t stab, const char *key, symbol_t entry) {
 		if (htable_write(stab->top->table, key, entry)) {
 			return true;
 		}
+	}
+	return false;
+}
+
+bool stable_remove_symbol_curlevel(stable_t stab, const char *key) {
+	assert(stab && "Called stable_remove_curlevel on nullptr.");
+	if (stab->top) {
+		return htable_remove(stab->top->table, key);
 	}
 	return false;
 }

@@ -7,6 +7,7 @@
 #ifndef SYMTABLE_H
 #define SYMTABLE_H
 
+#include "ast.h"
 #include <stddef.h>
 
 struct stable; // Ignore (for linking)
@@ -16,8 +17,50 @@ struct stable; // Ignore (for linking)
  */
 typedef struct stable *stable_t;
 
+/**
+ * @brief Determines whether symbol is a function or a variable
+ */
+typedef enum {
+	SYMBOL_UNSET,	 /**< Symbol variant is not set */
+	SYMBOL_FUNCTION, /**< Symbol is a function */
+	SYMBOL_VARIABLE, /**< Symbol is a variable */
+} symbol_variant_t;
+
+typedef enum {
+	FUNCTION_UNVISITED,
+	FUNCTION_VISITING,
+	FUNCTION_VISITED,
+} function_state_t;
+
+/**
+ * @brief Structure that represents a symbol in the symbol table
+ */
 struct symbol {
-	// TODO: what else will symbols need to store here
+	symbol_variant_t symbol_variant;
+	union {
+		struct {
+			data_type_t type;  /**< Data type of the variable */
+			bool is_mutable;   /**< Indicates if the variable is mutable (var) or immutable (val) */
+			char *unique_name; /**< Unique name for the variable (for code generation) */
+		} variable;
+		struct {
+			function_state_t state; /**< State of the function visit */
+
+			bool is_main;	 /**< Main function flag */
+			bool is_builtin; /**< Builtin function flag (needs to be have param list dealocated) */
+			bool has_explicit_return_type; /**< Indicates if the function has an explicit return
+											  type */
+
+			data_type_t return_type;	/**< Return type of the function */
+			ast_list_t parameter_lists; /**< List of parameter lists (NODE_PARAM_LIST) for the
+										   function (nullptr if no parameter lists) */
+
+			data_type_t
+				extension_parameter_type;	/**< Type of the variable used in extension function */
+			char *extension_parameter_name; /**< Name of the variable used in extension function
+										   (nullptr if not extension) */
+		} function;
+	};
 };
 
 typedef struct symbol *symbol_t;
@@ -69,6 +112,16 @@ void stable_leave_scope(stable_t stab);
  * @return false Failed
  */
 bool stable_write(stable_t stab, const char *key, symbol_t entry);
+
+/**
+ * @brief Removes symbol under specified key in the currect scope
+ *
+ * @param stab Symbol table to remove it from
+ * @param key Key of the symbol that should be removed
+ * @return true Removed
+ * @return false Not found
+ */
+bool stable_remove_symbol_curlevel(stable_t stab, const char *key);
 
 /**
  * @brief Gets you the first symbol entry under specified key from the scope stack
