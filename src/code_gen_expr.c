@@ -8,6 +8,7 @@
 #include "ast.h"
 #include "code_gen_private.h"
 #include "instruction_set.h"
+#include <stdlib.h>
 #include <token.h>
 
 static const operand_t operand_dis = {
@@ -19,6 +20,13 @@ static const operand_t operand_tmp_2 = {
 	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_2"}};
 static const operand_t operand_tmp_3 = {
 	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_3"}};
+
+/** @brief Boolean constant true */
+static const operand_t bool_true_operand = {
+	.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = true}};
+/** @brief Boolean constant true */
+static const operand_t bool_false_operand = {
+	.operand_type = OP_TYPE_BOOL, .frame = FT_NO_FRAME, .value = {.bool_val = false}};
 
 static void generate_int_push(ast_node_t current_node);
 
@@ -128,10 +136,68 @@ static void generate_var_push(ast_node_t current_node) {
 }
 
 static bool generate_logical_op(ast_node_t current_node) {
-	if (current_node->as.binary_op.operator_type == OPERATOR_AND) {
+	bool success = true;
 
-	} else {
+	char *false_label = get_unique_label("$", "andstmt", "$false");
+	char *end_label_and = get_unique_label("$", "andstmt", "$end");
+	char *end_label_or = get_unique_label("$", "orstmt", "$end");
+	char *true_label = get_unique_label("$", "orstmt", "$true");
+
+	operand_t operand_false_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = false_label}};
+	operand_t operand_end_label_and = {.operand_type = OP_TYPE_LABEL,
+									   .frame = FT_NO_FRAME,
+									   .value = {.label_name = end_label_and}};
+	operand_t operand_end_label_or = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = end_label_or}};
+	operand_t operand_true_label = {
+		.operand_type = OP_TYPE_LABEL, .frame = FT_NO_FRAME, .value = {.label_name = true_label}};
+
+	if (!false_label || !end_label_and || !end_label_or || !true_label) {
+		success = false;
+		goto cleanup;
 	}
+	if (current_node->as.binary_op.operator_type == OPERATOR_AND) {
+		if (!generate_expression(current_node->as.binary_op.left)) {
+			success = false;
+			goto cleanup;
+		}
+		print_inst_1(INST_PUSHS, bool_false_operand);
+		print_inst_1(INST_JUMPIFEQS, operand_false_label);
+
+		if (!generate_expression(current_node->as.binary_op.right)) {
+			success = false;
+			goto cleanup;
+		}
+		print_inst_1(INST_JUMP, operand_end_label_and);
+		print_inst_1(INST_LABEL, operand_false_label);
+		print_inst_1(INST_PUSHS, bool_false_operand);
+		print_inst_1(INST_LABEL, operand_end_label_and);
+	} else {
+		if (!generate_expression(current_node->as.binary_op.left)) {
+			success = false;
+			goto cleanup;
+		}
+		print_inst_1(INST_PUSHS, bool_true_operand);
+		print_inst_1(INST_JUMPIFEQS, operand_true_label);
+
+		if (!generate_expression(current_node->as.binary_op.right)) {
+			success = false;
+			goto cleanup;
+		}
+		print_inst_1(INST_JUMP, operand_end_label_or);
+		print_inst_1(INST_LABEL, operand_true_label);
+		print_inst_1(INST_PUSHS, bool_true_operand);
+		print_inst_1(INST_LABEL, operand_end_label_or);
+	}
+
+cleanup:
+	free(false_label);
+	free(end_label_and);
+	free(end_label_or);
+	free(true_label);
+
+	return success;
 }
 
 static bool generate_relation_op(op_type_t operator_type) {
