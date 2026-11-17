@@ -128,9 +128,10 @@ static void generate_var_push(ast_node_t current_node) {
 }
 
 static bool generate_logical_op(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
-	return false;
+	if (current_node->as.binary_op.operator_type == OPERATOR_AND) {
+
+	} else {
+	}
 }
 
 static bool generate_binary_op(ast_node_t current_node) {
@@ -150,11 +151,26 @@ static bool generate_binary_op(ast_node_t current_node) {
 	switch (current_node->as.binary_op.operator_type) {
 	// relation
 	case OPERATOR_LESS_EQUAL:
+		print_inst_0(INST_GTS);
+		print_inst_0(INST_NOTS);
+		break;
 	case OPERATOR_GREATER_EQUAL:
+		print_inst_0(INST_LTS);
+		print_inst_0(INST_NOTS);
+		break;
 	case OPERATOR_EQUAL:
+		print_inst_0(INST_EQS);
+		break;
 	case OPERATOR_NOT_EQUAL:
+		print_inst_0(INST_EQS);
+		print_inst_0(INST_NOTS);
+		break;
 	case OPERATOR_GREATER:
+		print_inst_0(INST_GTS);
+		break;
 	case OPERATOR_LESS:
+		print_inst_0(INST_LTS);
+		break;
 
 	// arithmetic
 	case OPERATOR_PLUS:
