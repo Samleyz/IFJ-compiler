@@ -20,6 +20,12 @@ static const operand_t operand_tmp_2 = {
 	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_2"}};
 static const operand_t operand_tmp_3 = {
 	.operand_type = OP_TYPE_VAR, .frame = FT_GLOBAL, .value = {.var_name = "%tmp_3"}};
+/** @brief Integer constant -1 */
+static const operand_t int_neg1_operand = {
+	.operand_type = OP_TYPE_INT, .frame = FT_NO_FRAME, .value = {.int_val = -1}};
+/** @brief Double constant -1 */
+static const operand_t double_neg1_operand = {
+	.operand_type = OP_TYPE_FLOAT, .frame = FT_NO_FRAME, .value = {.double_val = -1}};
 
 /** @brief Boolean constant true */
 static const operand_t bool_true_operand = {
@@ -303,9 +309,29 @@ static bool generate_binary_op(ast_node_t current_node) {
 }
 
 static bool generate_unary_op(ast_node_t current_node) {
-	// TODO
-	(void)current_node;
-	return false;
+	if (!generate_expression(current_node->as.unary_op.operand)) {
+		return false;
+	}
+
+	switch (current_node->as.unary_op.operator_type) {
+	case OPERATOR_MINUS:
+		if (current_node->as.unary_op.operand->eval_type == TYPE_INT) {
+			print_inst_1(INST_PUSHS, int_neg1_operand);
+			print_inst_0(INST_MULS);
+		} else {
+			print_inst_1(INST_PUSHS, double_neg1_operand);
+			print_inst_0(INST_MULS);
+		}
+		break;
+	case OPERATOR_PLUS:
+		break;
+	case OPERATOR_EX_MARK:
+		print_inst_0(INST_NOTS);
+		break;
+	default:
+		return false;
+	}
+	return true;
 }
 
 static bool generate_function_call(ast_node_t current_node) {
