@@ -6,6 +6,8 @@
  */
 
 #include "ast.h"
+#include "code_gen.h"
+#include "code_gen_private.h"
 #include "error.h"
 #include "lexer.h"
 #include "parser.h"
@@ -31,10 +33,13 @@ int main(void) {
 		error_exit();
 	}
 
-	(void *)ast_root;
-
 	// TODO semantic analysis
-	// TODO code generation
+
+	code_gen_setup(stdout);
+	if (!generate_program(ast_root)) {
+		print_error(ERR_INTERNAL, 0, "Code generation failed!");
+		error_exit();
+	}
 
 	compiler_cleanup();
 
