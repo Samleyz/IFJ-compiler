@@ -470,4 +470,14 @@ bool sem_second_node_lit_bool(ast_node_t node, semantic_context_t *context);
  */
 bool sem_second_node_lit_unit(ast_node_t node, semantic_context_t *context);
 
+/**
+ * @brief Loads the parameters for a function body pass into local symtable
+ *
+ * @param node Function node
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Failed to load parameters
+ */
+bool sem_second_load_params(ast_node_t node, semantic_context_t *context);
+
 #endif
