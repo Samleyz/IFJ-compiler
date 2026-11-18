@@ -7,10 +7,10 @@
 
 #include "ast.h"
 #include "code_gen.h"
-#include "code_gen_private.h"
 #include "error.h"
 #include "lexer.h"
 #include "parser.h"
+#include "semantic_analysis.h"
 
 void compiler_cleanup(void) {
 	lexer_cleanup();
@@ -33,7 +33,9 @@ int main(void) {
 		error_exit();
 	}
 
-	// TODO semantic analysis
+	if (!perform_semantic_analysis(ast_root)) {
+		error_exit();
+	}
 
 	code_gen_setup(stdout);
 	if (!generate_program(ast_root)) {
