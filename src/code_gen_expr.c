@@ -16,12 +16,13 @@
  * @brief Names of the types that can be a receiver of an extension method, indexed by data_type_t
  *
  * The names are used in the labels of extension methods ($$Type$name). Types other than Int,
- * Double and String have no entry, so the index has to be checked first.
+ * Double, String and Bool have no entry, so the index has to be checked first.
  */
 static const char *const type_names[] = {
 	[TYPE_INT] = "Int",
 	[TYPE_DOUBLE] = "Double",
 	[TYPE_STRING] = "String",
+	[TYPE_BOOL] = "Bool",
 };
 
 /**
@@ -517,7 +518,7 @@ static bool generate_method_call(ast_node_t current_node) {
 
 	unsigned type_idx = current_node->as.func_call.callee->as.member_access.target->eval_type;
 
-	if (type_idx < TYPE_INT || type_idx > TYPE_STRING) {
+	if (type_idx < TYPE_INT || type_idx > TYPE_BOOL) {
 		return false;
 	}
 
@@ -619,7 +620,7 @@ static bool generate_member_access(ast_node_t current_node) {
 	} else {
 		unsigned type_idx = current_node->as.member_access.target->eval_type;
 
-		if (type_idx < TYPE_INT || type_idx > TYPE_STRING) {
+		if (type_idx < TYPE_INT || type_idx > TYPE_BOOL) {
 			success = false;
 			goto cleanup;
 		}
