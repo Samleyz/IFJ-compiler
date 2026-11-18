@@ -11,7 +11,9 @@ permissions:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    # pinned: ubuntu-latest moved to 26.04 with clang-tidy 21, whose analyzer reports false
+    # positives (va_start in C23); 24.04 keeps clang-format and clang-tidy 18
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install clang tools
