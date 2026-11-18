@@ -59,6 +59,7 @@ struct symbol {
 				extension_parameter_type;	/**< Type of the variable used in extension function */
 			char *extension_parameter_name; /**< Name of the variable used in extension function
 										   (nullptr if not extension) */
+			ast_node_t function_definition; /**< pointer to function definition node in ast */
 		} function;
 	};
 };

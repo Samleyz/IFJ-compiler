@@ -84,6 +84,10 @@ void semantic_context_dtor(semantic_context_t *context) {
 		stable_dtor(context->symtable_extension_functions);
 	}
 
+	if (context->call_chain.top != nullptr) {
+		call_chain_destroy(context);
+	}
+
 	// Zero out the structure
 	*context = (semantic_context_t){0};
 }
@@ -829,7 +833,7 @@ bool sem_second_node_program(ast_node_t node, semantic_context_t *context) {
 
 bool sem_second_node_block(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_block on nullptr.");
-	// TODO
+	// TODO set block eval type
 	return true;
 }
 
@@ -841,8 +845,95 @@ bool sem_second_node_extension(ast_node_t node, semantic_context_t *context) {
 
 bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_func_def on nullptr.");
-	// TODO
-	return true;
+	bool success = true;
+	bool pushed = false; // if malloc fails
+
+	ast_node_t temp_node;
+	// store previous local table
+	stable_t prev_local_table = context->symtable_local;
+
+	// store previous function name
+	char *prev_function_name = context->current_function_name;
+	context->current_function_name = node->as.func_def.name;
+
+	symbol_t current_function =
+		stable_find_curlevel(context->symtable_functions, context->current_function_name);
+	assert(current_function != nullptr);
+
+	if (current_function->function.state == FUNCTION_VISITED) {
+		context->current_function_name = prev_function_name;
+		return true;
+	}
+
+	current_function->function.state = FUNCTION_VISITING;
+
+	if (!call_chain_add(context, node)) {
+		print_error(ERR_INTERNAL, node->line_num, "Call chain node allocation failed!");
+		success = false;
+		goto cleanup;
+	}
+
+	pushed = true;
+
+	context->symtable_local = stable_init();
+
+	if (!context->symtable_local) {
+		print_error(ERR_INTERNAL, node->line_num, "Symtable init failed!");
+		success = false;
+		goto cleanup;
+	}
+
+	// load params to local symtable - set is_mutable = false
+	if (!sem_second_load_params(node, context)) {
+		success = false;
+		goto cleanup;
+	}
+
+	if (node->as.func_def.body->type == NODE_BLOCK) {
+		if (!sem_second_node_block(node->as.func_def.body, context)) {
+			success = false;
+			goto cleanup;
+		}
+
+		// TODO: function to paste returns (based on eval_type set in sem_second_node_block)
+	} else {
+		if (!sem_second_expr(node->as.func_def.body, context)) {
+			success = false;
+			goto cleanup;
+		}
+
+		temp_node = ast_create_node(NODE_RETURN, node->as.func_def.body->line_num);
+		if (!temp_node) {
+			print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed");
+			success = false;
+			goto cleanup;
+		}
+
+		temp_node->as.return_stmt.expr = node->as.func_def.body;
+		node->as.func_def.body = temp_node;
+		node->as.func_def.body->eval_type = node->as.func_def.body->as.return_stmt.expr->eval_type;
+	}
+
+	// TODO: decide if the return type is explicit - recursion
+
+	// TODO: decide return type - false throw err
+
+	// TODO: write return type to symbol
+
+cleanup:
+	context->current_function_name = prev_function_name;
+	stable_dtor(context->symtable_local);
+	context->symtable_local = prev_local_table;
+
+	if (success) {
+		current_function->function.state = FUNCTION_VISITED;
+	}
+
+	if (pushed) {
+		call_chain_pop(context);
+	}
+
+	return success;
 }
 
 bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context) {
@@ -1798,11 +1889,18 @@ bool call_chain_check_cycle(semantic_context_t *context, ast_node_t cycle_start)
 	call_chain_item_t current_item = context->call_chain.top;
 
 	while (current_item) {
+		if (current_item->function_node->as.func_def.return_type == NULL) {
+			print_error(ERR_SEM_TYPE_COMPAT, cycle_start->line_num,
+						"Recursion without explicit function type!");
+			return false;
+		}
 		if (current_item->function_node == cycle_start) {
 			return true;
 		}
 		current_item = current_item->previous_item;
 	}
 
+	print_error(ERR_INTERNAL, cycle_start->line_num,
+				"Function is being analyzed but is missing from the call chain!");
 	return false;
 }
