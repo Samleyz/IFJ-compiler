@@ -1751,3 +1751,58 @@ bool sem_second_load_params(ast_node_t node, semantic_context_t *context) {
 	// TODO
 	return true;
 }
+
+bool call_chain_add(semantic_context_t *context, ast_node_t function_node) {
+	call_chain_item_t new_item = malloc(sizeof(struct call_chain_item));
+
+	if (!new_item) {
+		return false;
+	}
+
+	new_item->function_node = function_node;
+	new_item->previous_item = context->call_chain.top;
+
+	context->call_chain.top = new_item;
+	context->call_chain.size++;
+
+	return true;
+}
+
+void call_chain_init(semantic_context_t *context) {
+	context->call_chain.size = 0;
+	context->call_chain.top = nullptr;
+}
+
+void call_chain_destroy(semantic_context_t *context) {
+	call_chain_item_t current_item = context->call_chain.top;
+
+	while (current_item) {
+		call_chain_item_t temp_item = current_item;
+		current_item = current_item->previous_item;
+		free(temp_item);
+		context->call_chain.size--;
+	}
+
+	context->call_chain.top = nullptr;
+}
+
+void call_chain_pop(semantic_context_t *context) {
+	assert(context->call_chain.top != nullptr);
+	call_chain_item_t temp_item = context->call_chain.top;
+	context->call_chain.top = context->call_chain.top->previous_item;
+	free(temp_item);
+	context->call_chain.size--;
+}
+
+bool call_chain_check_cycle(semantic_context_t *context, ast_node_t cycle_start) {
+	call_chain_item_t current_item = context->call_chain.top;
+
+	while (current_item) {
+		if (current_item->function_node == cycle_start) {
+			return true;
+		}
+		current_item = current_item->previous_item;
+	}
+
+	return false;
+}

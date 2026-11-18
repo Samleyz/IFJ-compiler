@@ -11,6 +11,16 @@
 #include "semantic_analysis.h"
 #include "symtable.h"
 
+typedef struct call_chain_item {
+	ast_node_t function_node;
+	struct call_chain_item *previous_item;
+} *call_chain_item_t;
+
+typedef struct {
+	call_chain_item_t top;
+	unsigned size;
+} call_chain_t;
+
 typedef struct {
 	stable_t symtable_local;			   /**< Table of local symbols */
 	stable_t symtable_functions;		   /**< Table of function symbols */
@@ -28,8 +38,19 @@ typedef struct {
 	bool found_branch_without_return; /**< Flag indicating if a branch without return was found */
 	bool is_in_expression_if; /**< Flag indicating if currently analyzing an if as expression */
 
+	call_chain_t call_chain;
 	// TODO: Add more fields if needed for semantic context
 } semantic_context_t;
+
+void call_chain_init(semantic_context_t *context);
+
+bool call_chain_add(semantic_context_t *context, ast_node_t function_node);
+
+void call_chain_destroy(semantic_context_t *context);
+
+void call_chain_pop(semantic_context_t *context);
+
+bool call_chain_check_cycle(semantic_context_t *context, ast_node_t cycle_start);
 
 /**
  * @brief Initializes a semantic context structure
