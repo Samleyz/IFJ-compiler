@@ -844,13 +844,151 @@ bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 
 bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_var_def on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_VAR_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_var_def on non variable definition node.");
+		return false;
+	}
+	if (!node->as.var_def.name) {
+		print_error(ERR_INTERNAL, node->line_num, "Variable definition has no name.");
+		return false;
+	}
+	if (!node->as.var_def.init_expr) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Variable definition has no initialization expression.");
+		return false;
+	}
+
+	// Check if variable is already defined in the current scope
+	if (stable_find_curlevel(context->symtable_local, node->as.var_def.name)) {
+		print_error(ERR_SEM_REDEFINITION, node->line_num,
+					"Variable '%s' is already defined in the current scope.",
+					node->as.var_def.name);
+		return false;
+	}
+
+	// Pass expression
+	if (!sem_second_expr(node->as.var_def.init_expr, context)) {
+		throw_warning(node->line_num,
+					  "Failed to process variable definition value for variable '%s'.",
+					  node->as.var_def.name);
+		return false;
+	}
+
+	// Create symbol
+	symbol_t sym = stable_init_symbol();
+	if (!sym) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to create symbol for variable '%s'.",
+					node->as.var_def.name);
+		return false;
+	}
+
+	// Create unique name
+	if (stable_find_alllevel(context->symtable_local, node->as.var_def.name)) {
+		sym->variable.unique_name =
+			malloc(strlen(node->as.var_def.name) + 20); // Enough for size_t digits
+		if (!sym->variable.unique_name) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for extension function key.");
+			stable_destroy_symbol(sym);
+			return false;
+		}
+		sprintf(sym->variable.unique_name, "%s$%s", node->as.var_def.name,
+				context->rename_counter++);
+	} else {
+		sym->variable.unique_name = strdup(node->as.var_def.name);
+		if (!sym->variable.unique_name) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for extension function key.");
+			stable_destroy_symbol(sym);
+			return false;
+		}
+	}
+
+	// Fill out symbol
+	sym->symbol_variant = SYMBOL_VARIABLE;
+	sym->variable.is_mutable = node->as.var_def.is_val;
+	sym->variable.type = get_data_type_from_string(node->as.var_def.type_name);
+	if (sym->variable.type == TYPE_UNKNOWN) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num, "Variable '%s' has unknown type '%s'.",
+					node->as.var_def.name, node->as.var_def.type_name);
+		stable_destroy_symbol(sym);
+		return false;
+	}
+
+	// Write symbol to the symbol table
+	if (!stable_write(context->symtable_local, node->as.var_def.name, sym)) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to write symbol for variable '%s' to the symbol table.",
+					node->as.var_def.name);
+		stable_destroy_symbol(sym);
+		return false;
+	}
 	return true;
 }
 
 bool sem_second_node_assign(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_assign on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_ASSIGN) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_assign on non assignment node.");
+		return false;
+	}
+	if (!node->as.assign.target_id) {
+		print_error(ERR_INTERNAL, node->line_num, "Assignment has no target.");
+		return false;
+	}
+	if (!node->as.assign.expr) {
+		print_error(ERR_INTERNAL, node->line_num, "Assignment has no value.");
+		return false;
+	}
+
+	// Check if defined
+	symbol_t sym = stable_find_alllevel(context->symtable_local, node->as.assign.target_id);
+	if (!sym) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num,
+					"Variable '%s' is not defined in the current scope.",
+					node->as.assign.target_id);
+		return false;
+	}
+
+	// Check types
+	if (!sem_second_expr(node->as.assign.expr, context)) {
+		throw_warning(node->line_num, "Failed to process assignment value for variable '%s'.",
+					  node->as.assign.target_id);
+		return false;
+	}
+	if (sym->variable.type == node->as.assign.expr->eval_type) {
+		// Types match
+		node->eval_type = sym->variable.type;
+	} else if (sym->variable.type == TYPE_DOUBLE && node->as.assign.expr->eval_type == TYPE_INT) {
+		// Implicit conversion from Int to Double
+		ast_node_t conversion_node = ast_create_node(NODE_TYPE_CAST, node->line_num);
+		if (!conversion_node) {
+			print_error(
+				ERR_INTERNAL, node->line_num,
+				"Failed to create type cast node for implicit conversion from Int to Double.");
+			return false;
+		}
+		conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
+		conversion_node->eval_type = TYPE_DOUBLE;
+		conversion_node->as.type_cast.operand = node->as.assign.expr;
+		node->as.assign.expr = conversion_node;
+
+		// Set eval type
+		node->eval_type = TYPE_DOUBLE;
+	} else {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+					"Type mismatch in assignment to variable '%s': expected '%s', got '%s'.",
+					node->as.assign.target_id, data_type_string_forms[sym->variable.type],
+					data_type_string_forms[node->as.assign.expr->eval_type]);
+		return false;
+	}
+
 	return true;
 }
 
@@ -927,7 +1065,7 @@ bool sem_second_node_type_cast(ast_node_t node, semantic_context_t *context) {
 }
 
 bool sem_second_node_param_list(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_param_list on nullptr.");
+	assert(context && "Called sem_second_node_param_list on nullptr.");
 	// TODO
 	return true;
 }
@@ -940,13 +1078,7 @@ bool sem_second_node_param(ast_node_t node, semantic_context_t *context) {
 
 bool sem_second_node_identifier(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_identifier on nullptr.");
-
-	// Node checks
-	if (node->type != NODE_IDENTIFIER) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_identifier on non identifier node.");
-		return false;
-	}
+	// TODO
 	return true;
 }
 

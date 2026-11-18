@@ -393,7 +393,7 @@ bool sem_second_node_type_cast(ast_node_t node, semantic_context_t *context);
 /**
  * @brief Performs the second pass of semantic analysis on a NODE_PARAM_LIST
  *
- * @param node Parameter list node to analyze
+ * @param node Node with a parameter list to analyze
  * @param context Semantic analysis context
  * @return true Success
  * @return false Semantic error
