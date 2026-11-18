@@ -7,33 +7,39 @@ LD := ld
 CFLAGS := -std=c23 -Wall -Wextra -Wjump-misses-init
 #disable jump over declaration in lexer switch
 lexer.o: CFLAGS += -Wno-jump-misses-init
+semantic_analysis.o: CFLAGS += -Wno-jump-misses-init
 TARGETS := \
 	compiler \
+	semantic_analysis.o \
 	main.o compiler.o \
-	ast.o stack.o dynamic_string.o hashtable.o error.o \
+	symtable.o ast.o stack.o dynamic_string.o hashtable.o error.o \
 	lexer.o lexer_helpers.o token.o lexer_final.o \
 	parser.o parser_grammar.o parser_helpers.o parse_expr.o parse_expr_helpers.o parser_final.o \
 	code_gen.o code_gen_expr.o code_gen_stmt.o code_gen_builtins.o instruction_set.o code_gen_final.o
 HEADERS := \
-        src/ast.h \
-        src/code_gen.h \
-        src/code_gen_private.h \
-        src/dynamic_string.h \
-        src/dynamic_string_private.h \
-        src/error.h \
-        src/hashtable.h \
-        src/hashtable_private.h \
-        src/instruction_set.h \
-        src/lexer.h \
-        src/lexer_private.h \
-        src/parse_expr.h \
-        src/parse_expr_private.h \
-        src/parser.h \
-        src/parser_grammar.h \
-        src/parser_private.h \
-        src/stack.h \
-        src/stack_private.h \
-        src/token.h
+	src/ast.h \
+	src/code_gen.h \
+	src/code_gen_private.h \
+	src/dynamic_string.h \
+	src/dynamic_string_private.h \
+	src/error.h \
+	src/hashtable.h \
+	src/hashtable_private.h \
+	src/instruction_set.h \
+	src/lexer.h \
+	src/lexer_private.h \
+	src/parse_expr.h \
+	src/parse_expr_private.h \
+	src/parser.h \
+	src/parser_grammar.h \
+	src/parser_private.h \
+	src/stack.h \
+	src/stack_private.h \
+	src/token.h \
+	src/semantic_analysis.h \
+	src/semantic_analysis_private.h \
+	src/symtable.h \
+	src/symtable_private.h
 
 TEST_EXECUTABLES := \
 	$(BUILD_DIR)/dynamic_string_tests \
@@ -49,7 +55,7 @@ TEST_EXECUTABLES := \
 
 build: compiler
 
-compiler: ast.o code_gen_final.o dynamic_string.o hashtable.o error.o lexer_final.o stack.o parser_final.o compiler.o
+compiler: ast.o code_gen_final.o dynamic_string.o hashtable.o error.o lexer_final.o stack.o parser_final.o compiler.o semantic_analysis.o symtable.o
 
 #main
 compiler.o: main.o
@@ -62,7 +68,8 @@ lexer_final.o: lexer.o lexer_helpers.o token.o
 parser_final.o: parser.o parser_grammar.o parser_helpers.o parse_expr.o parse_expr_helpers.o
 	$(LD) -r $^ -o $@
 
-#TODO semantic
+semantic_analysis.o : src/semantic_analysis.c src/semantic_analysis.h src/semantic_analysis_private.h src/symtable.h
+	$(CC) -c $< -o $@ $(CFLAGS)
 
 code_gen_final.o: code_gen.o code_gen_expr.o code_gen_stmt.o code_gen_builtins.o instruction_set.o
 	$(LD) -r $^ -o $@
