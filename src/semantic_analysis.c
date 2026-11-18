@@ -940,36 +940,116 @@ bool sem_second_node_param(ast_node_t node, semantic_context_t *context) {
 
 bool sem_second_node_identifier(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_identifier on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_IDENTIFIER) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_identifier on non identifier node.");
+		return false;
+	}
 	return true;
 }
 
 bool sem_second_node_lit_int(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_lit_int on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_LIT_INT) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_lit_int on non integer literal node.");
+		return false;
+	}
+	if (node->next) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Integer literal node should not have a next node.");
+		return false;
+	}
+
+	// Set eval type
+	node->eval_type = TYPE_INT;
+
 	return true;
 }
 
 bool sem_second_node_lit_double(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_lit_double on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_LIT_DOUBLE) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_lit_double on non double literal node.");
+		return false;
+	}
+	if (node->next) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Double literal node should not have a next node.");
+		return false;
+	}
+
+	// Set eval type
+	node->eval_type = TYPE_DOUBLE;
+
 	return true;
 }
 
 bool sem_second_node_lit_string(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_lit_string on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_LIT_STRING) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_lit_string on non string literal node.");
+		return false;
+	}
+	if (node->next) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"String literal node should not have a next node.");
+		return false;
+	}
+
+	// Set eval type
+	node->eval_type = TYPE_STRING;
+
 	return true;
 }
 
 bool sem_second_node_lit_bool(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_lit_bool on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_LIT_BOOL) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_lit_bool on non boolean literal node.");
+		return false;
+	}
+	if (node->next) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Boolean literal node should not have a next node.");
+		return false;
+	}
+
+	// Set eval type
+	node->eval_type = TYPE_BOOL;
+
 	return true;
 }
 
 bool sem_second_node_lit_unit(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_lit_unit on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_LIT_UNIT) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_lit_unit on non unit literal node.");
+		return false;
+	}
+	if (node->next) {
+		print_error(ERR_INTERNAL, node->line_num, "Unit literal node should not have a next node.");
+		return false;
+	}
+
+	// Set eval type
+	node->eval_type = TYPE_UNIT;
+
 	return true;
 }
