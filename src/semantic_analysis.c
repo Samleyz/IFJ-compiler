@@ -1484,9 +1484,65 @@ bool sem_second_node_for(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Return statement implemented with AI assistance according to the design of the author (the
+// function is the top of the call chain, the type is checked against the explicit return type).
+// Prompt: Write sem_second_node_return. Return needs an explicit return type, the empty return is
+// allowed only for Unit, Int is converted to Double, other mismatch is the error 6.
 bool sem_second_node_return(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_return on nullptr.");
-	// TODO
+	ast_node_t function_node;
+	ast_node_t conversion_node;
+	data_type_t expected;
+
+	function_node = context->call_chain.top->function_node;
+
+	if (!function_node->as.func_def.return_type) {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+					"Function with return needs an explicit return type.");
+		return false;
+	}
+	expected = get_data_type_from_string(function_node->as.func_def.return_type);
+
+	// Empty return
+	if (!node->as.return_stmt.expr) {
+		if (expected != TYPE_UNIT) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Return without a value in a function that does not return Unit.");
+			return false;
+		}
+		node->eval_type = TYPE_UNIT;
+		return true;
+	}
+
+	if (!sem_second_expr(node->as.return_stmt.expr, context)) {
+		return false;
+	}
+	node->eval_type = node->as.return_stmt.expr->eval_type;
+
+	// Unit discards the value, same types are fine
+	if (expected == TYPE_UNIT || node->eval_type == expected) {
+		return true;
+	}
+
+	if (node->eval_type != TYPE_INT || expected != TYPE_DOUBLE) {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+					"Returned value does not match the declared return type.");
+		return false;
+	}
+
+	// Implicit conversion from Int to Double
+	conversion_node = ast_create_node(NODE_TYPE_CAST, node->line_num);
+	if (!conversion_node) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to create type cast node for the returned value.");
+		return false;
+	}
+	conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
+	conversion_node->as.type_cast.operand = node->as.return_stmt.expr;
+	conversion_node->eval_type = TYPE_DOUBLE;
+	node->as.return_stmt.expr = conversion_node;
+	node->eval_type = TYPE_DOUBLE;
 	return true;
 }
 
