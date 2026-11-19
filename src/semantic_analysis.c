@@ -487,7 +487,7 @@ bool sem_first_node_func_def(ast_node_t node, semantic_context_t *context) {
 		}
 
 		// Main parameters
-		if (node->as.func_def.param_lists.count != 1 || // One parameter list
+		if (node->as.func_def.param_lists.count > 1 || // More parameter list
 			node->as.func_def.param_lists.head->as.param_list.params.count != 0) { // It is empty
 			print_error(ERR_SEM_PARAMS, node->line_num,
 						"Main function must have empty parameter list.");
