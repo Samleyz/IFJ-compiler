@@ -961,6 +961,41 @@ bool sem_second_append_empty_return(ast_node_t block_node) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Helper of the implicit returns implemented with AI assistance according to the design of the
+// author (the third rule of the return type in the specification).
+// Prompt: Write a function that checks the value type of a branch of the if at the end of a
+// function. A missing branch has the Unit value, without the explicit type all branches are Unit.
+bool sem_second_check_branch_type(ast_node_t branch, unsigned line_num, data_type_t expected) {
+	data_type_t branch_type = TYPE_UNIT;
+
+	if (branch) {
+		branch_type = branch->eval_type;
+
+		if (branch->type == NODE_BLOCK && branch->as.block.statements.tail &&
+			branch->as.block.statements.tail->type == NODE_IF) {
+			return true;
+		}
+	}
+
+	// The explicit Unit discards the values
+	if (expected == TYPE_UNIT) {
+		return true;
+	}
+
+	// Without the explicit type all the branches have to be Unit
+	if (expected == TYPE_UNKNOWN) {
+		expected = TYPE_UNIT;
+	}
+	if (branch_type == expected || (expected == TYPE_DOUBLE && branch_type == TYPE_INT)) {
+		return true;
+	}
+
+	print_error(ERR_SEM_TYPE_COMPAT, line_num,
+				"The value of a branch does not match the return type of the function.");
+	return false;
+}
+
 // Inserts the implicit return into one branch of an if (block or one-line statement)
 bool sem_second_insert_return_into_branch(ast_node_t branch, semantic_context_t *context,
 										  data_type_t expected) {
@@ -1038,7 +1073,9 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 		current_if = last_stmt_node;
 		// Walk the if / else if chain
 		while (current_if) {
-			if (!sem_second_insert_return_into_branch(current_if->as.if_stmt.then_branch, context,
+			if (!sem_second_check_branch_type(current_if->as.if_stmt.then_branch,
+											  current_if->line_num, expected) ||
+				!sem_second_insert_return_into_branch(current_if->as.if_stmt.then_branch, context,
 													  expected)) {
 				return false;
 			}
@@ -1047,8 +1084,9 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 			if (branch != nullptr && branch->type == NODE_IF) {
 				current_if = branch;
 			} else {
-				if (branch != nullptr &&
-					!sem_second_insert_return_into_branch(branch, context, expected)) {
+				if (!sem_second_check_branch_type(branch, current_if->line_num, expected) ||
+					(branch != nullptr &&
+					 !sem_second_insert_return_into_branch(branch, context, expected))) {
 					return false;
 				}
 				current_if = nullptr;

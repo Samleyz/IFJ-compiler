@@ -268,6 +268,8 @@ bool sem_second_node_extension(ast_node_t node, semantic_context_t *context);
 
 bool sem_second_append_empty_return(ast_node_t block_node);
 
+bool sem_second_check_branch_type(ast_node_t branch, unsigned line_num, data_type_t expected);
+
 bool sem_second_insert_return_into_branch(ast_node_t branch, semantic_context_t *context,
 										  data_type_t expected);
 
