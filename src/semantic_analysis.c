@@ -1068,40 +1068,39 @@ bool sem_second_func_analyze_body(ast_node_t node, semantic_context_t *context,
 	assert(node && context && current_function &&
 		   "Called sem_second_func_analyze_body on nullptr.");
 	data_type_t expected_type;
-	ast_node_t temp_node;
+	ast_node_t block_node;
+	ast_node_t statement_node;
 
-	if (node->as.func_def.body->type == NODE_BLOCK) {
-		// checks the whole block and sets block eval type
-		if (!sem_second_node_block_body(node->as.func_def.body, context)) {
-			return false;
-		}
-
-		// TYPE_UNKNOWN means that the return type is not explicit
-		expected_type = TYPE_UNKNOWN;
-		if (current_function->function.has_explicit_return_type) {
-			expected_type = current_function->function.return_type;
-		}
-
-		if (!sem_second_insert_implicit_return(node->as.func_def.body, context, expected_type)) {
-			return false;
-		}
-	} else {
-		if (!sem_second_expr(node->as.func_def.body, context)) {
-			return false;
-		}
-
-		temp_node = ast_create_node(NODE_RETURN, node->as.func_def.body->line_num);
-		if (!temp_node) {
+	// Tool: Claude Code (Claude Sonnet 5.5)
+	// The one-line body is a block with one statement, changed with AI assistance.
+	// Prompt: Wrap the one-line body of a function into a block with an expression statement.
+	if (node->as.func_def.body->type != NODE_BLOCK) {
+		block_node = ast_create_node(NODE_BLOCK, node->as.func_def.body->line_num);
+		statement_node = ast_create_node(NODE_EXPR_STMT, node->as.func_def.body->line_num);
+		if (!block_node || !statement_node ||
+			!ast_list_append(&block_node->as.block.statements, statement_node)) {
 			print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed");
+			ast_dtor(block_node);
+			ast_dtor(statement_node);
 			return false;
 		}
 
-		temp_node->as.return_stmt.expr = node->as.func_def.body;
-		node->as.func_def.body = temp_node;
-		node->as.func_def.body->eval_type = node->as.func_def.body->as.return_stmt.expr->eval_type;
+		statement_node->as.expr_stmt.expr = node->as.func_def.body;
+		node->as.func_def.body = block_node;
 	}
 
-	return true;
+	// checks the whole block and sets block eval type
+	if (!sem_second_node_block_body(node->as.func_def.body, context)) {
+		return false;
+	}
+
+	// TYPE_UNKNOWN means that the return type is not explicit
+	expected_type = TYPE_UNKNOWN;
+	if (current_function->function.has_explicit_return_type) {
+		expected_type = current_function->function.return_type;
+	}
+
+	return sem_second_insert_implicit_return(node->as.func_def.body, context, expected_type);
 }
 
 // Checks the body type against the declared return type or infers the return type
@@ -1737,7 +1736,7 @@ bool sem_second_node_return(ast_node_t node, semantic_context_t *context) {
 	// Empty return
 	if (!node->as.return_stmt.expr) {
 		if (expected != TYPE_UNIT) {
-			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+			print_error(ERR_SEM_OTHER, node->line_num,
 						"Return without a value in a function that does not return Unit.");
 			return false;
 		}
