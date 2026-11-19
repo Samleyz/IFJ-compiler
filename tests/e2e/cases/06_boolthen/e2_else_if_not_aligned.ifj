@@ -1,0 +1,10 @@
+//! spec: 5.2
+//! compile: 2
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+@main def main(): Unit =
+  if 1 > 2 then
+    print(1)
+    else if 2 > 1 then
+      print(2)

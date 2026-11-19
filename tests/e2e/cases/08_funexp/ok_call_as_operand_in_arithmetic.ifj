@@ -1,0 +1,11 @@
+//! spec: 5.1
+//! compile: 0
+//! run: 0
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+def sq(x: Int): Int = x * x
+@main def main(): Unit =
+  print(2 * sq(3) + sq(1))
+  print(" ")
+  print(sq(2) - sq(1) - 1)

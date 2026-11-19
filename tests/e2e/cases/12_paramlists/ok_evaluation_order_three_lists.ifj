@@ -1,0 +1,14 @@
+//! spec: 5.10
+//! compile: 0
+//! run: 0
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+def p(x: Int): Int =
+  print(x)
+  x
+def f(a: Int, b: Int)(c: Int)(d: Int): Int =
+  print("B")
+  0
+@main def main(): Unit =
+  val r = f(p(1), p(2))(p(3))(p(4))

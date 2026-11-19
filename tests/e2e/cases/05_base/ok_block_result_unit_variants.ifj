@@ -1,0 +1,19 @@
+//! spec: 2.3
+//! compile: 0
+//! run: 0
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+def a() =
+  var x = 1
+  x = 2
+def b() =
+  var i = 0
+  while i < 2 do
+    i = i + 1
+def c() =
+  val y = 1
+@main def main(): Unit =
+  print(a())
+  print(b())
+  print(c())

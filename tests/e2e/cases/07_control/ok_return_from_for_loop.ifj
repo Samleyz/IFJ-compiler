@@ -1,0 +1,16 @@
+//! spec: 2.3
+//! compile: 0
+//! run: 0
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+def firstDivisor(n: Int): Int =
+  for i <- 2 to n do
+    if n / i * i == n then
+      return i
+    else
+      ()
+  return 0
+@main def main(): Unit =
+  print(firstDivisor(15))
+  print(firstDivisor(1))

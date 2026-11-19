@@ -1,0 +1,14 @@
+//! spec: 5.9
+//! compile: 0
+//! run: 0
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+extension (b: Boolean)
+  def flip: Boolean = !b
+@main def main(): Unit =
+  val t = true
+  val f = false
+  print(t.flip)
+  print(" ")
+  print(f.flip)

@@ -1,0 +1,18 @@
+//! spec: 1.1
+//! compile: 0
+//! run: 0
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+@main def _start1(): Unit =
+  val _a = 1
+  val a_1 = 2
+  val A1b = 3
+  val __ = 0
+  print(_a + a_1 + A1b + __)
+  print(" ")
+  val x_ = 7
+  print(x_)
+  print(" ")
+  val Val = 8
+  print(Val)

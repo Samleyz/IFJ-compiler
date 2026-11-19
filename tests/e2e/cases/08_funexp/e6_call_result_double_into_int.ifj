@@ -1,0 +1,9 @@
+//! spec: 5.1
+//! compile: 6
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+def half(x: Double): Double = x / 2
+@main def main(): Unit =
+  val x: Int = half(1.0)
+  print(x)
