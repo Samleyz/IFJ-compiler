@@ -287,6 +287,18 @@ bool sem_second_check_return_type(ast_node_t node, symbol_t current_function);
 bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context);
 
 /**
+ * @brief Analyzes the body of a function or an extension method with its symbol
+ *
+ * @param node Function definition node
+ * @param context Semantic analysis context
+ * @param current_function Symbol of the function
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_analyze_function(ast_node_t node, semantic_context_t *context,
+								 symbol_t current_function);
+
+/**
  * @brief Performs the second pass of semantic analysis on a NODE_VAR_DEF
  *
  * @param node Variable definition node to analyze
@@ -394,6 +406,9 @@ bool sem_second_node_unary_op(ast_node_t node, semantic_context_t *context);
  * @return true Success
  * @return false Semantic error
  */
+symbol_t sem_second_find_extension_symbol(ast_node_t member_access_node,
+										  semantic_context_t *context);
+
 bool sem_second_node_func_call(ast_node_t node, semantic_context_t *context);
 
 /**
@@ -491,9 +506,10 @@ bool sem_second_node_lit_unit(ast_node_t node, semantic_context_t *context);
  *
  * @param node Function node
  * @param context Semantic analysis context
+ * @param function_symbol Symbol of the function (or of the extension method)
  * @return true Success
  * @return false Failed to load parameters
  */
-bool sem_second_load_params(ast_node_t node, semantic_context_t *context);
+bool sem_second_load_params(ast_node_t node, semantic_context_t *context, symbol_t function_symbol);
 
 #endif

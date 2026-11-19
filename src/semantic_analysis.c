@@ -899,9 +899,50 @@ bool sem_second_node_block(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Second pass of the extension implemented with AI assistance according to the design of the
+// author (the symbol of each method is found by the key name$Type and analyzed).
+// Prompt: Write sem_second_node_extension. Set the unique receiver name and analyze every method
+// of the extension with its symbol.
 bool sem_second_node_extension(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_extension on nullptr.");
-	// TODO
+	ast_node_t method = node->as.extension.methods.head;
+	symbol_t method_symbol;
+	char *key;
+
+	// The receiver variable is declared with this name by the code generator
+	node->as.extension.unique_receiver_name = strdup(node->as.extension.receiver_name);
+	if (!node->as.extension.unique_receiver_name) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for the unique receiver name.");
+		return false;
+	}
+
+	while (method) {
+		key =
+			malloc(strlen(method->as.func_def.name) + strlen(node->as.extension.receiver_type) + 2);
+		if (!key) {
+			print_error(ERR_INTERNAL, method->line_num,
+						"Failed to allocate memory for extension function key.");
+			return false;
+		}
+		sprintf(key, "%s$%s", method->as.func_def.name, node->as.extension.receiver_type);
+
+		method_symbol = stable_find_curlevel(context->symtable_extension_functions, key);
+		free(key);
+		if (!method_symbol) {
+			print_error(ERR_INTERNAL, method->line_num,
+						"Extension function is missing in the symbol table.");
+			return false;
+		}
+
+		if (!sem_second_analyze_function(method, context, method_symbol)) {
+			return false;
+		}
+
+		method = method->next;
+	}
+
 	return true;
 }
 
@@ -1133,8 +1174,13 @@ bool sem_second_check_return_type(ast_node_t node, symbol_t current_function) {
 	return true;
 }
 
-bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_func_def on nullptr.");
+// Tool: Claude Code (Claude Sonnet 5.5)
+// The body of sem_second_node_func_def was moved here with AI assistance, the symbol is passed
+// as a parameter so it works for functions and for extension methods.
+// Prompt: Split func_def so the analysis gets the function symbol as a parameter.
+bool sem_second_analyze_function(ast_node_t node, semantic_context_t *context,
+								 symbol_t current_function) {
+	assert(node && context && current_function && "Called sem_second_analyze_function on nullptr.");
 	bool success = true;
 	bool pushed = false; // if malloc fails
 
@@ -1144,10 +1190,6 @@ bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 	// store previous function name
 	char *prev_function_name = context->current_function_name;
 	context->current_function_name = node->as.func_def.name;
-
-	symbol_t current_function =
-		stable_find_curlevel(context->symtable_functions, context->current_function_name);
-	assert(current_function != nullptr);
 
 	if (current_function->function.state == FUNCTION_VISITED) {
 		context->current_function_name = prev_function_name;
@@ -1173,7 +1215,7 @@ bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 	}
 
 	// load params to local symtable - set is_mutable = false
-	if (!sem_second_load_params(node, context)) {
+	if (!sem_second_load_params(node, context, current_function)) {
 		success = false;
 		goto cleanup;
 	}
@@ -1204,6 +1246,16 @@ cleanup:
 	}
 
 	return success;
+}
+
+bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_func_def on nullptr.");
+
+	symbol_t current_function =
+		stable_find_curlevel(context->symtable_functions, node->as.func_def.name);
+	assert(current_function != nullptr);
+
+	return sem_second_analyze_function(node, context, current_function);
 }
 
 bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context) {
@@ -1456,9 +1508,101 @@ bool sem_second_node_unary_op(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Helper that finds the symbol of an extension method for a member access, implemented with AI
+// assistance according to the specification of the author (pattern of the lookup is taken from
+// sem_second_node_arg_list).
+// Prompt: Write sem_second_find_extension_symbol, it analyzes the target of the member access,
+// builds the key name$Type, searches symtable_extension_functions and prints an error when the
+// method is not found.
+symbol_t sem_second_find_extension_symbol(ast_node_t member_access_node,
+										  semantic_context_t *context) {
+	assert(member_access_node && context && "Called sem_second_find_extension_symbol on nullptr.");
+	ast_node_t target = member_access_node->as.member_access.target;
+	char *member_name = member_access_node->as.member_access.member_name;
+	char *key;
+	symbol_t extension_symbol;
+
+	if (!sem_second_expr(target, context)) {
+		return nullptr;
+	}
+
+	if (target->eval_type == TYPE_UNKNOWN) {
+		print_error(ERR_INTERNAL, member_access_node->line_num,
+					"Member access target has no evaluation type.");
+		return nullptr;
+	}
+
+	// Key is name$Type, the same as in the first pass
+	key = malloc(strlen(member_name) + strlen(data_type_string_forms[target->eval_type]) + 2);
+	if (!key) {
+		print_error(ERR_INTERNAL, member_access_node->line_num,
+					"Failed to allocate memory for extension function key.");
+		return nullptr;
+	}
+	sprintf(key, "%s$%s", member_name, data_type_string_forms[target->eval_type]);
+
+	extension_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
+	free(key);
+
+	if (!extension_symbol) {
+		print_error(ERR_SEM_UNDEFINED, member_access_node->line_num,
+					"Extension function '%s' for type '%s' is not defined.", member_name,
+					data_type_string_forms[target->eval_type]);
+	}
+
+	return extension_symbol;
+}
+
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Function call analysis implemented with AI assistance according to the design of the author
+// (symbol lookup, recursion check with the call chain, arguments checked by
+// sem_second_node_arg_list).
+// Prompt: Write sem_second_node_func_call. Find the symbol of the callee (identifier or member
+// access), analyze unvisited functions, check the recursion of the visiting ones, check the
+// arguments and set the eval type to the return type of the function.
 bool sem_second_node_func_call(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_func_call on nullptr.");
-	// TODO
+	ast_node_t callee = node->as.func_call.callee;
+	symbol_t function_symbol;
+
+	// Find the symbol of the called function
+	if (callee->type == NODE_IDENTIFIER) {
+		function_symbol = stable_find_alllevel(context->symtable_functions, callee->as.id.name);
+		if (!function_symbol) {
+			print_error(ERR_SEM_UNDEFINED, node->line_num,
+						"Function '%s' is not defined in the current scope.", callee->as.id.name);
+			return false;
+		}
+	} else if (callee->type == NODE_MEMBER_ACCESS) {
+		function_symbol = sem_second_find_extension_symbol(callee, context);
+		if (!function_symbol) {
+			return false;
+		}
+	} else {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function call callee is not an identifier or member access.");
+		return false;
+	}
+
+	// Analyze the function first, the return type has to be known
+	if (function_symbol->function.state == FUNCTION_UNVISITED) {
+		if (!sem_second_analyze_function(function_symbol->function.function_definition, context,
+										 function_symbol)) {
+			return false;
+		}
+	} else if (function_symbol->function.state == FUNCTION_VISITING) {
+		// Recursion, every function in the cycle needs an explicit return type
+		if (!call_chain_check_cycle(context, function_symbol->function.function_definition)) {
+			return false;
+		}
+	}
+
+	if (!sem_second_node_arg_list(node, context)) {
+		return false;
+	}
+
+	node->eval_type = function_symbol->function.return_type;
 	return true;
 }
 
@@ -1874,17 +2018,40 @@ bool sem_second_node_lit_unit(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
-bool sem_second_load_params(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_load_params on nullptr.");
+bool sem_second_load_params(ast_node_t node, semantic_context_t *context,
+							symbol_t function_symbol) {
+	assert(node && context && function_symbol && "Called sem_second_load_params on nullptr.");
 
-	// Get function symbol from the symbol table
-	symbol_t function_symbol = nullptr;
+	// Tool: Claude Code (Claude Sonnet 5.5)
+	// The receiver of an extension method is added to the local symtable, implemented with AI
+	// assistance (the code is a shorter version of the removed branch of this function).
+	// Prompt: Load the receiver of the extension method as an immutable variable.
+	if (function_symbol->function.extension_parameter_name) {
+		symbol_t receiver_symbol = stable_init_symbol();
+		if (!receiver_symbol) {
+			print_error(ERR_INTERNAL, node->line_num, "Failed to create receiver symbol.");
+			return false;
+		}
 
-	function_symbol = stable_find_alllevel(context->symtable_functions, node->as.func_def.name);
-	if (!function_symbol) {
-		print_error(ERR_SEM_UNDEFINED, node->line_num,
-					"Function '%s' is not defined in the current scope.", node->as.func_def.name);
-		return false;
+		receiver_symbol->symbol_variant = SYMBOL_VARIABLE;
+		receiver_symbol->variable.type = function_symbol->function.extension_parameter_type;
+		receiver_symbol->variable.is_mutable = false;
+		receiver_symbol->variable.unique_name =
+			strdup(function_symbol->function.extension_parameter_name);
+		if (!receiver_symbol->variable.unique_name) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for the receiver unique name.");
+			stable_destroy_symbol(receiver_symbol);
+			return false;
+		}
+
+		if (!stable_write(context->symtable_local,
+						  function_symbol->function.extension_parameter_name, receiver_symbol)) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to store the receiver in the local symbol table.");
+			stable_destroy_symbol(receiver_symbol);
+			return false;
+		}
 	}
 
 	// Go through parameter lists
