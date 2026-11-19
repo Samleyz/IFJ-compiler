@@ -11,6 +11,9 @@
 #include "semantic_analysis.h"
 #include "symtable.h"
 
+/** @brief Digits of size_t, space for the counter in the unique names of variables */
+#define SIZE_T_MAX_DIGITS 20
+
 typedef struct call_chain_item {
 	ast_node_t function_node;
 	struct call_chain_item *previous_item;
@@ -318,7 +321,7 @@ bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context);
  */
 bool sem_second_node_assign(ast_node_t node, semantic_context_t *context);
 
-bool sem_second_if_branch(ast_node_t branch, semantic_context_t *context);
+bool sem_second_branch_body(ast_node_t branch, semantic_context_t *context);
 
 bool sem_second_if_branch_to_double(ast_node_t branch);
 
@@ -351,6 +354,10 @@ bool sem_second_node_if_expr(ast_node_t node, semantic_context_t *context);
  * @return false Semantic error
  */
 bool sem_second_node_while(ast_node_t node, semantic_context_t *context);
+
+bool sem_second_for_range(ast_node_t node, semantic_context_t *context);
+
+bool sem_second_for_variable(ast_node_t node, semantic_context_t *context);
 
 /**
  * @brief Performs the second pass of semantic analysis on a NODE_FOR

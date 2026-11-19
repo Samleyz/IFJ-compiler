@@ -1300,7 +1300,7 @@ bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context) {
 
 	// Create unique name
 	sym->variable.unique_name =
-		malloc(strlen(node->as.var_def.name) + 20 + 1 + 1); // Enough for size_t digits + \0 + $
+		malloc(strlen(node->as.var_def.name) + SIZE_T_MAX_DIGITS + 1 + 1); // Digits + \0 + $
 	if (!sym->variable.unique_name) {
 		print_error(ERR_INTERNAL, node->line_num,
 					"Failed to allocate memory for variable unique name.");
@@ -1467,11 +1467,12 @@ bool sem_second_node_if_expr(ast_node_t node, semantic_context_t *context) {
 }
 
 // Tool: Claude Code (Claude Sonnet 5.5)
-// Helper of the if implemented with AI assistance according to the design of the author.
-// Prompt: Write a function that analyzes one branch of an if, a block has its own scope and a
-// one-line branch is a statement.
-bool sem_second_if_branch(ast_node_t branch, semantic_context_t *context) {
-	assert(branch && context && "Called sem_second_if_branch on nullptr.");
+// Helper of the if and the for implemented with AI assistance according to the design of the
+// author.
+// Prompt: Write a function that analyzes a branch of an if or a body of a for, a block has its own
+// scope and a one-line body is a statement.
+bool sem_second_branch_body(ast_node_t branch, semantic_context_t *context) {
+	assert(branch && context && "Called sem_second_branch_body on nullptr.");
 
 	if (branch->type == NODE_BLOCK) {
 		return sem_second_node_block(branch, context);
@@ -1532,13 +1533,13 @@ bool sem_second_node_if_stmt(ast_node_t node, semantic_context_t *context) {
 		return false;
 	}
 
-	if (!sem_second_if_branch(node->as.if_stmt.then_branch, context)) {
+	if (!sem_second_branch_body(node->as.if_stmt.then_branch, context)) {
 		return false;
 	}
 
 	// The else branch can be missing, else if is a nested if
 	if (node->as.if_stmt.else_branch &&
-		!sem_second_if_branch(node->as.if_stmt.else_branch, context)) {
+		!sem_second_branch_body(node->as.if_stmt.else_branch, context)) {
 		return false;
 	}
 
@@ -1593,10 +1594,124 @@ bool sem_second_node_while(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Helper of the for implemented with AI assistance according to the design of the author.
+// Prompt: Write a function that analyzes the bounds and the step of the for range, they are Int
+// and a literal zero step is an error.
+bool sem_second_for_range(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_for_range on nullptr.");
+	ast_node_t bounds[3] = {node->as.for_stmt.from_expr, node->as.for_stmt.to_expr,
+							node->as.for_stmt.step_expr};
+
+	for (int i = 0; i < 3; i++) {
+		// Missing step
+		if (!bounds[i]) {
+			continue;
+		}
+
+		if (!sem_second_expr(bounds[i], context)) {
+			return false;
+		}
+
+		if (bounds[i]->eval_type != TYPE_INT) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"The bounds and the step of the for range must be Int.");
+			return false;
+		}
+	}
+
+	// Literal zero step
+	if (node->as.for_stmt.step_expr && node->as.for_stmt.step_expr->type == NODE_LIT_INT &&
+		node->as.for_stmt.step_expr->as.int_val == 0) {
+		print_error(ERR_SEM_OTHER, node->line_num, "The step of the for range cannot be zero.");
+		return false;
+	}
+
+	return true;
+}
+
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Helper of the for implemented with AI assistance according to the design of the author.
+// Prompt: Write a function that creates the loop variable of the for, an immutable Int with a
+// unique name stored in the symtable and in the node.
+bool sem_second_for_variable(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_for_variable on nullptr.");
+	symbol_t loop_symbol = stable_init_symbol();
+
+	if (loop_symbol) {
+		loop_symbol->symbol_variant = SYMBOL_VARIABLE;
+		loop_symbol->variable.type = TYPE_INT;
+		loop_symbol->variable.is_mutable = false;
+		loop_symbol->variable.unique_name =
+			malloc(strlen(node->as.for_stmt.var_name) + SIZE_T_MAX_DIGITS + 1 + 1);
+	}
+	if (!loop_symbol || !loop_symbol->variable.unique_name) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to create the loop variable.");
+		stable_destroy_symbol(loop_symbol);
+		return false;
+	}
+	sprintf(loop_symbol->variable.unique_name, "%s$%zu", node->as.for_stmt.var_name,
+			context->rename_counter++);
+
+	node->as.for_stmt.unique_var_name = strdup(loop_symbol->variable.unique_name);
+	if (!node->as.for_stmt.unique_var_name ||
+		!stable_write(context->symtable_local, node->as.for_stmt.var_name, loop_symbol)) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to store the loop variable.");
+		stable_destroy_symbol(loop_symbol);
+		return false;
+	}
+
+	return true;
+}
+
+// Tool: Claude Code (Claude Sonnet 5.5)
+// For cycle implemented with AI assistance step by step according to the design of the author.
+// Prompt: Write sem_second_node_for. The range and the step are Int, the loop variable has its own
+// scope, the guards are Boolean and the body is analyzed.
 bool sem_second_node_for(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_for on nullptr.");
-	// TODO
-	return true;
+	bool success = true;
+
+	if (!sem_second_for_range(node, context)) {
+		return false;
+	}
+
+	// The loop variable has its own scope
+	if (!stable_enter_scope(context->symtable_local)) {
+		print_error(ERR_INTERNAL, node->line_num, "Symtable enter scope failed!");
+		return false;
+	}
+
+	if (!sem_second_for_variable(node, context)) {
+		success = false;
+		goto cleanup;
+	}
+
+	// Guards see the loop variable
+	for (ast_node_t guard = node->as.for_stmt.guards.head; guard; guard = guard->next) {
+		if (!sem_second_expr(guard, context)) {
+			success = false;
+			goto cleanup;
+		}
+
+		if (guard->eval_type != TYPE_BOOL) {
+			print_error(ERR_SEM_TYPE_COMPAT, guard->line_num, "The guard of for must be Boolean.");
+			success = false;
+			goto cleanup;
+		}
+	}
+
+	// The body is a block with its own scope or a one-line statement
+	if (!sem_second_branch_body(node->as.for_stmt.body, context)) {
+		success = false;
+		goto cleanup;
+	}
+
+	node->eval_type = TYPE_UNIT;
+
+cleanup:
+	stable_leave_scope(context->symtable_local);
+	return success;
 }
 
 // Tool: Claude Code (Claude Sonnet 5.5)
