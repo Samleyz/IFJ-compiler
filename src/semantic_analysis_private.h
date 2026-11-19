@@ -1,6 +1,7 @@
 /**
  * @file semantic_analysis_private.h
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Header file for internal semantic analysis functions and data structures
  */
 

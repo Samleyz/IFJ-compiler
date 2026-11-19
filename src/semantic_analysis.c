@@ -1,6 +1,7 @@
 /**
  * @file semantic_analysis.c
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Implementation of semantic analysis functions
  */
 
