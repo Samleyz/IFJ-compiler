@@ -19,8 +19,8 @@
  * Double, String and Bool have no entry, so the index has to be checked first.
  */
 static const char *const type_names[] = {
-	[TYPE_INT] = "Int",	  [TYPE_DOUBLE] = "Double", [TYPE_STRING] = "String",
-	[TYPE_BOOL] = "Bool", [TYPE_UNIT] = "Unit",
+	[TYPE_INT] = "Int",		 [TYPE_DOUBLE] = "Double", [TYPE_STRING] = "String",
+	[TYPE_BOOL] = "Boolean", [TYPE_UNIT] = "Unit",
 };
 
 /**
