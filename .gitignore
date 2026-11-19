@@ -55,3 +55,5 @@ vgcore.*
 
 # Node.js dependencies
 node_modules/
+
+ic26int
