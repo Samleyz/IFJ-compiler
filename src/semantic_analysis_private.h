@@ -318,6 +318,10 @@ bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context);
  */
 bool sem_second_node_assign(ast_node_t node, semantic_context_t *context);
 
+bool sem_second_if_branch(ast_node_t branch, semantic_context_t *context);
+
+bool sem_second_if_branch_to_double(ast_node_t branch);
+
 /**
  * @brief Performs the second pass of semantic analysis on a NODE_IF (statement)
  *

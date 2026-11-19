@@ -1456,15 +1456,116 @@ bool sem_second_node_assign(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Implemented with AI assistance, the if statement and the if expression share the analysis and
+// the is_expr flag of the node decides.
+// Prompt: Write sem_second_node_if_expr, it only calls the analysis of the if statement.
 bool sem_second_node_if_expr(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_if_expr on nullptr.");
-	// TODO
+
+	return sem_second_node_if_stmt(node, context);
+}
+
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Helper of the if implemented with AI assistance according to the design of the author.
+// Prompt: Write a function that analyzes one branch of an if, a block has its own scope and a
+// one-line branch is a statement.
+bool sem_second_if_branch(ast_node_t branch, semantic_context_t *context) {
+	assert(branch && context && "Called sem_second_if_branch on nullptr.");
+
+	if (branch->type == NODE_BLOCK) {
+		return sem_second_node_block(branch, context);
+	}
+
+	return sem_second_stmt(branch, context);
+}
+
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Helper of the if expression implemented with AI assistance according to the design of the
+// author.
+// Prompt: Write a function that converts the value of an Int branch of an if expression to
+// Double. The branch is an expression statement, a block or a nested if.
+bool sem_second_if_branch_to_double(ast_node_t branch) {
+	assert(branch && "Called sem_second_if_branch_to_double on nullptr.");
+	ast_node_t value_node = branch;
+
+	// else if, all the branches of the nested if have the value
+	if (branch->type == NODE_IF) {
+		if (!sem_second_if_branch_to_double(branch->as.if_stmt.then_branch) ||
+			!sem_second_if_branch_to_double(branch->as.if_stmt.else_branch)) {
+			return false;
+		}
+		branch->eval_type = TYPE_DOUBLE;
+		return true;
+	}
+
+	// The value of a block is the expression statement at its end
+	if (branch->type == NODE_BLOCK) {
+		value_node = branch->as.block.statements.tail;
+	}
+
+	if (!sem_second_insert_double_cast(&value_node->as.expr_stmt.expr)) {
+		return false;
+	}
+	value_node->eval_type = TYPE_DOUBLE;
+	branch->eval_type = TYPE_DOUBLE;
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// If statement and if expression implemented with AI assistance step by step according to the
+// design of the author (one function, the is_expr flag of the node decides what it is).
+// Prompt: Write sem_second_node_if_stmt. Analyze the condition and check that it is Boolean, the
+// branches have their own scope. The statement has the Unit type, the branches of the expression
+// have the same type or Int is converted to Double.
 bool sem_second_node_if_stmt(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_if_stmt on nullptr.");
-	// TODO
+	data_type_t then_type;
+	data_type_t else_type;
+
+	if (!sem_second_expr(node->as.if_stmt.condition, context)) {
+		return false;
+	}
+
+	if (node->as.if_stmt.condition->eval_type != TYPE_BOOL) {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num, "The condition of if must be Boolean.");
+		return false;
+	}
+
+	if (!sem_second_if_branch(node->as.if_stmt.then_branch, context)) {
+		return false;
+	}
+
+	// The else branch can be missing, else if is a nested if
+	if (node->as.if_stmt.else_branch &&
+		!sem_second_if_branch(node->as.if_stmt.else_branch, context)) {
+		return false;
+	}
+
+	if (!node->as.if_stmt.is_expr) {
+		node->eval_type = TYPE_UNIT;
+		return true;
+	}
+
+	// If expression, the type of the value is the type of the branches
+	then_type = node->as.if_stmt.then_branch->eval_type;
+	else_type = node->as.if_stmt.else_branch->eval_type;
+	node->eval_type = then_type;
+
+	if (then_type == TYPE_INT && else_type == TYPE_DOUBLE) {
+		node->eval_type = TYPE_DOUBLE;
+		return sem_second_if_branch_to_double(node->as.if_stmt.then_branch);
+	}
+	if (then_type == TYPE_DOUBLE && else_type == TYPE_INT) {
+		return sem_second_if_branch_to_double(node->as.if_stmt.else_branch);
+	}
+
+	if (then_type != else_type) {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+					"The branches of the if expression have different types.");
+		return false;
+	}
+
 	return true;
 }
 
