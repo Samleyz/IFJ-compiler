@@ -462,6 +462,9 @@ bool sem_first_node_func_def(ast_node_t node, semantic_context_t *context) {
 	// Prefill symbol
 	symbol->symbol_variant = SYMBOL_FUNCTION;
 
+	// Add pointer to function definition node to symtable
+	symbol->function.function_definition = node;
+
 	// Check if not defined
 	if (stable_find_curlevel(context->symtable_functions, node->as.func_def.name)) {
 		print_error(ERR_SEM_REDEFINITION, node->line_num,
@@ -599,6 +602,8 @@ bool sem_first_node_extension(ast_node_t node, semantic_context_t *context) {
 
 		// Prefill symbol
 		symbol->symbol_variant = SYMBOL_FUNCTION;
+
+		symbol->function.function_definition = current_extension_node;
 
 		// Return type
 		if (current_extension_node->as.func_def.return_type) {
@@ -831,9 +836,45 @@ bool sem_second_node_program(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+bool sem_second_node_block_body(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_block_body on nullptr.");
+
+	ast_node_t current_node = node->as.block.statements.head;
+	ast_node_t last_node = current_node;
+
+	while (current_node) {
+		if (!sem_second_stmt(current_node, context)) {
+			return false;
+		}
+
+		current_node = current_node->next;
+		if (current_node != nullptr) {
+			last_node = last_node->next;
+		}
+	}
+
+	if (!node->as.block.statements.head) {
+		node->eval_type = TYPE_UNIT;
+	} else {
+		node->eval_type = last_node->eval_type;
+	}
+
+	return true;
+}
+
 bool sem_second_node_block(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_block on nullptr.");
-	// TODO set block eval type
+	if (!stable_enter_scope(context->symtable_local)) {
+		print_error(ERR_INTERNAL, node->line_num, "Symtable enter scope failed!");
+		return false;
+	}
+
+	if (!sem_second_node_block_body(node, context)) {
+		stable_leave_scope(context->symtable_local);
+		return false;
+	}
+
+	stable_leave_scope(context->symtable_local);
 	return true;
 }
 
@@ -843,10 +884,65 @@ bool sem_second_node_extension(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+bool sem_second_append_empty(ast_node_t block_node, ast_node_t return_node) {
+	if (!ast_list_append(&block_node->as.block.statements, return_node)) {
+		print_error(ERR_INTERNAL, block_node->line_num, "AST node append failed!");
+		return false;
+	}
+
+	return_node->as.return_stmt.expr = nullptr;
+	return_node->eval_type = TYPE_UNIT;
+	return true;
+}
+
+bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *context,
+									   bool returns_unit) {
+	assert(node && context && "Called sem_second_insert_implicit_return on nullptr.");
+
+	ast_node_t last_stmt_node = node->as.block.statements.tail;
+
+	ast_node_t return_node = ast_create_node(NODE_RETURN, node->line_num);
+	if (!return_node) {
+		print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed!");
+		return false;
+	}
+
+	if (last_stmt_node == nullptr || node->as.block.statements.head == nullptr) {
+		if (!sem_second_append_empty(node, return_node)) {
+			ast_dtor(return_node);
+			free(return_node);
+			return false;
+		}
+		return true;
+	}
+
+	switch (last_stmt_node->type) {
+	case NODE_RETURN:
+		ast_dtor(return_node);
+		return true;
+	case NODE_EXPR_STMT:
+		// TODO return node with stmt type or unit
+		return true;
+	case NODE_VAR_DEF:
+	case NODE_FOR:
+	case NODE_WHILE:
+		// TODO empty return
+		return true;
+	case NODE_IF:
+		// TODO
+		return true;
+	default:
+		print_error(ERR_INTERNAL, node->line_num,
+					"Wrong type in a block, failed to paste returns!");
+		return false;
+	}
+}
+
 bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_func_def on nullptr.");
 	bool success = true;
 	bool pushed = false; // if malloc fails
+	bool returns_unit;
 
 	ast_node_t temp_node;
 	// store previous local table
@@ -890,12 +986,19 @@ bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 	}
 
 	if (node->as.func_def.body->type == NODE_BLOCK) {
-		if (!sem_second_node_block(node->as.func_def.body, context)) {
+		// checks the whole block and sets block eval type
+		if (!sem_second_node_block_body(node->as.func_def.body, context)) {
 			success = false;
 			goto cleanup;
 		}
 
-		// TODO: function to paste returns (based on eval_type set in sem_second_node_block)
+		returns_unit = (bool)(current_function->function.has_explicit_return_type &&
+							  current_function->function.return_type == TYPE_UNIT);
+
+		if (!sem_second_insert_implicit_return(node->as.func_def.body, context, returns_unit)) {
+			success = false;
+			goto cleanup;
+		}
 	} else {
 		if (!sem_second_expr(node->as.func_def.body, context)) {
 			success = false;
@@ -912,9 +1015,8 @@ bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 		temp_node->as.return_stmt.expr = node->as.func_def.body;
 		node->as.func_def.body = temp_node;
 		node->as.func_def.body->eval_type = node->as.func_def.body->as.return_stmt.expr->eval_type;
+		// TODO: set eval_type after the type check function (it can insert a type cast)
 	}
-
-	// TODO: decide if the return type is explicit - recursion
 
 	// TODO: decide return type - false throw err
 

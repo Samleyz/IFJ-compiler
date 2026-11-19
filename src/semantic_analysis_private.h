@@ -241,6 +241,8 @@ bool sem_second_expr(ast_node_t node, semantic_context_t *context);
  */
 bool sem_second_node_program(ast_node_t node, semantic_context_t *context);
 
+bool sem_second_node_block_body(ast_node_t node, semantic_context_t *context);
+
 /**
  * @brief Performs the second pass of semantic analysis on a NODE_BLOCK
  *
@@ -260,6 +262,9 @@ bool sem_second_node_block(ast_node_t node, semantic_context_t *context);
  * @return false Semantic error
  */
 bool sem_second_node_extension(ast_node_t node, semantic_context_t *context);
+
+bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *context,
+									   bool retruns_unit);
 
 /**
  * @brief Performs the second pass of semantic analysis on a NODE_FUNC_DEF
