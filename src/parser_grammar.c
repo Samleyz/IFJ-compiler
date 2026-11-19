@@ -1,9 +1,18 @@
 /**
  * @file parser_grammar.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
- * @author Michal Sobek (xsobekm00@vutbr.cz)
- * @brief Implementation of the IFJ26 grammar (LL1*) rules
+ * @author Michal Sobek (xsobekm00@vutbr.cz) & Gemini 3.8 Flash
+ * @brief Implementation of the IFJ26 grammar, acording the defined LL(1) table
  * @date 2026-10-22
+ * NOTE: LL(1) table & grammar rules were done by Michal Sobek
+ */
+
+/**
+ * AI_USAGE:
+ * Smaller rule function were generated using Gemini 3.8 Flash, those functions are marked
+ * accordingly Context list: ast.h, parser.c, ll1.txt, already implemented grammar rules in this
+ * file Prompt: "Implement <rule> according the given ll1 grammar, inspire yourself with the already
+ * 	        existing functions. make no mistakes."
  */
 
 #include "parser_grammar.h"
@@ -188,6 +197,7 @@ ast_node_t parse_func_def(parser_t *p) {
 	return func_node;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 ast_node_t parse_func_body(parser_t *p) {
 	// Rule 31: <func_body> -> "EOL" <block>
 	// Rule 32: <func_body> -> expr "EOL"
@@ -318,6 +328,7 @@ ast_node_t parse_ext_def(parser_t *p) {
 	return ext_node;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 ast_node_t parse_block(parser_t *p) {
 	// Rule 7: <block> -> "indent" <line> <line_seq> <opt_eol> "dedent"
 
@@ -384,6 +395,7 @@ ast_node_t parse_block(parser_t *p) {
 	return block_node;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 bool parse_line(parser_t *p, ast_node_t block_node) {
 	// Rule 8: <line> -> <simple_seq>
 	// Rule 9: <line> -> <complex_stmt>
@@ -509,6 +521,7 @@ ast_node_t parse_cond_stmt(parser_t *p) {
 	return if_node;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 ast_node_t parse_branch_body(parser_t *p) {
 	// Rule 77: <branch_body> -> "EOL" <block>
 	// Rule 78: <branch_body> -> <simple_stmt>
@@ -753,6 +766,7 @@ ast_node_t parse_for_stmt(parser_t *p) {
 	return for_node;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 ast_node_t parse_var_def(parser_t *p) {
 	// Rule 67: <var_def> -> <var_kw> identifier <opt_type> "=" expr
 	// Rule 68: <var_kw> -> "val"
@@ -827,6 +841,7 @@ ast_node_t parse_var_def(parser_t *p) {
 	return var_node;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 ast_node_t parse_assign_stmt(parser_t *p) {
 	// Rule 70: <assign_stmt> -> identifier "=" expr
 
@@ -870,6 +885,7 @@ ast_node_t parse_assign_stmt(parser_t *p) {
 	return assign_node;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 ast_node_t parse_return_stmt(parser_t *p) {
 	// Rule 51: <return_stmt> -> "return" <opt_expr>
 	// Rule 52: <opt_expr> -> expr
@@ -907,6 +923,7 @@ ast_node_t parse_return_stmt(parser_t *p) {
 	return return_node;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 ast_node_t parse_simple_stmt(parser_t *p) {
 	// Rule 17: <simple_stmt> -> <var_def>
 	// Rule 18: <simple_stmt> -> <assign_stmt>
@@ -950,6 +967,7 @@ ast_node_t parse_simple_stmt(parser_t *p) {
 	return NULL;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 ast_node_t parse_complex_stmt(parser_t *p) {
 	// Rule 21: <complex_stmt> -> <while_stmt>
 	// Rule 22: <complex_stmt> -> <cond_stmt>
@@ -971,6 +989,7 @@ ast_node_t parse_complex_stmt(parser_t *p) {
 	return NULL;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 ast_node_t parse_param_list(parser_t *p) {
 	// Rule 34: <param_list> -> "(" <param_list_opt> ")"
 	// Rule 35: <param_list_opt> -> <param> <params_tail>
@@ -1078,6 +1097,7 @@ ast_node_t parse_param_list(parser_t *p) {
 	return plist_node;
 }
 
+// Function implemented with AI, see top of the file for prompt and ai's context
 char *parse_type(parser_t *p) {
 	// Rule 71: <type> -> "Int"
 	// Rule 72: <type> -> "Double"
