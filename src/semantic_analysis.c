@@ -930,11 +930,6 @@ bool sem_second_node_extension(ast_node_t node, semantic_context_t *context) {
 
 		method_symbol = stable_find_curlevel(context->symtable_extension_functions, key);
 		free(key);
-		if (!method_symbol) {
-			print_error(ERR_INTERNAL, method->line_num,
-						"Extension function is missing in the symbol table.");
-			return false;
-		}
 
 		if (!sem_second_analyze_function(method, context, method_symbol)) {
 			return false;
@@ -1592,12 +1587,6 @@ symbol_t sem_second_find_extension_symbol(ast_node_t member_access_node,
 		return nullptr;
 	}
 
-	if (target->eval_type == TYPE_UNKNOWN) {
-		print_error(ERR_INTERNAL, member_access_node->line_num,
-					"Member access target has no evaluation type.");
-		return nullptr;
-	}
-
 	// Key is name$Type, the same as in the first pass
 	key = malloc(strlen(member_name) + strlen(data_type_string_forms[target->eval_type]) + 2);
 	if (!key) {
@@ -1639,15 +1628,11 @@ bool sem_second_node_func_call(ast_node_t node, semantic_context_t *context) {
 						"Function '%s' is not defined in the current scope.", callee->as.id.name);
 			return false;
 		}
-	} else if (callee->type == NODE_MEMBER_ACCESS) {
+	} else {
 		function_symbol = sem_second_find_extension_symbol(callee, context);
 		if (!function_symbol) {
 			return false;
 		}
-	} else {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Function call callee is not an identifier or member access.");
-		return false;
 	}
 
 	// Analyze the function first, the return type has to be known
