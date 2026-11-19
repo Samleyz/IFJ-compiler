@@ -45,7 +45,7 @@ TEST_EXECUTABLES := \
 	$(BUILD_DIR)/parse_expr_tests \
 	$(BUILD_DIR)/parser_integration_tests
 
-.PHONY: build unit-tests test valgrind clean
+.PHONY: build unit-tests test valgrind e2e clean
 
 build: compiler
 
@@ -101,6 +101,10 @@ valgrind: unit-tests
 			--errors-for-leak-kinds=definite,indirect,possible \
 			--error-exitcode=1 "$$test"; \
 	done
+
+# end-to-end tests from the specification (see README.md)
+e2e:
+	tests/e2e/run.sh
 
 clean:
 	$(CMAKE) -E rm -rf $(BUILD_DIR)

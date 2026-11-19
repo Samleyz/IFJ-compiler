@@ -1,0 +1,7 @@
+//! spec: 1.2
+//! compile: 2
+import ifj26.*
+@main def main(): Unit =
+  val a = 1
+    val b = 2
+  print(a)

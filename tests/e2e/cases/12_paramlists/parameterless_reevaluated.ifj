@@ -1,0 +1,10 @@
+//! spec: 5.10
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+def hello: Unit = print("hi")
+
+@main def main(): Unit =
+  hello
+  hello

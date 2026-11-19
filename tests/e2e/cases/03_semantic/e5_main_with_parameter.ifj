@@ -1,0 +1,4 @@
+//! spec: 2
+//! compile: 5
+import ifj26.*
+@main def main(a: Int): Unit = print(a)

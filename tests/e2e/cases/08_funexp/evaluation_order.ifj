@@ -1,0 +1,19 @@
+//! spec: 5.1
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+def p(x: Int): Int =
+  print(x)
+  x
+
+def add3(a: Int, b: Int, c: Int): Int = a + b + c
+
+@main def main(): Unit =
+  val s = add3(p(1), p(2), p(3))
+  print(" ")
+  val t = p(4) + p(5) * p(6)
+  print(" ")
+  print(s)
+  print(" ")
+  print(t)

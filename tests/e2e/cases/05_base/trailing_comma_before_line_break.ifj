@@ -1,0 +1,14 @@
+//! spec: 1.2
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+def add(a: Int, b: Int,
+  ): Int = a + b
+
+@main def main(): Unit =
+  val r = add(
+    1,
+    2,
+    )
+  print(r)

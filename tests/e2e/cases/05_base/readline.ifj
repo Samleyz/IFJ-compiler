@@ -1,0 +1,9 @@
+//! spec: 4
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  val a = readLine()
+  val b = readLine()
+  val c = readLine()
+  print("[" + a + "][" + b + "][" + c + "]")

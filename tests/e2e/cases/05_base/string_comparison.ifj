@@ -1,0 +1,29 @@
+//! spec: 3
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  if "abc" < "abd" then
+    print("lt")
+  else
+    print("x")
+  print(" ")
+  if "b" > "abc" then
+    print("gt")
+  else
+    print("x")
+  print(" ")
+  if "abc" == "abc" then
+    print("eq")
+  else
+    print("x")
+  print(" ")
+  if "a" != "b" then
+    print("ne")
+  else
+    print("x")
+  print(" ")
+  if "abc" <= "abc" then
+    print("le")
+  else
+    print("x")

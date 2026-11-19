@@ -1,0 +1,7 @@
+//! spec: 4
+//! compile: 0
+//! run: 40
+import ifj26.*
+@main def main(): Unit =
+  val s = 0 - 1
+  print(subStr("abc", s, 2))

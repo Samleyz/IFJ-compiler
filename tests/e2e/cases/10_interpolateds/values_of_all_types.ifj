@@ -1,0 +1,6 @@
+//! spec: 5.6
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  print(s"${1 + 2} ${true} ${()} ${"x"}")
