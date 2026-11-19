@@ -23,12 +23,15 @@ bool perform_semantic_analysis(ast_node_t root) {
 		return false;
 	}
 
-	// TODO: Pass1
-	// TODO: Checks with cleanup on error
+	if (!sem_first(root, &context)) {
+		semantic_context_dtor(&context);
+		return false;
+	}
 
-	// TODO: Pass2
-	// TODO: (Checks with cleanup on error)
-
+	if (!sem_second(root, &context)) {
+		semantic_context_dtor(&context);
+		return false;
+	}
 	// TODO: (Context checks)
 
 	// Cleanup
@@ -830,9 +833,27 @@ bool sem_second_expr(ast_node_t node, semantic_context_t *context) {
 	}
 }
 
-bool sem_second_node_program(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_program on nullptr.");
-	// TODO
+bool sem_second(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second on nullptr.");
+	ast_node_t current_node = node->as.program.items.head;
+
+	while (current_node) {
+		switch (current_node->type) {
+		case NODE_FUNC_DEF:
+			if (!sem_second_node_func_def(current_node, context)) {
+				return false;
+			}
+			break;
+		case NODE_EXTENSION:
+			if (!sem_second_node_extension(current_node, context)) {
+				return false;
+			}
+			break;
+		default:
+			print_error(ERR_INTERNAL, current_node->line_num, "Wrong node in program found!");
+		}
+		current_node = current_node->next;
+	}
 	return true;
 }
 

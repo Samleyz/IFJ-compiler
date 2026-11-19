@@ -239,7 +239,7 @@ bool sem_second_expr(ast_node_t node, semantic_context_t *context);
  * @return true Success
  * @return false Semantic error
  */
-bool sem_second_node_program(ast_node_t node, semantic_context_t *context);
+bool sem_second(ast_node_t node, semantic_context_t *context);
 
 bool sem_second_node_block_body(ast_node_t node, semantic_context_t *context);
 
