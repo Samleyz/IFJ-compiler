@@ -386,6 +386,11 @@ bool sem_second_node_expr_stmt(ast_node_t node, semantic_context_t *context);
  * @return true Success
  * @return false Semantic error
  */
+bool sem_second_binary_op_result_type(op_type_t operator_type, data_type_t left_type,
+									  data_type_t right_type, data_type_t *result_type);
+
+bool sem_second_insert_double_cast(ast_node_t *operand);
+
 bool sem_second_node_binary_op(ast_node_t node, semantic_context_t *context);
 
 /**

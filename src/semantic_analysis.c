@@ -1556,9 +1556,111 @@ bool sem_second_node_expr_stmt(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Helper of the binary operator implemented with AI assistance according to the design of the
+// author (the rules of the operators are taken from the specification, chapter 3).
+// Prompt: Write a function that decides if the operand types are valid for the binary operator
+// and what is the type of the result.
+bool sem_second_binary_op_result_type(op_type_t operator_type, data_type_t left_type,
+									  data_type_t right_type, data_type_t *result_type) {
+	assert(result_type && "Called sem_second_binary_op_result_type on nullptr.");
+	bool numbers = (bool)((left_type == TYPE_INT || left_type == TYPE_DOUBLE) &&
+						  (right_type == TYPE_INT || right_type == TYPE_DOUBLE));
+
+	switch (operator_type) {
+	case OPERATOR_PLUS:
+	case OPERATOR_MINUS:
+	case OPERATOR_STAR:
+	case OPERATOR_SLASH:
+		if (numbers) {
+			*result_type = TYPE_DOUBLE;
+			if (left_type == TYPE_INT && right_type == TYPE_INT) {
+				*result_type = TYPE_INT;
+			}
+			return true;
+		}
+		// Concatenation
+		if (operator_type == OPERATOR_PLUS && left_type == TYPE_STRING &&
+			right_type == TYPE_STRING) {
+			*result_type = TYPE_STRING;
+			return true;
+		}
+		return false;
+	case OPERATOR_LESS:
+	case OPERATOR_LESS_EQUAL:
+	case OPERATOR_GREATER:
+	case OPERATOR_GREATER_EQUAL:
+		*result_type = TYPE_BOOL;
+		return (bool)(numbers || (left_type == TYPE_STRING && right_type == TYPE_STRING));
+	case OPERATOR_EQUAL:
+	case OPERATOR_NOT_EQUAL:
+		*result_type = TYPE_BOOL;
+		return (bool)(numbers || left_type == right_type);
+	case OPERATOR_AND:
+	case OPERATOR_OR:
+		*result_type = TYPE_BOOL;
+		return (bool)(left_type == TYPE_BOOL && right_type == TYPE_BOOL);
+	default:
+		return false;
+	}
+}
+
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Implemented with AI assistance (pattern taken from sem_second_node_assign).
+// Prompt: Write a function that wraps an operand into the type cast node from Int to Double.
+bool sem_second_insert_double_cast(ast_node_t *operand) {
+	assert(operand && *operand && "Called sem_second_insert_double_cast on nullptr.");
+
+	ast_node_t conversion_node = ast_create_node(NODE_TYPE_CAST, (*operand)->line_num);
+	if (!conversion_node) {
+		print_error(ERR_INTERNAL, (*operand)->line_num, "Failed to create type cast node.");
+		return false;
+	}
+
+	conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
+	conversion_node->as.type_cast.operand = *operand;
+	conversion_node->eval_type = TYPE_DOUBLE;
+	*operand = conversion_node;
+	return true;
+}
+
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Binary operator implemented with AI assistance step by step according to the design of the
+// author (the rules of the operators are taken from the specification, chapter 3).
+// Prompt: Write sem_second_node_binary_op. Analyze the operands, check their types, convert Int to
+// Double and set the type of the result.
 bool sem_second_node_binary_op(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_binary_op on nullptr.");
-	// TODO
+	data_type_t left_type;
+	data_type_t right_type;
+	data_type_t result_type;
+
+	if (!sem_second_expr(node->as.binary_op.left, context) ||
+		!sem_second_expr(node->as.binary_op.right, context)) {
+		return false;
+	}
+
+	left_type = node->as.binary_op.left->eval_type;
+	right_type = node->as.binary_op.right->eval_type;
+
+	if (!sem_second_binary_op_result_type(node->as.binary_op.operator_type, left_type, right_type,
+										  &result_type)) {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+					"Type mismatch of the operands of the binary operator.");
+		return false;
+	}
+
+	// The Int operand is converted if the other one is Double
+	if (left_type == TYPE_INT && right_type == TYPE_DOUBLE &&
+		!sem_second_insert_double_cast(&node->as.binary_op.left)) {
+		return false;
+	}
+	if (left_type == TYPE_DOUBLE && right_type == TYPE_INT &&
+		!sem_second_insert_double_cast(&node->as.binary_op.right)) {
+		return false;
+	}
+
+	node->eval_type = result_type;
 	return true;
 }
 
