@@ -1049,7 +1049,25 @@ bool sem_second_func_analyze_body(ast_node_t node, semantic_context_t *context,
 // Checks the body type against the declared return type or infers the return type
 bool sem_second_check_return_type(ast_node_t node, symbol_t current_function) {
 	assert(node && current_function && "Called sem_second_check_return_type on nullptr.");
-	data_type_t body_type = node->as.func_def.body->eval_type;
+	data_type_t body_type;
+	ast_node_t last_node = node->as.func_def.body;
+
+	// Tool: Claude Code (Claude Sonnet 5.5)
+	// Type of the last statement instead of the block type, changed with AI assistance.
+	// Prompt: Fix check_return_type to use the type of the last statement of the body.
+	if (last_node->type == NODE_BLOCK) {
+		last_node = last_node->as.block.statements.tail;
+	}
+
+	// Ends with if, the returns in its branches decide the type
+	if (last_node->type != NODE_RETURN) {
+		if (!current_function->function.has_explicit_return_type) {
+			current_function->function.return_type = TYPE_UNIT;
+		}
+		return true;
+	}
+
+	body_type = last_node->eval_type;
 
 	if (current_function->function.has_explicit_return_type) {
 		data_type_t expected = current_function->function.return_type;
