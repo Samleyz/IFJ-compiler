@@ -1,0 +1,10 @@
+//! spec: 2.3
+//! compile: 6
+import ifj26.*
+def loop(n: Int) =
+  if n > 0 then
+    loop(n - 1)
+  else
+    ()
+@main def main(): Unit =
+  loop(3)

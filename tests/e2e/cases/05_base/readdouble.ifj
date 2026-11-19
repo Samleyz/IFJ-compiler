@@ -1,0 +1,16 @@
+//! spec: 4
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  val a = readDouble()
+  val b = readDouble()
+  val c = readDouble()
+  val d = readDouble()
+  print(toStr(a))
+  print(",")
+  print(toStr(b))
+  print(",")
+  print(toStr(c))
+  print(",")
+  print(toStr(d))

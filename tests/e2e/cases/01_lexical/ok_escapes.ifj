@@ -1,0 +1,6 @@
+//! spec: 1.1
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  print("a\tb\\c\"d\n")

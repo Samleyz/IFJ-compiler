@@ -1,0 +1,15 @@
+//! spec: 5.4
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  val s = "abc"
+  print(s.length + 1)
+  print(" ")
+  val d = 3.7
+  print(-d.toInt)
+  print(" ")
+  val e = -3.7
+  print(toStr(e.floor))
+  print(" ")
+  print(e.toInt)

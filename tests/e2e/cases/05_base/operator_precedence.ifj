@@ -1,0 +1,16 @@
+//! spec: 3
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  print(2 + 3 * 4)
+  print(" ")
+  print((2 + 3) * 4)
+  print(" ")
+  print(10 - 3 - 2)
+  print(" ")
+  print(100 / 10 / 5)
+  print(" ")
+  print(-2 * 3)
+  print(" ")
+  print(2 - -3)

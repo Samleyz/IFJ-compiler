@@ -16,6 +16,7 @@
 /my_program
 /main
 /a.out
+/compiler
 
 # Build directories and generated build metadata
 /build/

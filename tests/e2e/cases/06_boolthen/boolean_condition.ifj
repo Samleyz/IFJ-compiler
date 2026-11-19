@@ -1,0 +1,11 @@
+//! spec: 5.2
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  var ok = true
+  var n = 0
+  while ok do
+    n = n + 1
+    ok = n < 3
+  print(n)

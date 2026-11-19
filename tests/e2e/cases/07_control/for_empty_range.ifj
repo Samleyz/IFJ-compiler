@@ -1,0 +1,8 @@
+//! spec: 5.3
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  for i <- 5 to 1 do
+    print(i)
+  print("end")

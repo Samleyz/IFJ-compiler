@@ -1,0 +1,7 @@
+//! spec: 3
+//! compile: 0
+//! run: 57
+import ifj26.*
+@main def main(): Unit =
+  val z = 0.0
+  print(1.0 / z)

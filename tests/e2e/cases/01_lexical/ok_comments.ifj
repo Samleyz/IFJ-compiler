@@ -1,0 +1,14 @@
+//! spec: 1.1
+//! compile: 0
+//! run: 0
+// comment before the prolog
+/* block comment before the prolog */
+import ifj26.*
+
+// line comment
+@main def main(): Unit =
+  /* nested /* comment */ still a comment */
+  val x = /* inline */ 5 // trailing
+  val y = 1 /* a comment
+  over two lines */
+  print(x + y)

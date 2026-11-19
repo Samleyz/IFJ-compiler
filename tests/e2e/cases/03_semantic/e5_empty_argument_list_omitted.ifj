@@ -1,0 +1,7 @@
+//! spec: 5.10
+//! compile: 5
+import ifj26.*
+def offset()(value: Int): Int = value + 1
+@main def main(): Unit =
+  val r = offset(1)
+  print(r)

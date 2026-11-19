@@ -1,0 +1,11 @@
+//! spec: 5.2
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+def neg(b: Boolean): Boolean = !b
+
+@main def main(): Unit =
+  val c: Boolean = 1 < 2
+  val d = neg(c)
+  print(d)
