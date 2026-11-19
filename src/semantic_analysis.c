@@ -1027,6 +1027,15 @@ bool sem_second_insert_return_into_branch(ast_node_t branch, semantic_context_t 
 		}
 		branch->type = NODE_RETURN;
 		return true;
+	// Tool: Claude Code (Claude Sonnet 5.5)
+	// One-line branches that are not an expression implemented with AI assistance.
+	// Prompt: Let a one-line return, assignment and variable definition pass, a return already
+	// returns and the other two are Unit (the type was checked by sem_second_check_branch_type,
+	// the return after the if is appended by sem_second_insert_implicit_return).
+	case NODE_RETURN:
+	case NODE_ASSIGN:
+	case NODE_VAR_DEF:
+		return true;
 	default:
 		print_error(ERR_INTERNAL, branch->line_num, "Pasting node return into if failed!");
 		return false;
@@ -1070,21 +1079,6 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 			return sem_second_append_empty_return(node);
 		}
 
-		// An if chain without the final else has no value on every path, so it is Unit
-		for (current_if = last_stmt_node; current_if != nullptr;) {
-			if (current_if->as.if_stmt.else_branch == nullptr) {
-				if (expected != TYPE_UNKNOWN) {
-					print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-								"The if without else does not return a value on every path.");
-					return false;
-				}
-				return sem_second_append_empty_return(node);
-			}
-			current_if = current_if->as.if_stmt.else_branch->type == NODE_IF
-							 ? current_if->as.if_stmt.else_branch
-							 : nullptr;
-		}
-
 		current_if = last_stmt_node;
 		// Walk the if / else if chain
 		while (current_if) {
@@ -1106,6 +1100,16 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 				}
 				current_if = nullptr;
 			}
+		}
+
+		// Tool: Claude Code (Claude Sonnet 5.5)
+		// The return after an if of a function without the explicit type implemented with AI
+		// assistance (replaces the pre-check of the missing else, the types of the branches are
+		// checked by the loop above).
+		// Prompt: Without the explicit type all the branches are Unit, so append one empty return
+		// after the if, the path where no branch returns must not fall through.
+		if (expected == TYPE_UNKNOWN) {
+			return sem_second_append_empty_return(node);
 		}
 		return true;
 	default:
