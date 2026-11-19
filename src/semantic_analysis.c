@@ -1061,6 +1061,9 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 	case NODE_RETURN:
 		// Already returns
 		return true;
+	case NODE_BLOCK:
+		// A block in the last position (the rewritten return of a Unit function), look inside
+		return sem_second_insert_implicit_return(last_stmt_node, context, expected);
 	case NODE_EXPR_STMT:
 		// Unit: value is discarded, add an empty return; otherwise return the value
 		if (returns_unit) {
@@ -1785,6 +1788,40 @@ cleanup:
 // function is the top of the call chain, the type is checked against the explicit return type).
 // Prompt: Write sem_second_node_return. Return needs an explicit return type, the empty return is
 // allowed only for Unit, Int is converted to Double, other mismatch is the error 6.
+// Rewrites "return expr" of a Unit function in place into the block { expr; return }, the value
+// is evaluated and discarded and the function returns (). The generator needs no knowledge of the
+// function return type.
+static bool sem_second_discard_return_value(ast_node_t node) {
+	assert(node && node->type == NODE_RETURN && node->as.return_stmt.expr &&
+		   "Called sem_second_discard_return_value on a return without a value.");
+
+	ast_node_t value_node = ast_create_node(NODE_EXPR_STMT, node->line_num);
+	ast_node_t return_node = ast_create_node(NODE_RETURN, node->line_num);
+	if (!value_node || !return_node) {
+		print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed!");
+		ast_dtor(value_node);
+		ast_dtor(return_node);
+		return false;
+	}
+
+	value_node->as.expr_stmt.expr = node->as.return_stmt.expr;
+	value_node->eval_type = node->as.return_stmt.expr->eval_type;
+	return_node->as.return_stmt.expr = nullptr;
+	return_node->eval_type = TYPE_UNIT;
+
+	// The union is overwritten here, the expression is already owned by value_node
+	node->type = NODE_BLOCK;
+	node->eval_type = TYPE_UNIT;
+	ast_list_init(&node->as.block.statements);
+	if (!ast_list_append(&node->as.block.statements, value_node) ||
+		!ast_list_append(&node->as.block.statements, return_node)) {
+		print_error(ERR_INTERNAL, node->line_num, "AST node append failed!");
+		return false;
+	}
+
+	return true;
+}
+
 bool sem_second_node_return(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_return on nullptr.");
 	ast_node_t function_node;
@@ -1816,8 +1853,11 @@ bool sem_second_node_return(ast_node_t node, semantic_context_t *context) {
 	}
 	node->eval_type = node->as.return_stmt.expr->eval_type;
 
-	// Unit discards the value, same types are fine
-	if (expected == TYPE_UNIT || node->eval_type == expected) {
+	// Unit discards the value (this applies to return too), same types are fine
+	if (expected == TYPE_UNIT) {
+		return sem_second_discard_return_value(node);
+	}
+	if (node->eval_type == expected) {
 		return true;
 	}
 
