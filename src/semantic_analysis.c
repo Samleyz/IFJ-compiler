@@ -1029,6 +1029,7 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 		}
 		return sem_second_insert_return_into_branch(last_stmt_node, context, expected);
 	case NODE_VAR_DEF:
+	case NODE_ASSIGN:
 	case NODE_FOR:
 	case NODE_WHILE:
 		// Result is Unit
