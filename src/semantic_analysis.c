@@ -1879,153 +1879,12 @@ bool sem_second_load_params(ast_node_t node, semantic_context_t *context) {
 
 	// Get function symbol from the symbol table
 	symbol_t function_symbol = nullptr;
-	if (node->type == NODE_FUNC_DEF && node->as.func_def.) {
-		// Node checks
-		if (!node->as.member_access.member_name) {
-			print_error(ERR_INTERNAL, node->line_num, "Member access has no member name.");
-			return false;
-		}
-		if (!node->as.member_access.target) {
-			print_error(ERR_INTERNAL, node->line_num, "Member access has no target.");
-			return false;
-		}
-		if (!node->as.member_access.target->eval_type) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Member access callee has no evaluation type.");
-			return false;
-		}
 
-		// Make key
-		char *key =
-			malloc(strlen(data_type_string_forms[node->as.member_access.target->eval_type]) +
-				   strlen(node->as.member_access.member_name) + 1 + 1);
-		if (!key) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for extension function key.");
-			return false;
-		}
-		sprintf(key, "%s$%s", node->as.member_access.member_name,
-				data_type_string_forms[node->as.member_access.target->eval_type]);
-
-		// Search symtable
-		function_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
-		free(key);
-		if (!function_symbol) {
-			print_error(
-				ERR_SEM_UNDEFINED, node->line_num,
-				"Extension function '%s' for type '%s' is not defined in the current scope.",
-				node->as.member_access.member_name,
-				data_type_string_forms[node->as.member_access.target->eval_type]);
-			return false;
-		}
-
-		// Put the extension symbol to local symtable
-		symbol_t local_extension_symbol = stable_init_symbol();
-		if (!local_extension_symbol) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to create local extension function symbol.");
-			return false;
-		}
-		local_extension_symbol->symbol_variant = SYMBOL_VARIABLE;
-		local_extension_symbol->variable.type = function_symbol->function.extension_parameter_type;
-		local_extension_symbol->variable.is_mutable = false;
-		local_extension_symbol->variable.unique_name =
-			strdup(function_symbol->function.extension_parameter_name);
-		if (!local_extension_symbol->variable.unique_name) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for local extension function parameter name.");
-			stable_destroy_symbol(local_extension_symbol);
-			return false;
-		}
-		if (!stable_write(context->symtable_local,
-						  function_symbol->function.extension_parameter_name,
-						  local_extension_symbol)) {
-			print_error(
-				ERR_INTERNAL, node->line_num,
-				"Failed to write local extension function parameter symbol to symbol table.");
-			stable_destroy_symbol(local_extension_symbol);
-			return false;
-		}
-	} else if (node->type == NODE_FUNC_CALL &&
-			   node->as.func_call.callee->type == NODE_MEMBER_ACCESS) {
-		// Node checks
-		if (!node->as.func_call.callee->as.member_access.member_name) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Member access in function call has no member name.");
-			return false;
-		}
-		if (!node->as.func_call.callee->as.member_access.target) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Member access in function call has no target.");
-			return false;
-		}
-		if (!node->as.func_call.callee->as.member_access.target->eval_type) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Member access target in function call has no evaluation type.");
-			return false;
-		}
-
-		// Make key
-		char *key = malloc(strlen(data_type_string_forms[node->as.func_call.callee->as.member_access
-															 .target->eval_type]) +
-						   strlen(node->as.func_call.callee->as.member_access.member_name) + 1 + 1);
-		if (!key) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for extension function key.");
-			return false;
-		}
-		sprintf(
-			key, "%s$%s", node->as.func_call.callee->as.member_access.member_name,
-			data_type_string_forms[node->as.func_call.callee->as.member_access.target->eval_type]);
-
-		// Search symtable
-		function_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
-		free(key);
-		if (!function_symbol) {
-			print_error(
-				ERR_SEM_UNDEFINED, node->line_num,
-				"Extension function '%s' for type '%s' is not defined in the current scope.",
-				node->as.func_call.callee->as.member_access.member_name,
-				data_type_string_forms[node->as.func_call.callee->as.member_access.target
-										   ->eval_type]);
-			return false;
-		}
-
-		// Put the extension symbol to local symtable
-		symbol_t local_extension_symbol = stable_init_symbol();
-		if (!local_extension_symbol) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to create local extension function symbol.");
-			return false;
-		}
-		local_extension_symbol->symbol_variant = SYMBOL_VARIABLE;
-		local_extension_symbol->variable.type = function_symbol->function.extension_parameter_type;
-		local_extension_symbol->variable.is_mutable = false;
-		local_extension_symbol->variable.unique_name =
-			strdup(function_symbol->function.extension_parameter_name);
-		if (!local_extension_symbol->variable.unique_name) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for local extension function parameter name.");
-			stable_destroy_symbol(local_extension_symbol);
-			return false;
-		}
-		if (!stable_write(context->symtable_local,
-						  function_symbol->function.extension_parameter_name,
-						  local_extension_symbol)) {
-			print_error(
-				ERR_INTERNAL, node->line_num,
-				"Failed to write local extension function parameter symbol to symbol table.");
-			stable_destroy_symbol(local_extension_symbol);
-			return false;
-		}
-	} else {
-		function_symbol = stable_find_alllevel(context->symtable_functions, node->as.func_def.name);
-		if (!function_symbol) {
-			print_error(ERR_SEM_UNDEFINED, node->line_num,
-						"Function '%s' is not defined in the current scope.",
-						node->as.func_def.name);
-			return false;
-		}
+	function_symbol = stable_find_alllevel(context->symtable_functions, node->as.func_def.name);
+	if (!function_symbol) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num,
+					"Function '%s' is not defined in the current scope.", node->as.func_def.name);
+		return false;
 	}
 
 	// Go through parameter lists
@@ -2109,7 +1968,6 @@ bool sem_second_load_params(ast_node_t node, semantic_context_t *context) {
 		current_function_param_list_node = current_function_param_list_node->next;
 	}
 
-	// TODO
 	return true;
 }
 
