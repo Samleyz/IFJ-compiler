@@ -1490,9 +1490,17 @@ bool sem_second_node_return(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Expression statement implemented with AI assistance according to the design of the author.
+// Prompt: Write sem_second_node_expr_stmt. Analyze the expression and copy its eval type.
 bool sem_second_node_expr_stmt(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_expr_stmt on nullptr.");
-	// TODO
+
+	if (!sem_second_expr(node->as.expr_stmt.expr, context)) {
+		return false;
+	}
+
+	node->eval_type = node->as.expr_stmt.expr->eval_type;
 	return true;
 }
 
