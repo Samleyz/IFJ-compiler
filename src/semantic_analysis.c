@@ -1137,6 +1137,14 @@ bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context) {
 			print_error(ERR_INTERNAL, node->line_num, "Member access has no member name.");
 			return false;
 		}
+
+		// Check target eval type if not checked yet
+		if (!node->as.member_access.target->eval_type) {
+			if (!sem_second_expr(node->as.member_access.target, context)) {
+				throw_warning(node->line_num, "Failed to process member access target.");
+				return false;
+			}
+		}
 		if (!node->as.member_access.target->eval_type) {
 			print_error(ERR_INTERNAL, node->line_num,
 						"Member access callee has no evaluation type.");
@@ -1199,6 +1207,16 @@ bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context) {
 						"Member access in function call has no target.");
 			return false;
 		}
+
+		// Check target eval type if not checked yet
+		if (!node->as.func_call.callee->as.member_access.target->eval_type) {
+			if (!sem_second_expr(node->as.func_call.callee->as.member_access.target, context)) {
+				throw_warning(node->line_num,
+							  "Failed to process member access target in function call.");
+				return false;
+			}
+		}
+
 		if (!node->as.func_call.callee->as.member_access.target->eval_type) {
 			print_error(ERR_INTERNAL, node->line_num,
 						"Member access target in function call has no evaluation type.");
@@ -1236,7 +1254,7 @@ bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context) {
 			return false;
 		}
 		if (node->as.func_call.callee->type != NODE_IDENTIFIER) {
-			print_error(ERR_INTERNAL, node->line_num,
+			print_error(ERR_SEM_OTHER, node->line_num,
 						"Function call callee is not an identifier or member access.");
 			return false;
 		}
@@ -1349,9 +1367,7 @@ bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context) {
 				} else if (current_function_param_node->eval_type != TYPE_ANY ||
 						   !current_argument_node->eval_type) {
 					print_error(ERR_SEM_PARAMS, current_argument_node->line_num,
-								"Function expects type %s for parameter, but got %s.",
-								data_type_string_forms[current_function_param_node->eval_type],
-								data_type_string_forms[current_argument_node->eval_type]);
+								"Unexpected type in function parameter.");
 					return false;
 				}
 				// Type mismatch, but any type is allowed -> continue
