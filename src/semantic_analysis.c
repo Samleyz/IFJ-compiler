@@ -884,52 +884,99 @@ bool sem_second_node_extension(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
-bool sem_second_append_empty(ast_node_t block_node, ast_node_t return_node) {
-	if (!ast_list_append(&block_node->as.block.statements, return_node)) {
-		print_error(ERR_INTERNAL, block_node->line_num, "AST node append failed!");
+// Appends an empty return (Unit) to the end of a block
+bool sem_second_append_empty_return(ast_node_t block_node) {
+	ast_node_t return_node = ast_create_node(NODE_RETURN, block_node->line_num);
+	if (!return_node) {
+		print_error(ERR_INTERNAL, block_node->line_num, "AST node allocation failed!");
 		return false;
 	}
 
 	return_node->as.return_stmt.expr = nullptr;
 	return_node->eval_type = TYPE_UNIT;
-	return true;
-}
 
-bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *context,
-									   bool returns_unit) {
-	assert(node && context && "Called sem_second_insert_implicit_return on nullptr.");
-
-	ast_node_t last_stmt_node = node->as.block.statements.tail;
-
-	ast_node_t return_node = ast_create_node(NODE_RETURN, node->line_num);
-	if (!return_node) {
-		print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed!");
+	if (!ast_list_append(&block_node->as.block.statements, return_node)) {
+		print_error(ERR_INTERNAL, block_node->line_num, "AST node append failed!");
+		ast_dtor(return_node);
 		return false;
 	}
 
-	if (last_stmt_node == nullptr || node->as.block.statements.head == nullptr) {
-		if (!sem_second_append_empty(node, return_node)) {
-			ast_dtor(return_node);
-			free(return_node);
-			return false;
-		}
+	return true;
+}
+
+// Inserts the implicit return into one branch of an if (block or one-line statement)
+bool sem_second_insert_return_into_branch(ast_node_t branch, semantic_context_t *context,
+										  bool returns_unit) {
+	assert(branch && context && "Called sem_second_insert_return_into_branch on nullptr.");
+
+	switch (branch->type) {
+	case NODE_BLOCK:
+		return sem_second_insert_implicit_return(branch, context, returns_unit);
+	case NODE_EXPR_STMT:
+		// One-line branch
+		branch->type = NODE_RETURN;
 		return true;
+	default:
+		print_error(ERR_INTERNAL, branch->line_num, "Pasting node return into if failed!");
+		return false;
+	}
+}
+
+// Inserts the implicit return at the end of a block
+bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *context,
+									   bool returns_unit) {
+	assert(node && context && "Called sem_second_insert_implicit_return on nullptr.");
+	ast_node_t current_if;
+	ast_node_t branch;
+
+	ast_node_t last_stmt_node = node->as.block.statements.tail;
+
+	// Empty block
+	if (last_stmt_node == nullptr) {
+		return sem_second_append_empty_return(node);
 	}
 
 	switch (last_stmt_node->type) {
 	case NODE_RETURN:
-		ast_dtor(return_node);
+		// Already returns
 		return true;
 	case NODE_EXPR_STMT:
-		// TODO return node with stmt type or unit
+		// Unit: value is discarded, add an empty return; otherwise return the value
+		if (returns_unit) {
+			return sem_second_append_empty_return(node);
+		}
+		last_stmt_node->type = NODE_RETURN;
 		return true;
 	case NODE_VAR_DEF:
 	case NODE_FOR:
 	case NODE_WHILE:
-		// TODO empty return
-		return true;
+		// Result is Unit
+		return sem_second_append_empty_return(node);
 	case NODE_IF:
-		// TODO
+		// Unit: one empty return after the if, otherwise return in every branch
+		if (returns_unit) {
+			return sem_second_append_empty_return(node);
+		}
+
+		current_if = last_stmt_node;
+		// Walk the if / else if chain
+		while (current_if) {
+			if (!sem_second_insert_return_into_branch(current_if->as.if_stmt.then_branch,
+													  context, returns_unit)) {
+				return false;
+			}
+
+			branch = current_if->as.if_stmt.else_branch;
+			if (branch != nullptr && branch->type == NODE_IF) {
+				current_if = branch;
+			} else {
+				if (branch != nullptr &&
+					!sem_second_insert_return_into_branch(branch, context, returns_unit)) {
+					return false;
+				}
+				current_if = nullptr;
+			}
+		}
 		return true;
 	default:
 		print_error(ERR_INTERNAL, node->line_num,
