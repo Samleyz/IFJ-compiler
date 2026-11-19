@@ -2019,13 +2019,47 @@ bool sem_second_node_func_call(ast_node_t node, semantic_context_t *context) {
 
 bool sem_second_node_member_access(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_member_access on nullptr.");
-	// TODO
+
+	symbol_t mem_acc_symbol = sem_second_find_extension_symbol(node, context);
+	if (!mem_acc_symbol) {
+		return false;
+	}
+
+	if (!(mem_acc_symbol->function.parameter_lists.head == nullptr)) {
+		print_error(ERR_SEM_PARAMS, node->line_num, "Member access function can not have params!");
+		return false;
+	}
+
+	if (mem_acc_symbol->function.state == FUNCTION_UNVISITED) {
+		if (!sem_second_analyze_function(mem_acc_symbol->function.function_definition, context,
+										 mem_acc_symbol)) {
+			return false;
+		}
+	} else if (mem_acc_symbol->function.state == FUNCTION_VISITING) {
+		if (!call_chain_check_cycle(context, mem_acc_symbol->function.function_definition)) {
+			return false;
+		}
+	}
+
+	node->eval_type = mem_acc_symbol->function.return_type;
+
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Interpolated string implemented with AI assistance according to the design of the author.
+// Prompt: Write sem_second_node_string_interp. Analyze all the parts, any type is allowed because
+// the values are converted like toStr, the result is String.
 bool sem_second_node_string_interp(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_string_interp on nullptr.");
-	// TODO
+
+	for (ast_node_t part = node->as.string_interp.parts.head; part; part = part->next) {
+		if (!sem_second_expr(part, context)) {
+			return false;
+		}
+	}
+
+	node->eval_type = TYPE_STRING;
 	return true;
 }
 
@@ -2333,7 +2367,21 @@ bool sem_second_node_identifier(ast_node_t node, semantic_context_t *context) {
 			return false;
 		}
 	} else if (function_symbol) {
-		// TODO: change node to func call with calle identifier
+		char *function_name = node->as.id.name;
+
+		ast_node_t identifier_node = ast_create_node(NODE_IDENTIFIER, node->line_num);
+
+		if (!identifier_node) {
+			print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed!");
+			return false;
+		}
+		identifier_node->as.id.name = function_name;
+
+		node->type = NODE_FUNC_CALL;
+		node->as.func_call.callee = identifier_node;
+		node->as.func_call.has_parens = false;
+		ast_list_init(&node->as.func_call.arg_lists);
+
 		if (!sem_second_node_func_call(node, context)) {
 			throw_warning(node->line_num, "Failed to process function call for identifier '%s'.",
 						  node->as.id.name);
