@@ -4,4 +4,4 @@
 import ifj26.*
 
 @main def main(): Unit =
-  print("A")
+  print("\u0041")
