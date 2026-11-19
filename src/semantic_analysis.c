@@ -1070,6 +1070,21 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 			return sem_second_append_empty_return(node);
 		}
 
+		// An if chain without the final else has no value on every path, so it is Unit
+		for (current_if = last_stmt_node; current_if != nullptr;) {
+			if (current_if->as.if_stmt.else_branch == nullptr) {
+				if (expected != TYPE_UNKNOWN) {
+					print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+								"The if without else does not return a value on every path.");
+					return false;
+				}
+				return sem_second_append_empty_return(node);
+			}
+			current_if = current_if->as.if_stmt.else_branch->type == NODE_IF
+							 ? current_if->as.if_stmt.else_branch
+							 : nullptr;
+		}
+
 		current_if = last_stmt_node;
 		// Walk the if / else if chain
 		while (current_if) {
