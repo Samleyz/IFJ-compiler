@@ -1116,6 +1116,8 @@ char *parse_type(parser_t *p) {
 		name = "Unit";
 	} else if (match_keyword(p, KW_BOOLEAN)) {
 		name = "Boolean";
+	} else if (match_token_type(p, TOKEN_IDENTIFIER)) {
+		print_error(ERR_SEM_UNDEFINED, p->curr_tkn.line_num, "Unknown type.");
 	}
 
 	if (name) {
