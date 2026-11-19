@@ -1,0 +1,12 @@
+//! spec: 1.3
+//! compile: 0
+//! run: 0
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+def half(x: Double): Double = x / 2
+def asDouble(n: Int): Double = n
+@main def main(): Unit =
+  print(toStr(half(5)))
+  print(" ")
+  print(toStr(asDouble(3)))

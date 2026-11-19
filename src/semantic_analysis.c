@@ -1,6 +1,7 @@
 /**
  * @file semantic_analysis.c
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Implementation of semantic analysis functions
  */
 
@@ -961,6 +962,41 @@ bool sem_second_append_empty_return(ast_node_t block_node) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Helper of the implicit returns implemented with AI assistance according to the design of the
+// author (the third rule of the return type in the specification).
+// Prompt: Write a function that checks the value type of a branch of the if at the end of a
+// function. A missing branch has the Unit value, without the explicit type all branches are Unit.
+bool sem_second_check_branch_type(ast_node_t branch, unsigned line_num, data_type_t expected) {
+	data_type_t branch_type = TYPE_UNIT;
+
+	if (branch) {
+		branch_type = branch->eval_type;
+
+		if (branch->type == NODE_BLOCK && branch->as.block.statements.tail &&
+			branch->as.block.statements.tail->type == NODE_IF) {
+			return true;
+		}
+	}
+
+	// The explicit Unit discards the values
+	if (expected == TYPE_UNIT) {
+		return true;
+	}
+
+	// Without the explicit type all the branches have to be Unit
+	if (expected == TYPE_UNKNOWN) {
+		expected = TYPE_UNIT;
+	}
+	if (branch_type == expected || (expected == TYPE_DOUBLE && branch_type == TYPE_INT)) {
+		return true;
+	}
+
+	print_error(ERR_SEM_TYPE_COMPAT, line_num,
+				"The value of a branch does not match the return type of the function.");
+	return false;
+}
+
 // Inserts the implicit return into one branch of an if (block or one-line statement)
 bool sem_second_insert_return_into_branch(ast_node_t branch, semantic_context_t *context,
 										  data_type_t expected) {
@@ -992,6 +1028,15 @@ bool sem_second_insert_return_into_branch(ast_node_t branch, semantic_context_t 
 		}
 		branch->type = NODE_RETURN;
 		return true;
+	// Tool: Claude Code (Claude Sonnet 5.5)
+	// One-line branches that are not an expression implemented with AI assistance.
+	// Prompt: Let a one-line return, assignment and variable definition pass, a return already
+	// returns and the other two are Unit (the type was checked by sem_second_check_branch_type,
+	// the return after the if is appended by sem_second_insert_implicit_return).
+	case NODE_RETURN:
+	case NODE_ASSIGN:
+	case NODE_VAR_DEF:
+		return true;
 	default:
 		print_error(ERR_INTERNAL, branch->line_num, "Pasting node return into if failed!");
 		return false;
@@ -1017,6 +1062,9 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 	case NODE_RETURN:
 		// Already returns
 		return true;
+	case NODE_BLOCK:
+		// A block in the last position (the rewritten return of a Unit function), look inside
+		return sem_second_insert_implicit_return(last_stmt_node, context, expected);
 	case NODE_EXPR_STMT:
 		// Unit: value is discarded, add an empty return; otherwise return the value
 		if (returns_unit) {
@@ -1038,7 +1086,9 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 		current_if = last_stmt_node;
 		// Walk the if / else if chain
 		while (current_if) {
-			if (!sem_second_insert_return_into_branch(current_if->as.if_stmt.then_branch, context,
+			if (!sem_second_check_branch_type(current_if->as.if_stmt.then_branch,
+											  current_if->line_num, expected) ||
+				!sem_second_insert_return_into_branch(current_if->as.if_stmt.then_branch, context,
 													  expected)) {
 				return false;
 			}
@@ -1047,12 +1097,23 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 			if (branch != nullptr && branch->type == NODE_IF) {
 				current_if = branch;
 			} else {
-				if (branch != nullptr &&
-					!sem_second_insert_return_into_branch(branch, context, expected)) {
+				if (!sem_second_check_branch_type(branch, current_if->line_num, expected) ||
+					(branch != nullptr &&
+					 !sem_second_insert_return_into_branch(branch, context, expected))) {
 					return false;
 				}
 				current_if = nullptr;
 			}
+		}
+
+		// Tool: Claude Code (Claude Sonnet 5.5)
+		// The return after an if of a function without the explicit type implemented with AI
+		// assistance (replaces the pre-check of the missing else, the types of the branches are
+		// checked by the loop above).
+		// Prompt: Without the explicit type all the branches are Unit, so append one empty return
+		// after the if, the path where no branch returns must not fall through.
+		if (expected == TYPE_UNKNOWN) {
+			return sem_second_append_empty_return(node);
 		}
 		return true;
 	default:
@@ -1164,6 +1225,11 @@ bool sem_second_check_return_type(ast_node_t node, symbol_t current_function) {
 			return false;
 		}
 		current_function->function.return_type = body_type;
+		if (current_function->function.is_main && body_type != TYPE_UNIT) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Main function must have return type Unit.");
+			return false;
+		}
 	}
 
 	return true;
@@ -1547,6 +1613,11 @@ bool sem_second_node_if_stmt(ast_node_t node, semantic_context_t *context) {
 		return true;
 	}
 
+	if (!node->as.if_stmt.else_branch) {
+		print_error(ERR_INTERNAL, node->line_num, "The if expression has no else branch.");
+		return false;
+	}
+
 	// If expression, the type of the value is the type of the branches
 	then_type = node->as.if_stmt.then_branch->eval_type;
 	else_type = node->as.if_stmt.else_branch->eval_type;
@@ -1718,6 +1789,40 @@ cleanup:
 // function is the top of the call chain, the type is checked against the explicit return type).
 // Prompt: Write sem_second_node_return. Return needs an explicit return type, the empty return is
 // allowed only for Unit, Int is converted to Double, other mismatch is the error 6.
+// Rewrites "return expr" of a Unit function in place into the block { expr; return }, the value
+// is evaluated and discarded and the function returns (). The generator needs no knowledge of the
+// function return type.
+static bool sem_second_discard_return_value(ast_node_t node) {
+	assert(node && node->type == NODE_RETURN && node->as.return_stmt.expr &&
+		   "Called sem_second_discard_return_value on a return without a value.");
+
+	ast_node_t value_node = ast_create_node(NODE_EXPR_STMT, node->line_num);
+	ast_node_t return_node = ast_create_node(NODE_RETURN, node->line_num);
+	if (!value_node || !return_node) {
+		print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed!");
+		ast_dtor(value_node);
+		ast_dtor(return_node);
+		return false;
+	}
+
+	value_node->as.expr_stmt.expr = node->as.return_stmt.expr;
+	value_node->eval_type = node->as.return_stmt.expr->eval_type;
+	return_node->as.return_stmt.expr = nullptr;
+	return_node->eval_type = TYPE_UNIT;
+
+	// The union is overwritten here, the expression is already owned by value_node
+	node->type = NODE_BLOCK;
+	node->eval_type = TYPE_UNIT;
+	ast_list_init(&node->as.block.statements);
+	if (!ast_list_append(&node->as.block.statements, value_node) ||
+		!ast_list_append(&node->as.block.statements, return_node)) {
+		print_error(ERR_INTERNAL, node->line_num, "AST node append failed!");
+		return false;
+	}
+
+	return true;
+}
+
 bool sem_second_node_return(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_return on nullptr.");
 	ast_node_t function_node;
@@ -1749,8 +1854,11 @@ bool sem_second_node_return(ast_node_t node, semantic_context_t *context) {
 	}
 	node->eval_type = node->as.return_stmt.expr->eval_type;
 
-	// Unit discards the value, same types are fine
-	if (expected == TYPE_UNIT || node->eval_type == expected) {
+	// Unit discards the value (this applies to return too), same types are fine
+	if (expected == TYPE_UNIT) {
+		return sem_second_discard_return_value(node);
+	}
+	if (node->eval_type == expected) {
 		return true;
 	}
 

@@ -1,0 +1,15 @@
+//! spec: 5.3
+//! compile: 0
+//! run: 0
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+def a(n: Int): Boolean =
+  print("g1")
+  n > 1
+def b(n: Int): Boolean =
+  print("g2")
+  true
+@main def main(): Unit =
+  for i <- 0 to 3 if a(i) if b(i) do
+    ()

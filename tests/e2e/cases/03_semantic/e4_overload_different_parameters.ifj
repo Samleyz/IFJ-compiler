@@ -1,0 +1,9 @@
+//! spec: 2.3
+//! compile: 4
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+def f(a: Int): Int = a
+def f(a: String): String = a
+@main def main(): Unit =
+  print(f(1))

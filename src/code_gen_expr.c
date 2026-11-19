@@ -19,10 +19,8 @@
  * Double, String and Bool have no entry, so the index has to be checked first.
  */
 static const char *const type_names[] = {
-	[TYPE_INT] = "Int",
-	[TYPE_DOUBLE] = "Double",
-	[TYPE_STRING] = "String",
-	[TYPE_BOOL] = "Bool",
+	[TYPE_INT] = "Int",		 [TYPE_DOUBLE] = "Double", [TYPE_STRING] = "String",
+	[TYPE_BOOL] = "Boolean", [TYPE_UNIT] = "Unit",
 };
 
 /**
@@ -518,7 +516,7 @@ static bool generate_method_call(ast_node_t current_node) {
 
 	unsigned type_idx = current_node->as.func_call.callee->as.member_access.target->eval_type;
 
-	if (type_idx < TYPE_INT || type_idx > TYPE_BOOL) {
+	if (type_idx < TYPE_INT || type_idx > TYPE_UNIT) {
 		return false;
 	}
 
@@ -620,7 +618,7 @@ static bool generate_member_access(ast_node_t current_node) {
 	} else {
 		unsigned type_idx = current_node->as.member_access.target->eval_type;
 
-		if (type_idx < TYPE_INT || type_idx > TYPE_BOOL) {
+		if (type_idx < TYPE_INT || type_idx > TYPE_UNIT) {
 			success = false;
 			goto cleanup;
 		}

@@ -1,0 +1,12 @@
+//! spec: 5.4
+//! compile: 0
+//! run: 0
+// AI-generated test (Claude Sonnet 5.5), prompt: extend black-box e2e suite from the spec; see tests/e2e/NEW_TESTS.md
+import ifj26.*
+
+@main def main(): Unit =
+  print(subStr("hello", 1, 4).length)
+  print(" ")
+  print((if true then "ab" else "c").length)
+  print(" ")
+  print((1 + 2).toString + "x")

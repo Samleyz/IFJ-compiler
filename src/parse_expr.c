@@ -437,6 +437,12 @@ static bool expr_parse_call(stack_t stk, parser_t *p) {
 	ast_node_t callee = expr_take_node(entry);
 	expr_entry_free(entry);
 
+	if (callee->type != NODE_IDENTIFIER && callee->type != NODE_MEMBER_ACCESS) {
+		print_error(ERR_SYNTACTIC, callee->line_num, "Only function can be called");
+		ast_dtor(callee);
+		return false;
+	}
+
 	// From here on the call node owns the callee, so freeing it on an error frees both.
 	ast_node_t call = expr_create_node(NODE_FUNC_CALL, callee->line_num);
 	if (call == nullptr) {
