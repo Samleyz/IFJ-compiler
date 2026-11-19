@@ -1202,6 +1202,11 @@ bool sem_second_check_return_type(ast_node_t node, symbol_t current_function) {
 			return false;
 		}
 		current_function->function.return_type = body_type;
+		if (current_function->function.is_main && body_type != TYPE_UNIT) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Main function must have return type Unit.");
+			return false;
+		}
 	}
 
 	return true;
