@@ -47,7 +47,7 @@ size_t htable_record_count(htable_t htab) {
 }
 
 bool htable_write(htable_t htab, const char *key, void *data) {
-	assert(htab && "Called htable_write on nullptr.");
+	assert(htab && key && "Called htable_write on nullptr.");
 	if (htab->used + 1 > htab->size * 3 / 4) { // Will occupancy be over 75%
 		// Try to make the table larger
 		bool successful_resize = upscale_htab(htab);
@@ -70,11 +70,14 @@ bool htable_write(htable_t htab, const char *key, void *data) {
 			htab->boxes[current_idx].data = data;
 			htab->used++; // Increment used counter
 			return true;
-		} else if (!strcmp(htab->boxes[current_idx].key, key)) { // Has same key
-			// Update data there
-			if (htab->data_dtor && htab->boxes[current_idx].data) {
-				htab->data_dtor(htab->boxes[current_idx].data);
+		} else if (!strcmp(htab->boxes[current_idx].key, key)) {	// Has same key
+			if (htab->data_dtor && htab->boxes[current_idx].data) { // If the old can be freed
+				if (htab->boxes[current_idx].data != data) {		// And it isn't the same pointer
+					// free the old
+					htab->data_dtor(htab->boxes[current_idx].data);
+				}
 			}
+			// Update data there
 			htab->boxes[current_idx].data = data;
 			return true;
 		}
@@ -85,7 +88,7 @@ bool htable_write(htable_t htab, const char *key, void *data) {
 }
 
 void *htable_read(htable_t htab, const char *key) {
-	assert(htab && "Called htable_read on nullptr.");
+	assert(htab && key && "Called htable_read on nullptr.");
 	// Search boxes
 	size_t current_idx = get_index(hash_function(key), htab->size);
 	for (size_t i = 0; i < htab->size; i++) {
@@ -103,7 +106,7 @@ void *htable_read(htable_t htab, const char *key) {
 }
 
 bool htable_remove(htable_t htab, const char *key) {
-	assert(htab && "Called htable_remove on nullptr.");
+	assert(htab && key && "Called htable_remove on nullptr.");
 	// Search boxes
 	size_t current_idx = get_index(hash_function(key), htab->size);
 	for (size_t i = 0; i < htab->size; i++) {

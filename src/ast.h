@@ -41,6 +41,7 @@ typedef enum {
 	TYPE_STRING,
 	TYPE_BOOL,
 	TYPE_UNIT,
+	TYPE_ANY, // For builtin functions only (that accept any type)
 } data_type_t;
 
 /**
@@ -85,7 +86,7 @@ typedef enum {
 } node_type_t;
 
 struct ast_node {
-	node_type_t type;
+	node_type_t type;	   // Data type of the node
 	ast_node_t next;	   // Chaining for sequences
 	unsigned line_num;	   // Source line number for error reporting
 	data_type_t eval_type; // Evaluated expression type
@@ -191,7 +192,7 @@ struct ast_node {
 
 		// NODE_FUNC_CALL
 		struct {
-			ast_node_t callee;	  // Expression being called (e.g. IDENTIFIER, FUNC_CALL, LAMBDA)
+			ast_node_t callee;	  // Identifier or member access (what is called)
 			bool has_parens;	  // False for parameterless calls without parens
 			ast_list_t arg_lists; // Linked list of lists of arguments
 		} func_call;
