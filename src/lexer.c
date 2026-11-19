@@ -854,7 +854,7 @@ token lexer_get_token(void) {
 			// unget
 			ungetc(c, lexer_state.source_file);
 			// send correct token
-			if (lexer_state.interpolateds_substate != -1) {
+			if ((int)lexer_state.interpolateds_substate != -1) {
 				// send string
 				if (lexer_state.interpolateds_substate == 1) { // if sending interpolated string
 					// store that it was sended
@@ -915,7 +915,7 @@ token lexer_get_token(void) {
 			}
 			// unget
 			ungetc(c, lexer_state.source_file);
-			if (lexer_state.interpolateds_substate != -1) {
+			if ((int)lexer_state.interpolateds_substate != -1) {
 				// send string
 				if (lexer_state.interpolateds_substate == 2) { // if sending interpolated string
 					// store that it was sended
@@ -1406,7 +1406,7 @@ token lexer_get_token(void) {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// send correct token
-				if (lexer_state.interpolateds_substate != -1) {
+				if ((int)lexer_state.interpolateds_substate != -1) {
 					// send empty string
 					if (lexer_state.interpolateds_substate == 1) { // if sending interpolated string
 						// store that it was sended
