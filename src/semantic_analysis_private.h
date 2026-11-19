@@ -381,34 +381,14 @@ bool sem_second_node_member_access(ast_node_t node, semantic_context_t *context)
 bool sem_second_node_string_interp(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_TYPE_CAST
- *
- * @param node Type cast node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_type_cast(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_PARAM_LIST
+ * @brief Checks the semantic correctness of a parameter list in a function call
  *
  * @param node Node with a parameter list to analyze
  * @param context Semantic analysis context
  * @return true Success
  * @return false Semantic error
  */
-bool sem_second_node_param_list(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_PARAM
- *
- * @param node Parameter node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_param(ast_node_t node, semantic_context_t *context);
+bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context);
 
 /**
  * @brief Performs the second pass of semantic analysis on a NODE_IDENTIFIER

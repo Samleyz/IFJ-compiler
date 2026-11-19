@@ -663,6 +663,7 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
 						"Failed to register receiver name '%s' in parameter uniqueness check.",
 						receiver_name);
 			stable_leave_scope(context->symtable_local);
+			stable_destroy_symbol(receiver_symbol);
 			return false;
 		}
 	}
@@ -730,6 +731,7 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
 							"Failed to register parameter '%s' in parameter uniqueness check.",
 							current_param_node->as.param.name);
 				stable_leave_scope(context->symtable_local);
+				stable_destroy_symbol(param_symbol);
 				return false;
 			}
 
@@ -884,39 +886,77 @@ bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context) {
 					node->as.var_def.name);
 		return false;
 	}
+	sym->symbol_variant = SYMBOL_VARIABLE;
 
 	// Create unique name
-	if (stable_find_alllevel(context->symtable_local, node->as.var_def.name)) {
-		sym->variable.unique_name =
-			malloc(strlen(node->as.var_def.name) + 20); // Enough for size_t digits
-		if (!sym->variable.unique_name) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for extension function key.");
-			stable_destroy_symbol(sym);
-			return false;
-		}
-		sprintf(sym->variable.unique_name, "%s$%s", node->as.var_def.name,
-				context->rename_counter++);
-	} else {
-		sym->variable.unique_name = strdup(node->as.var_def.name);
-		if (!sym->variable.unique_name) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for extension function key.");
-			stable_destroy_symbol(sym);
-			return false;
-		}
-	}
-
-	// Fill out symbol
-	sym->symbol_variant = SYMBOL_VARIABLE;
-	sym->variable.is_mutable = node->as.var_def.is_val;
-	sym->variable.type = get_data_type_from_string(node->as.var_def.type_name);
-	if (sym->variable.type == TYPE_UNKNOWN) {
-		print_error(ERR_SEM_UNDEFINED, node->line_num, "Variable '%s' has unknown type '%s'.",
-					node->as.var_def.name, node->as.var_def.type_name);
+	sym->variable.unique_name =
+		malloc(strlen(node->as.var_def.name) + 20 + 1 + 1); // Enough for size_t digits + \0 + $
+	if (!sym->variable.unique_name) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for variable unique name.");
 		stable_destroy_symbol(sym);
 		return false;
 	}
+	sprintf(sym->variable.unique_name, "%s$%zu", node->as.var_def.name, context->rename_counter++);
+	node->as.var_def.unique_name = strdup(sym->variable.unique_name);
+	if (!node->as.var_def.unique_name) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for variable unique name in AST.");
+		stable_destroy_symbol(sym);
+		return false;
+	}
+
+	// Fill out symbol
+	sym->variable.is_mutable = !node->as.var_def.is_val;
+	if (node->as.var_def.type_name) {
+		// Explicit type
+		sym->variable.type = get_data_type_from_string(node->as.var_def.type_name);
+		if (sym->variable.type == TYPE_UNKNOWN) {
+			print_error(ERR_SEM_UNDEFINED, node->line_num, "Variable '%s' has unknown type '%s'.",
+						node->as.var_def.name, node->as.var_def.type_name);
+			stable_destroy_symbol(sym);
+			return false;
+		}
+		// Check implicit conversion
+		if (sym->variable.type != node->as.var_def.init_expr->eval_type) {
+			if (sym->variable.type == TYPE_DOUBLE &&
+				node->as.var_def.init_expr->eval_type == TYPE_INT) {
+				// Implicit conversion from Int to Double
+				ast_node_t conversion_node = ast_create_node(NODE_TYPE_CAST, node->line_num);
+				if (!conversion_node) {
+					print_error(ERR_INTERNAL, node->line_num,
+								"Failed to create type cast node for implicit conversion from Int "
+								"to Double.");
+					stable_destroy_symbol(sym);
+					return false;
+				}
+				conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
+				conversion_node->eval_type = TYPE_DOUBLE;
+				conversion_node->as.type_cast.operand = node->as.var_def.init_expr;
+				node->as.var_def.init_expr = conversion_node;
+
+			} else {
+				print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+							"Type mismatch in variable definition for variable '%s'.",
+							node->as.var_def.name);
+				stable_destroy_symbol(sym);
+				return false;
+			}
+		}
+	} else {
+		if (node->as.var_def.init_expr->eval_type == TYPE_UNKNOWN) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num, "Variable '%s' has unknown type.",
+						node->as.var_def.name);
+			stable_destroy_symbol(sym);
+			return false;
+		}
+
+		// Implicit type from initialization expression
+		sym->variable.type = node->as.var_def.init_expr->eval_type;
+	}
+
+	// Set eval type
+	node->eval_type = TYPE_UNIT;
 
 	// Write symbol to the symbol table
 	if (!stable_write(context->symtable_local, node->as.var_def.name, sym)) {
@@ -956,6 +996,13 @@ bool sem_second_node_assign(ast_node_t node, semantic_context_t *context) {
 		return false;
 	}
 
+	// Check if mutable
+	if (!sym->variable.is_mutable) {
+		print_error(ERR_SEM_IMMUTABLE, node->line_num, "Cannot assign to immutable variable '%s'.",
+					node->as.assign.target_id);
+		return false;
+	}
+
 	// Check types
 	if (!sem_second_expr(node->as.assign.expr, context)) {
 		throw_warning(node->line_num, "Failed to process assignment value for variable '%s'.",
@@ -964,7 +1011,6 @@ bool sem_second_node_assign(ast_node_t node, semantic_context_t *context) {
 	}
 	if (sym->variable.type == node->as.assign.expr->eval_type) {
 		// Types match
-		node->eval_type = sym->variable.type;
 	} else if (sym->variable.type == TYPE_DOUBLE && node->as.assign.expr->eval_type == TYPE_INT) {
 		// Implicit conversion from Int to Double
 		ast_node_t conversion_node = ast_create_node(NODE_TYPE_CAST, node->line_num);
@@ -975,12 +1021,9 @@ bool sem_second_node_assign(ast_node_t node, semantic_context_t *context) {
 			return false;
 		}
 		conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
-		conversion_node->eval_type = TYPE_DOUBLE;
 		conversion_node->as.type_cast.operand = node->as.assign.expr;
 		node->as.assign.expr = conversion_node;
-
-		// Set eval type
-		node->eval_type = TYPE_DOUBLE;
+		conversion_node->eval_type = TYPE_DOUBLE;
 	} else {
 		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
 					"Type mismatch in assignment to variable '%s': expected '%s', got '%s'.",
@@ -988,6 +1031,17 @@ bool sem_second_node_assign(ast_node_t node, semantic_context_t *context) {
 					data_type_string_forms[node->as.assign.expr->eval_type]);
 		return false;
 	}
+
+	// Set unique name for the target variable
+	node->as.assign.unique_target_id = strdup(sym->variable.unique_name);
+	if (!node->as.assign.unique_target_id) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for variable unique name in assignment.");
+		return false;
+	}
+
+	// Set eval type
+	node->eval_type = TYPE_UNIT;
 
 	return true;
 }
@@ -1058,27 +1112,307 @@ bool sem_second_node_string_interp(ast_node_t node, semantic_context_t *context)
 	return true;
 }
 
-bool sem_second_node_type_cast(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_type_cast on nullptr.");
-	// TODO
-	return true;
-}
+bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_arg_list on nullptr.");
 
-bool sem_second_node_param_list(ast_node_t node, semantic_context_t *context) {
-	assert(context && "Called sem_second_node_param_list on nullptr.");
-	// TODO
-	return true;
-}
+	// Node checks
+	if (node->type != NODE_FUNC_CALL && node->type != NODE_MEMBER_ACCESS) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_arg_list on non function call node.");
+		return false;
+	}
+	if (node->type == NODE_FUNC_CALL && !node->as.func_call.callee) {
+		print_error(ERR_INTERNAL, node->line_num, "Function call has no callee.");
+		return false;
+	}
 
-bool sem_second_node_param(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_param on nullptr.");
+	// Get function symbol from the symbol table
+	symbol_t function_symbol = nullptr;
+	if (node->type == NODE_MEMBER_ACCESS) {
+		if (!node->as.member_access.target) {
+			print_error(ERR_INTERNAL, node->line_num, "Member access has no target.");
+			return false;
+		}
+		if (!node->as.member_access.member_name) {
+			print_error(ERR_INTERNAL, node->line_num, "Member access has no member name.");
+			return false;
+		}
+		if (!node->as.member_access.target->eval_type) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Member access callee has no evaluation type.");
+			return false;
+		}
+
+		// Make key
+		char *key =
+			malloc(strlen(data_type_string_forms[node->as.member_access.target->eval_type]) +
+				   strlen(node->as.member_access.member_name) + 1 + 1);
+		if (!key) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for extension function key.");
+			return false;
+		}
+		sprintf(key, "%s$%s", node->as.member_access.member_name,
+				data_type_string_forms[node->as.member_access.target->eval_type]);
+
+		// Search symtable
+		function_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
+		free(key);
+		if (!function_symbol) {
+			print_error(
+				ERR_SEM_UNDEFINED, node->line_num,
+				"Extension function '%s' for type '%s' is not defined in the current scope.",
+				node->as.member_access.member_name,
+				data_type_string_forms[node->as.member_access.target->eval_type]);
+			return false;
+		}
+
+		// Check extension parameter type
+		if (function_symbol->function.extension_parameter_type !=
+			node->as.member_access.target->eval_type) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Extension function '%s' expects receiver type '%s', but got '%s'.",
+						node->as.member_access.member_name,
+						data_type_string_forms[function_symbol->function.extension_parameter_type],
+						data_type_string_forms[node->as.member_access.target->eval_type]);
+			return false;
+		}
+
+		// Check symbol has no parameter lists
+		if (function_symbol->function.parameter_lists.count != 0) {
+			print_error(ERR_SEM_PARAMS, node->line_num,
+						"Extension function '%s' has parameter lists, but should not.",
+						node->as.member_access.member_name);
+			return false;
+		}
+
+		return true;
+	} else if (node->type == NODE_FUNC_CALL &&
+			   node->as.func_call.callee->type == NODE_MEMBER_ACCESS) {
+		if (!node->as.func_call.callee->as.member_access.member_name) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Member access in function call has no member name.");
+			return false;
+		}
+		if (!node->as.func_call.callee->as.member_access.target) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Member access in function call has no target.");
+			return false;
+		}
+		if (!node->as.func_call.callee->as.member_access.target->eval_type) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Member access target in function call has no evaluation type.");
+			return false;
+		}
+
+		// Make key
+		char *key = malloc(strlen(data_type_string_forms[node->as.func_call.callee->as.member_access
+															 .target->eval_type]) +
+						   strlen(node->as.func_call.callee->as.member_access.member_name) + 1 + 1);
+		if (!key) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for extension function key.");
+			return false;
+		}
+		sprintf(
+			key, "%s$%s", node->as.func_call.callee->as.member_access.member_name,
+			data_type_string_forms[node->as.func_call.callee->as.member_access.target->eval_type]);
+
+		// Search symtable
+		function_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
+		free(key);
+		if (!function_symbol) {
+			print_error(
+				ERR_SEM_UNDEFINED, node->line_num,
+				"Extension function '%s' for type '%s' is not defined in the current scope.",
+				node->as.func_call.callee->as.member_access.member_name,
+				data_type_string_forms[node->as.func_call.callee->as.member_access.target
+										   ->eval_type]);
+			return false;
+		}
+	} else {
+		if (!node->as.func_call.callee) {
+			print_error(ERR_INTERNAL, node->line_num, "Function call has no callee.");
+			return false;
+		}
+		if (node->as.func_call.callee->type != NODE_IDENTIFIER) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Function call callee is not an identifier or member access.");
+			return false;
+		}
+		if (!node->as.func_call.callee->as.id.name) {
+			print_error(ERR_INTERNAL, node->line_num, "Function call callee has no name.");
+			return false;
+		}
+		function_symbol = stable_find_alllevel(context->symtable_functions,
+											   node->as.func_call.callee->as.id.name);
+		if (!function_symbol) {
+			print_error(ERR_SEM_UNDEFINED, node->line_num,
+						"Function '%s' is not defined in the current scope.",
+						node->as.func_call.callee->as.id.name);
+			return false;
+		}
+	}
+
+	// Check argument lists lengths
+	if (function_symbol->function.parameter_lists.count != node->as.func_call.arg_lists.count) {
+		print_error(
+			ERR_SEM_PARAMS, node->line_num, "Function expects %zu argument lists, but got %zu.",
+			function_symbol->function.parameter_lists.count, node->as.func_call.arg_lists.count);
+		return false;
+	}
+
+	// Go through argument lists and check lengths
+	ast_node_t current_argument_list_node = node->as.func_call.arg_lists.head;
+	ast_node_t current_function_param_list_node = function_symbol->function.parameter_lists.head;
+	while (current_argument_list_node && current_function_param_list_node) {
+		// Node checks
+		if (current_argument_list_node->type != NODE_ARG_LIST) {
+			print_error(ERR_INTERNAL, current_argument_list_node->line_num,
+						"Invalid node type in function call argument lists.");
+			return false;
+		}
+
+		// Check argument list lengths
+		if (current_argument_list_node->as.arg_list.args.count !=
+			current_function_param_list_node->as.param_list.params.count) {
+			print_error(ERR_SEM_PARAMS, current_argument_list_node->line_num,
+						"Function expects %zu parameters in argument list, but got %zu.",
+						current_function_param_list_node->as.param_list.params.count,
+						current_argument_list_node->as.arg_list.args.count);
+			return false;
+		}
+
+		// Go through arguments and check types
+		ast_list_t *current_arg_list_for_cast_insertion =
+			&current_argument_list_node->as.arg_list.args;
+		ast_node_t previous_argument_node_for_cast_insertion = nullptr;
+
+		ast_node_t current_argument_node = current_argument_list_node->as.arg_list.args.head;
+		ast_node_t current_function_param_node =
+			current_function_param_list_node->as.param_list.params.head;
+		while (current_argument_node && current_function_param_node) {
+			// Node checks
+			if (current_function_param_node->type != NODE_PARAM) {
+				print_error(ERR_INTERNAL, current_function_param_node->line_num,
+							"Invalid node type in function parameter list.");
+				return false;
+			}
+
+			// Get argument type
+			if (!sem_second_expr(current_argument_node, context)) {
+				throw_warning(current_argument_node->line_num,
+							  "Failed to process function call argument for function.");
+				return false;
+			}
+
+			// Check correct type
+			if (current_argument_node->eval_type != current_function_param_node->eval_type) {
+				if (current_function_param_node->eval_type == TYPE_DOUBLE &&
+					current_argument_node->eval_type == TYPE_INT) {
+					// Implicit conversion from Int to Double
+					// Create cast node
+					ast_node_t cast_node =
+						ast_create_node(NODE_TYPE_CAST, current_argument_node->line_num);
+					if (!cast_node) {
+						print_error(
+							ERR_INTERNAL, current_argument_node->line_num,
+							"Failed to create type cast node for implicit conversion from Int "
+							"to Double.");
+						return false;
+					}
+					cast_node->eval_type = TYPE_DOUBLE;
+					cast_node->as.type_cast.target_type = TYPE_DOUBLE;
+					cast_node->as.type_cast.operand = current_argument_node;
+
+					// Insert to argument list
+					cast_node->next = current_argument_node->next;
+					current_argument_node->next = nullptr;
+					current_argument_node = cast_node;
+					if (current_arg_list_for_cast_insertion->head == current_argument_node &&
+						current_arg_list_for_cast_insertion->tail == current_argument_node) {
+						// Only
+						current_arg_list_for_cast_insertion->head = cast_node;
+						current_arg_list_for_cast_insertion->tail = cast_node;
+					} else if (!previous_argument_node_for_cast_insertion) {
+						// First
+						current_arg_list_for_cast_insertion->head = cast_node;
+					} else if (!cast_node->next) {
+						// Last
+						previous_argument_node_for_cast_insertion->next = cast_node;
+						current_arg_list_for_cast_insertion->tail = cast_node;
+					} else {
+						// Middle
+						previous_argument_node_for_cast_insertion->next = cast_node;
+					}
+
+				} else if (current_function_param_node->eval_type != TYPE_ANY ||
+						   !current_argument_node->eval_type) {
+					print_error(ERR_SEM_PARAMS, current_argument_node->line_num,
+								"Function expects type %s for parameter, but got %s.",
+								data_type_string_forms[current_function_param_node->eval_type],
+								data_type_string_forms[current_argument_node->eval_type]);
+					return false;
+				}
+				// Type mismatch, but any type is allowed -> continue
+			}
+
+			// Move to next parameter
+			previous_argument_node_for_cast_insertion = current_argument_node;
+			current_argument_node = current_argument_node->next;
+			current_function_param_node = current_function_param_node->next;
+		}
+
+		// Move to next parameter list
+		current_argument_list_node = current_argument_list_node->next;
+		current_function_param_list_node = current_function_param_list_node->next;
+	}
+
 	// TODO
 	return true;
 }
 
 bool sem_second_node_identifier(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_identifier on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_IDENTIFIER) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_identifier on non identifier node.");
+		return false;
+	}
+	if (!node->as.id.name) {
+		print_error(ERR_INTERNAL, node->line_num, "Identifier node has no name.");
+		return false;
+	}
+
+	// Check if identifier is defined in the current scope
+	symbol_t variable_symbol = stable_find_alllevel(context->symtable_local, node->as.id.name);
+	symbol_t function_symbol = stable_find_alllevel(context->symtable_functions, node->as.id.name);
+
+	// Check if identifier is defined
+	if (variable_symbol) {
+		node->eval_type = variable_symbol->variable.type;
+		node->as.id.unique_name = strdup(variable_symbol->variable.unique_name);
+		if (!node->as.id.unique_name) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for variable unique name in identifier.");
+			return false;
+		}
+	} else if (function_symbol) {
+		// TODO: change node to func call with calle identifier
+		if (!sem_second_node_func_call(node, context)) {
+			throw_warning(node->line_num, "Failed to process function call for identifier '%s'.",
+						  node->as.id.name);
+			return false;
+		}
+		node->eval_type = function_symbol->function.return_type;
+	} else {
+		print_error(ERR_SEM_UNDEFINED, node->line_num,
+					"Identifier '%s' is not defined in the current scope.", node->as.id.name);
+		return false;
+	}
+
 	return true;
 }
 
@@ -1089,11 +1423,6 @@ bool sem_second_node_lit_int(ast_node_t node, semantic_context_t *context) {
 	if (node->type != NODE_LIT_INT) {
 		print_error(ERR_INTERNAL, node->line_num,
 					"Called sem_second_node_lit_int on non integer literal node.");
-		return false;
-	}
-	if (node->next) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Integer literal node should not have a next node.");
 		return false;
 	}
 
@@ -1112,11 +1441,6 @@ bool sem_second_node_lit_double(ast_node_t node, semantic_context_t *context) {
 					"Called sem_second_node_lit_double on non double literal node.");
 		return false;
 	}
-	if (node->next) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Double literal node should not have a next node.");
-		return false;
-	}
 
 	// Set eval type
 	node->eval_type = TYPE_DOUBLE;
@@ -1131,11 +1455,6 @@ bool sem_second_node_lit_string(ast_node_t node, semantic_context_t *context) {
 	if (node->type != NODE_LIT_STRING) {
 		print_error(ERR_INTERNAL, node->line_num,
 					"Called sem_second_node_lit_string on non string literal node.");
-		return false;
-	}
-	if (node->next) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"String literal node should not have a next node.");
 		return false;
 	}
 
@@ -1154,11 +1473,6 @@ bool sem_second_node_lit_bool(ast_node_t node, semantic_context_t *context) {
 					"Called sem_second_node_lit_bool on non boolean literal node.");
 		return false;
 	}
-	if (node->next) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Boolean literal node should not have a next node.");
-		return false;
-	}
 
 	// Set eval type
 	node->eval_type = TYPE_BOOL;
@@ -1175,13 +1489,248 @@ bool sem_second_node_lit_unit(ast_node_t node, semantic_context_t *context) {
 					"Called sem_second_node_lit_unit on non unit literal node.");
 		return false;
 	}
-	if (node->next) {
-		print_error(ERR_INTERNAL, node->line_num, "Unit literal node should not have a next node.");
-		return false;
-	}
 
 	// Set eval type
 	node->eval_type = TYPE_UNIT;
 
+	return true;
+}
+
+bool sem_second_load_params(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_load_params on nullptr.");
+
+	// Get function symbol from the symbol table
+	symbol_t function_symbol = nullptr;
+	if (node->type == NODE_FUNC_DEF && node->as.func_def.) {
+		// Node checks
+		if (!node->as.member_access.member_name) {
+			print_error(ERR_INTERNAL, node->line_num, "Member access has no member name.");
+			return false;
+		}
+		if (!node->as.member_access.target) {
+			print_error(ERR_INTERNAL, node->line_num, "Member access has no target.");
+			return false;
+		}
+		if (!node->as.member_access.target->eval_type) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Member access callee has no evaluation type.");
+			return false;
+		}
+
+		// Make key
+		char *key =
+			malloc(strlen(data_type_string_forms[node->as.member_access.target->eval_type]) +
+				   strlen(node->as.member_access.member_name) + 1 + 1);
+		if (!key) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for extension function key.");
+			return false;
+		}
+		sprintf(key, "%s$%s", node->as.member_access.member_name,
+				data_type_string_forms[node->as.member_access.target->eval_type]);
+
+		// Search symtable
+		function_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
+		free(key);
+		if (!function_symbol) {
+			print_error(
+				ERR_SEM_UNDEFINED, node->line_num,
+				"Extension function '%s' for type '%s' is not defined in the current scope.",
+				node->as.member_access.member_name,
+				data_type_string_forms[node->as.member_access.target->eval_type]);
+			return false;
+		}
+
+		// Put the extension symbol to local symtable
+		symbol_t local_extension_symbol = stable_init_symbol();
+		if (!local_extension_symbol) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to create local extension function symbol.");
+			return false;
+		}
+		local_extension_symbol->symbol_variant = SYMBOL_VARIABLE;
+		local_extension_symbol->variable.type = function_symbol->function.extension_parameter_type;
+		local_extension_symbol->variable.is_mutable = false;
+		local_extension_symbol->variable.unique_name =
+			strdup(function_symbol->function.extension_parameter_name);
+		if (!local_extension_symbol->variable.unique_name) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for local extension function parameter name.");
+			stable_destroy_symbol(local_extension_symbol);
+			return false;
+		}
+		if (!stable_write(context->symtable_local,
+						  function_symbol->function.extension_parameter_name,
+						  local_extension_symbol)) {
+			print_error(
+				ERR_INTERNAL, node->line_num,
+				"Failed to write local extension function parameter symbol to symbol table.");
+			stable_destroy_symbol(local_extension_symbol);
+			return false;
+		}
+	} else if (node->type == NODE_FUNC_CALL &&
+			   node->as.func_call.callee->type == NODE_MEMBER_ACCESS) {
+		// Node checks
+		if (!node->as.func_call.callee->as.member_access.member_name) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Member access in function call has no member name.");
+			return false;
+		}
+		if (!node->as.func_call.callee->as.member_access.target) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Member access in function call has no target.");
+			return false;
+		}
+		if (!node->as.func_call.callee->as.member_access.target->eval_type) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Member access target in function call has no evaluation type.");
+			return false;
+		}
+
+		// Make key
+		char *key = malloc(strlen(data_type_string_forms[node->as.func_call.callee->as.member_access
+															 .target->eval_type]) +
+						   strlen(node->as.func_call.callee->as.member_access.member_name) + 1 + 1);
+		if (!key) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for extension function key.");
+			return false;
+		}
+		sprintf(
+			key, "%s$%s", node->as.func_call.callee->as.member_access.member_name,
+			data_type_string_forms[node->as.func_call.callee->as.member_access.target->eval_type]);
+
+		// Search symtable
+		function_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
+		free(key);
+		if (!function_symbol) {
+			print_error(
+				ERR_SEM_UNDEFINED, node->line_num,
+				"Extension function '%s' for type '%s' is not defined in the current scope.",
+				node->as.func_call.callee->as.member_access.member_name,
+				data_type_string_forms[node->as.func_call.callee->as.member_access.target
+										   ->eval_type]);
+			return false;
+		}
+
+		// Put the extension symbol to local symtable
+		symbol_t local_extension_symbol = stable_init_symbol();
+		if (!local_extension_symbol) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to create local extension function symbol.");
+			return false;
+		}
+		local_extension_symbol->symbol_variant = SYMBOL_VARIABLE;
+		local_extension_symbol->variable.type = function_symbol->function.extension_parameter_type;
+		local_extension_symbol->variable.is_mutable = false;
+		local_extension_symbol->variable.unique_name =
+			strdup(function_symbol->function.extension_parameter_name);
+		if (!local_extension_symbol->variable.unique_name) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for local extension function parameter name.");
+			stable_destroy_symbol(local_extension_symbol);
+			return false;
+		}
+		if (!stable_write(context->symtable_local,
+						  function_symbol->function.extension_parameter_name,
+						  local_extension_symbol)) {
+			print_error(
+				ERR_INTERNAL, node->line_num,
+				"Failed to write local extension function parameter symbol to symbol table.");
+			stable_destroy_symbol(local_extension_symbol);
+			return false;
+		}
+	} else {
+		function_symbol = stable_find_alllevel(context->symtable_functions, node->as.func_def.name);
+		if (!function_symbol) {
+			print_error(ERR_SEM_UNDEFINED, node->line_num,
+						"Function '%s' is not defined in the current scope.",
+						node->as.func_def.name);
+			return false;
+		}
+	}
+
+	// Go through parameter lists
+	ast_node_t current_function_param_list_node = function_symbol->function.parameter_lists.head;
+	while (current_function_param_list_node) {
+		// Node checks
+		if (current_function_param_list_node->type != NODE_PARAM_LIST) {
+			print_error(ERR_INTERNAL, current_function_param_list_node->line_num,
+						"Invalid node type in function parameter lists.");
+			return false;
+		}
+
+		// Go through parameters
+		ast_node_t current_function_param_node =
+			current_function_param_list_node->as.param_list.params.head;
+		while (current_function_param_node) {
+			// Node checks
+			if (current_function_param_node->type != NODE_PARAM) {
+				print_error(ERR_INTERNAL, current_function_param_node->line_num,
+							"Invalid node type in function parameter list.");
+				return false;
+			}
+
+			// Check if parameter is defined
+			if (stable_find_alllevel(context->symtable_local,
+									 current_function_param_node->as.param.name)) {
+				print_error(ERR_INTERNAL, current_function_param_node->line_num,
+							"Parameter '%s' is already defined in the current scope.",
+							current_function_param_node->as.param.name);
+				return false;
+			}
+
+			// Create symbol
+			symbol_t param_symbol = stable_init_symbol();
+			if (!param_symbol) {
+				print_error(ERR_INTERNAL, current_function_param_node->line_num,
+							"Failed to create parameter symbol for parameter '%s'.",
+							current_function_param_node->as.param.name);
+				return false;
+			}
+
+			// Fill out symbol
+			param_symbol->symbol_variant = SYMBOL_VARIABLE;
+			param_symbol->variable.is_mutable = false; // Parameters are immutable
+			param_symbol->variable.type = current_function_param_node->eval_type;
+			param_symbol->variable.unique_name = strdup(current_function_param_node->as.param.name);
+			if (!param_symbol->variable.unique_name) {
+				print_error(ERR_INTERNAL, current_function_param_node->line_num,
+							"Failed to allocate memory for parameter unique name '%s'.",
+							current_function_param_node->as.param.name);
+				stable_destroy_symbol(param_symbol);
+				return false;
+			}
+
+			// Set unique name in AST node
+			current_function_param_node->as.param.unique_name =
+				strdup(param_symbol->variable.unique_name);
+			if (!current_function_param_node->as.param.unique_name) {
+				print_error(ERR_INTERNAL, current_function_param_node->line_num,
+							"Failed to allocate memory for parameter unique name in AST node '%s'.",
+							current_function_param_node->as.param.name);
+				stable_destroy_symbol(param_symbol);
+				return false;
+			}
+
+			// Store symbol in the local symbol table
+			if (!stable_write(context->symtable_local, current_function_param_node->as.param.name,
+							  param_symbol)) {
+				print_error(ERR_INTERNAL, current_function_param_node->line_num,
+							"Failed to store parameter '%s' in the local symbol table.",
+							current_function_param_node->as.param.name);
+				stable_destroy_symbol(param_symbol);
+				return false;
+			}
+
+			// Move to next parameter
+			current_function_param_node = current_function_param_node->next;
+		}
+
+		// Move to next parameter list
+		current_function_param_list_node = current_function_param_list_node->next;
+	}
+
+	// TODO
 	return true;
 }
