@@ -68,7 +68,7 @@ lexer_final.o: lexer.o lexer_helpers.o token.o
 parser_final.o: parser.o parser_grammar.o parser_helpers.o parse_expr.o parse_expr_helpers.o
 	$(LD) -r $^ -o $@
 
-semantic_analysis.o : src/semantic_analysis.c src/semantic_analysis.h src/semantic_analysis_private.h src/symtable.h
+semantic_analysis.o : src/semantic_analysis.c src/semantic_analysis.h src/semantic_analysis_private.h src/symtable.h src/ast.h src/token.h src/error.h
 	$(CC) -c $< -o $@ $(CFLAGS)
 
 code_gen_final.o: code_gen.o code_gen_expr.o code_gen_stmt.o code_gen_builtins.o instruction_set.o
