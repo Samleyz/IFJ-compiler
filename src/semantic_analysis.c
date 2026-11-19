@@ -1609,6 +1609,11 @@ bool sem_second_node_if_stmt(ast_node_t node, semantic_context_t *context) {
 		return true;
 	}
 
+	if (!node->as.if_stmt.else_branch) {
+		print_error(ERR_INTERNAL, node->line_num, "The if expression has no else branch.");
+		return false;
+	}
+
 	// If expression, the type of the value is the type of the branches
 	then_type = node->as.if_stmt.then_branch->eval_type;
 	else_type = node->as.if_stmt.else_branch->eval_type;
