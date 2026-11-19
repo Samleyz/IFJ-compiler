@@ -1004,15 +1004,101 @@ bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *cont
 	}
 }
 
+// Analyzes the function body and inserts the implicit returns
+bool sem_second_func_analyze_body(ast_node_t node, semantic_context_t *context,
+								  symbol_t current_function) {
+	assert(node && context && current_function &&
+		   "Called sem_second_func_analyze_body on nullptr.");
+	data_type_t expected_type;
+	ast_node_t temp_node;
+
+	if (node->as.func_def.body->type == NODE_BLOCK) {
+		// checks the whole block and sets block eval type
+		if (!sem_second_node_block_body(node->as.func_def.body, context)) {
+			return false;
+		}
+
+		// TYPE_UNKNOWN means that the return type is not explicit
+		expected_type = TYPE_UNKNOWN;
+		if (current_function->function.has_explicit_return_type) {
+			expected_type = current_function->function.return_type;
+		}
+
+		if (!sem_second_insert_implicit_return(node->as.func_def.body, context, expected_type)) {
+			return false;
+		}
+	} else {
+		if (!sem_second_expr(node->as.func_def.body, context)) {
+			return false;
+		}
+
+		temp_node = ast_create_node(NODE_RETURN, node->as.func_def.body->line_num);
+		if (!temp_node) {
+			print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed");
+			return false;
+		}
+
+		temp_node->as.return_stmt.expr = node->as.func_def.body;
+		node->as.func_def.body = temp_node;
+		node->as.func_def.body->eval_type = node->as.func_def.body->as.return_stmt.expr->eval_type;
+	}
+
+	return true;
+}
+
+// Checks the body type against the declared return type or infers the return type
+bool sem_second_check_return_type(ast_node_t node, symbol_t current_function) {
+	assert(node && current_function && "Called sem_second_check_return_type on nullptr.");
+	data_type_t body_type = node->as.func_def.body->eval_type;
+
+	if (current_function->function.has_explicit_return_type) {
+		data_type_t expected = current_function->function.return_type;
+
+		if (expected != TYPE_UNIT && body_type != expected) {
+			if (body_type == TYPE_INT && expected == TYPE_DOUBLE) {
+				// Tool: Claude Code (Claude Sonnet 5.5)
+				// Insertion of the Int -> Double type cast into the return of a one-line body
+				// implemented with AI assistance (pattern taken from sem_second_node_assign).
+				// Prompt: Add insertion of the type cast node.
+				if (node->as.func_def.body->type == NODE_RETURN) {
+					ast_node_t return_node = node->as.func_def.body;
+					ast_node_t conversion_node =
+						ast_create_node(NODE_TYPE_CAST, return_node->line_num);
+					if (!conversion_node) {
+						print_error(ERR_INTERNAL, return_node->line_num,
+									"Failed to create type cast node for the function return.");
+						return false;
+					}
+
+					conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
+					conversion_node->as.type_cast.operand = return_node->as.return_stmt.expr;
+					conversion_node->eval_type = TYPE_DOUBLE;
+					return_node->as.return_stmt.expr = conversion_node;
+					return_node->eval_type = TYPE_DOUBLE;
+				}
+				// Block body: the cast is inserted together with the returns
+			} else {
+				print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+							"Function return type does not match the declared return type");
+				return false;
+			}
+		}
+	} else {
+		if (body_type == TYPE_UNKNOWN) {
+			print_error(ERR_INTERNAL, node->line_num, "Function body type has not been set!");
+			return false;
+		}
+		current_function->function.return_type = body_type;
+	}
+
+	return true;
+}
+
 bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_func_def on nullptr.");
 	bool success = true;
 	bool pushed = false; // if malloc fails
-	data_type_t expected_type;
 
-	data_type_t body_type;
-
-	ast_node_t temp_node;
 	// store previous local table
 	stable_t prev_local_table = context->symtable_local;
 
@@ -1053,83 +1139,16 @@ bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 		goto cleanup;
 	}
 
-	if (node->as.func_def.body->type == NODE_BLOCK) {
-		// checks the whole block and sets block eval type
-		if (!sem_second_node_block_body(node->as.func_def.body, context)) {
-			success = false;
-			goto cleanup;
-		}
-
-		// TYPE_UNKNOWN means that the return type is not explicit
-		expected_type = current_function->function.has_explicit_return_type
-							? current_function->function.return_type
-							: TYPE_UNKNOWN;
-
-		if (!sem_second_insert_implicit_return(node->as.func_def.body, context, expected_type)) {
-			success = false;
-			goto cleanup;
-		}
-	} else {
-		if (!sem_second_expr(node->as.func_def.body, context)) {
-			success = false;
-			goto cleanup;
-		}
-
-		temp_node = ast_create_node(NODE_RETURN, node->as.func_def.body->line_num);
-		if (!temp_node) {
-			print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed");
-			success = false;
-			goto cleanup;
-		}
-
-		temp_node->as.return_stmt.expr = node->as.func_def.body;
-		node->as.func_def.body = temp_node;
-		node->as.func_def.body->eval_type = node->as.func_def.body->as.return_stmt.expr->eval_type;
+	// analyze the body and paste returns
+	if (!sem_second_func_analyze_body(node, context, current_function)) {
+		success = false;
+		goto cleanup;
 	}
 
-	body_type = node->as.func_def.body->eval_type;
-
-	if (current_function->function.has_explicit_return_type) {
-		data_type_t expected = current_function->function.return_type;
-
-		if (expected != TYPE_UNIT && body_type != expected) {
-			if (body_type == TYPE_INT && expected == TYPE_DOUBLE) {
-				// Tool: Claude Code (Claude Sonnet 5.5)
-				// Insertion of the Int -> Double type cast into the return of a one-line body
-				// implemented with AI assistance (pattern taken from sem_second_node_assign).
-				// Prompt: Add insertion of the type cast node.
-				if (node->as.func_def.body->type == NODE_RETURN) {
-					ast_node_t return_node = node->as.func_def.body;
-					ast_node_t conversion_node =
-						ast_create_node(NODE_TYPE_CAST, return_node->line_num);
-					if (!conversion_node) {
-						print_error(ERR_INTERNAL, return_node->line_num,
-									"Failed to create type cast node for the function return.");
-						success = false;
-						goto cleanup;
-					}
-
-					conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
-					conversion_node->as.type_cast.operand = return_node->as.return_stmt.expr;
-					conversion_node->eval_type = TYPE_DOUBLE;
-					return_node->as.return_stmt.expr = conversion_node;
-					return_node->eval_type = TYPE_DOUBLE;
-				}
-				// Block body: the cast is inserted together with the returns
-			} else {
-				print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-							"Function return type does not match the declared return type");
-				success = false;
-				goto cleanup;
-			}
-		}
-	} else {
-		if (body_type == TYPE_UNKNOWN) {
-			print_error(ERR_INTERNAL, node->line_num, "Function body type has not been set!");
-			success = false;
-			goto cleanup;
-		}
-		current_function->function.return_type = body_type;
+	// check or infer the return type
+	if (!sem_second_check_return_type(node, current_function)) {
+		success = false;
+		goto cleanup;
 	}
 
 cleanup:

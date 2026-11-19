@@ -271,6 +271,11 @@ bool sem_second_insert_return_into_branch(ast_node_t branch, semantic_context_t 
 bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *context,
 									   data_type_t expected);
 
+bool sem_second_func_analyze_body(ast_node_t node, semantic_context_t *context,
+								  symbol_t current_function);
+
+bool sem_second_check_return_type(ast_node_t node, symbol_t current_function);
+
 /**
  * @brief Performs the second pass of semantic analysis on a NODE_FUNC_DEF
  *
