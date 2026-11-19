@@ -1664,9 +1664,34 @@ bool sem_second_node_binary_op(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// Unary operator implemented with AI assistance according to the design of the author (the rules
+// are taken from the specification, chapter 3 and the extension BOOLTHEN).
+// Prompt: Write sem_second_node_unary_op. The unary + and - are for numbers, the ! is for Boolean,
+// the type of the result is the type of the operand.
 bool sem_second_node_unary_op(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_unary_op on nullptr.");
-	// TODO
+	data_type_t operand_type;
+	bool valid;
+
+	if (!sem_second_expr(node->as.unary_op.operand, context)) {
+		return false;
+	}
+	operand_type = node->as.unary_op.operand->eval_type;
+
+	if (node->as.unary_op.operator_type == OPERATOR_EX_MARK) {
+		valid = operand_type == TYPE_BOOL;
+	} else {
+		valid = (bool)(operand_type == TYPE_INT || operand_type == TYPE_DOUBLE);
+	}
+
+	if (!valid) {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+					"Type mismatch of the operand of the unary operator.");
+		return false;
+	}
+
+	node->eval_type = operand_type;
 	return true;
 }
 
