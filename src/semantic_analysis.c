@@ -1569,9 +1569,27 @@ bool sem_second_node_if_stmt(ast_node_t node, semantic_context_t *context) {
 	return true;
 }
 
+// Tool: Claude Code (Claude Sonnet 5.5)
+// While cycle implemented with AI assistance according to the design of the author.
+// Prompt: Write sem_second_node_while. The condition has to be Boolean, the body is a block with
+// its own scope and the cycle has the Unit type.
 bool sem_second_node_while(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_while on nullptr.");
-	// TODO
+
+	if (!sem_second_expr(node->as.while_stmt.condition, context)) {
+		return false;
+	}
+
+	if (node->as.while_stmt.condition->eval_type != TYPE_BOOL) {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num, "The condition of while must be Boolean.");
+		return false;
+	}
+
+	if (!sem_second_node_block(node->as.while_stmt.body, context)) {
+		return false;
+	}
+
+	node->eval_type = TYPE_UNIT;
 	return true;
 }
 
