@@ -1328,7 +1328,6 @@ bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context) {
 					// Insert to argument list
 					cast_node->next = current_argument_node->next;
 					current_argument_node->next = nullptr;
-					current_argument_node = cast_node;
 					if (current_arg_list_for_cast_insertion->head == current_argument_node &&
 						current_arg_list_for_cast_insertion->tail == current_argument_node) {
 						// Only
@@ -1345,6 +1344,7 @@ bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context) {
 						// Middle
 						previous_argument_node_for_cast_insertion->next = cast_node;
 					}
+					current_argument_node = cast_node;
 
 				} else if (current_function_param_node->eval_type != TYPE_ANY ||
 						   !current_argument_node->eval_type) {
