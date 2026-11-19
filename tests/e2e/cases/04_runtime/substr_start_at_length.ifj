@@ -1,0 +1,6 @@
+//! spec: 4
+//! compile: 0
+//! run: 40
+import ifj26.*
+@main def main(): Unit =
+  print(subStr("abc", 3, 3))

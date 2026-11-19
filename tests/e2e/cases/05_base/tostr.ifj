@@ -1,0 +1,16 @@
+//! spec: 4
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  print(toStr(42))
+  print(" ")
+  print(toStr(1.2345))
+  print(" ")
+  print(toStr(2.5))
+  print(" ")
+  print(toStr(-0.5))
+  print(" ")
+  print(toStr("x"))
+  print(" ")
+  print(toStr(()))

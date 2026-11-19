@@ -2,15 +2,29 @@
 
 ## Build and run tests
 
-The Makefile builds and runs the unit tests for the implemented modules. CMake uses an installed
-GoogleTest package or downloads GoogleTest on the first configure. A C23/C++20 compiler, GNU Make,
-and CMake 3.21 or newer are required on a POSIX-compatible system (Linux or macOS).
+The Makefile builds the compiler and runs the tests. The unit tests are built with CMake, which
+uses an installed GoogleTest package or downloads GoogleTest on the first configure. A C23/C++20
+compiler (e.g. gcc 14), GNU Make, and CMake 3.21 or newer are required on a POSIX-compatible system
+(Linux or macOS).
 
 ```sh
-make          # Configure and build all test executables
-make test     # Run all tests
-make valgrind # Run all tests under Valgrind
+make            # Build the compiler (./compiler)
+make unit-tests # Configure and build all unit test executables
+make test       # Build and run all unit tests
+make valgrind   # Run all unit tests under Valgrind
+make clean      # Remove the compiler, object files and the build directory
 ```
+
+### End-to-end tests
+
+```sh
+make e2e      # Run the end-to-end tests against ./compiler
+```
+
+`tests/e2e/cases` holds complete IFJ26 programs whose expected results come only from the
+specification (lexical, syntax, semantic and runtime errors, the base language and our extensions).
+The runner checks the compiler's exit code; with the interpreter (`IC26INT=/path/to/ic26int`) it
+also runs the generated code and compares the output. Rebuild with `make` after changing the code.
 
 ## Developer Setup
 

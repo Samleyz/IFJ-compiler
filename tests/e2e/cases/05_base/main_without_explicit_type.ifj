@@ -1,0 +1,5 @@
+//! spec: 2
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def start() = print("ok")

@@ -1,0 +1,6 @@
+//! spec: 4
+//! compile: 0
+//! run: 58
+import ifj26.*
+@main def main(): Unit =
+  print(chr(200))

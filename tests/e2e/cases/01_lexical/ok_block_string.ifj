@@ -1,0 +1,9 @@
+//! spec: 1.1
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  val x = """A
+    hoj s\nvete
+     """
+  print(x)

@@ -1,0 +1,22 @@
+//! spec: 2.3
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+def isEven(n: Int): Int =
+  if n == 0 then
+    return 1
+  else
+    return isOdd(n - 1)
+
+def isOdd(n: Int): Int =
+  if n == 0 then
+    return 0
+  else
+    return isEven(n - 1)
+
+@main def main(): Unit =
+  val a = isEven(10)
+  val b = isEven(7)
+  print(a)
+  print(b)

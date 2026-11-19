@@ -1,0 +1,11 @@
+//! spec: 5.10
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+def answer: Int = 42
+
+@main def main(): Unit =
+  print(answer + 1)
+  print(" ")
+  print(answer)

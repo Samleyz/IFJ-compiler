@@ -1,0 +1,10 @@
+//! spec: 1.2
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  val a = 1
+
+
+  // comment line
+  print(a)

@@ -1,6 +1,7 @@
 /**
  * @file parse_expr_private.h
- * @author Jan Mejzlík (xmejzlj00@vutbr.cz) , Samuel Cehlarik (xcehlas00@vutbr.cz)
+ * @author Jan Mejzlík (xmejzlj00@vutbr.cz) , Samuel Cehlarik (xcehlas00@vutbr.cz) , Claude Code
+ * (Sonnet 5.5)
  * @brief Internal declarations for precedence syntactic analysis of expressions
  * @date 2026-10-22
  */
@@ -14,6 +15,12 @@
 #include "ast.h"
 #include "stack.h"
 #include "token.h"
+
+// Tool: Claude Code (agent, Claude Sonnet 5.5)
+// Prompt (paraphrase): Declare the expression stack entries and helpers for the approach on top
+// of the existing stack ADT (pop, insert the '<' marker, push back), document them in the style
+// of stack_private.h, remove the unused CALL_OPEN symbol, and describe the failure values after
+// replacing throw_err with print_error.
 
 /*
  * Terminal classes used to index the precedence matrix.

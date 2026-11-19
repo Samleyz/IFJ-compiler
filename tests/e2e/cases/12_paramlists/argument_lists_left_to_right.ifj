@@ -1,0 +1,15 @@
+//! spec: 5.10
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+def p(x: Int): Int =
+  print(x)
+  x
+
+def add(a: Int)(b: Int): Int = a + b
+
+@main def main(): Unit =
+  val r = add(p(1))(p(2))
+  print(" ")
+  print(r)

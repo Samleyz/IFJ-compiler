@@ -1,0 +1,22 @@
+//! spec: 5.2
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+def t(): Boolean =
+  print("T")
+  true
+
+def f(): Boolean =
+  print("F")
+  false
+
+@main def main(): Unit =
+  if f() && t() then
+    print("1")
+  else
+    print("2")
+  if t() || f() then
+    print("3")
+  else
+    print("4")

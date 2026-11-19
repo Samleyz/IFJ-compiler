@@ -1,0 +1,11 @@
+//! spec: 5.9
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+@main def main(): Unit =
+  val s = "hi"
+  print(s.shout)
+
+extension (text: String)
+  def shout: String = text + "!"

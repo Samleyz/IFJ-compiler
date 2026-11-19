@@ -1,0 +1,9 @@
+//! spec: 5.9
+//! compile: 4
+import ifj26.*
+extension (v: Int)
+  def m: Int = v
+  def m: Int = v + 1
+@main def main(): Unit =
+  val x = 1
+  print(x.m)

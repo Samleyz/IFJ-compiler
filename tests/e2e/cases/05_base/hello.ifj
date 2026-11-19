@@ -1,0 +1,6 @@
+//! spec: 4
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  print("Hello\n")

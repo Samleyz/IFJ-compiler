@@ -1,0 +1,6 @@
+//! spec: 4
+//! compile: 5
+import ifj26.*
+@main def main(): Unit =
+  val n = toInt(1)
+  print(n)

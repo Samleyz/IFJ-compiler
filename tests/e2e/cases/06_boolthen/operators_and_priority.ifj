@@ -1,0 +1,20 @@
+//! spec: 5.2
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  print(!true)
+  print(" ")
+  print(true && false)
+  print(" ")
+  print(true || false)
+  print(" ")
+  print(!false && true)
+  print(" ")
+  print(true || false && false)
+  print(" ")
+  print(1 < 2 && 3 > 4)
+  print(" ")
+  print(true == false)
+  print(" ")
+  print(true != false)

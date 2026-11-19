@@ -1,6 +1,6 @@
 /**
  * @file parse_expr.c
- * @author Samuel Cehlarik (xcehlas00@vutbr.cz)
+ * @author Samuel Cehlarik (xcehlas00@vutbr.cz) , Claude Code (Sonnet 5.5)
  * @brief Implementation of precedence syntactic analysis for expressions
  * @date 2026-10-22
  */
@@ -123,6 +123,19 @@ expr_symbol_t expr_symbol_from_token(const token *tkn, bool expects_operand) {
 		return EXPR_SYMBOL_INVALID;
 	}
 }
+
+// Tool: Claude Code (agent, Claude Sonnet 5.5)
+// It's difficult to provide exact prompts, because the helpers were implemented in an iterative
+// process (I didn't know at the start what I would need) and generated with an agent over many
+// prompts. The answers were reviewed and modified if something was wrong. The general prompt,
+// paraphrased, could look like this:
+// Implement the helper functions of parse_expression: classify the input token and end an
+// expression at an identifier after an operand (to, until, by), move tokens onto the stack,
+// reduce a handle to an AST node, take the finished result, parse call arguments, calls, member
+// access, interpolated strings and if used as an expression (via parse_cond_stmt), and report
+// errors with print_error.
+
+// Everything else was due to spec restrictions was implemented manually.
 
 /**
  * @brief Maximum number of entries in a handle: "( expression )" and "expression op expression"
@@ -412,11 +425,6 @@ static bool expr_parse_arguments(parser_t *p, ast_list_t *args) {
 	return true;
 }
 
-// Tool: Claude Code (agent, Sonnet 5.5)
-// Prompt (paraphrase): Change the parser for the new AST: func_call.arg_lists holds
-// NODE_ARG_LIST nodes, member_access has no arguments.
-// Note: Agent session, verbatim prompts are not listed. AST design is ours, AI only changed
-// expr_parse_call and expr_parse_member.
 /**
  * @brief Helper function: Turns the expression on top of the stack into the callee of a call
  * @param stk Expression stack, a node entry must be on top

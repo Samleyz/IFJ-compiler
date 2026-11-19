@@ -1,0 +1,18 @@
+//! spec: 2.3
+//! compile: 0
+//! run: 0
+import ifj26.*
+
+def firstOver(limit: Int): Int =
+  var i = 0
+  while i < 100 do
+    if i * i > limit then
+      return i
+    else
+      ()
+    i = i + 1
+  return -1
+
+@main def main(): Unit =
+  val r = firstOver(50)
+  print(r)

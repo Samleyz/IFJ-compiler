@@ -1,0 +1,8 @@
+//! spec: 5.2
+//! compile: 0
+//! run: 0
+import ifj26.*
+@main def main(): Unit =
+  if 1 > 2 then
+    print("no")
+  print("end")
