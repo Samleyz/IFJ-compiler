@@ -88,10 +88,6 @@ void semantic_context_dtor(semantic_context_t *context) {
 		stable_dtor(context->symtable_extension_functions);
 	}
 
-	if (context->call_chain.top != nullptr) {
-		call_chain_destroy(context);
-	}
-
 	// Zero out the structure
 	*context = (semantic_context_t){0};
 }
@@ -538,6 +534,9 @@ bool sem_first_node_func_def(ast_node_t node, semantic_context_t *context) {
 		return false;
 	}
 
+	// Sttore symbol pointer for later access
+	node->sym_entry = symbol;
+
 	return true;
 }
 
@@ -556,6 +555,12 @@ bool sem_first_node_extension(ast_node_t node, semantic_context_t *context) {
 	}
 	if (!node->as.extension.receiver_type) {
 		print_error(ERR_INTERNAL, node->line_num, "Extension has no receiver type.");
+		return false;
+	}
+
+	// Name of receiver (always unique in the scope of extension)
+	if (!(node->as.extension.unique_receiver_name = strdup(node->as.extension.receiver_name))) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to duplicate receiver name.");
 		return false;
 	}
 
@@ -644,6 +649,8 @@ bool sem_first_node_extension(ast_node_t node, semantic_context_t *context) {
 			return false;
 		}
 		free(key);
+		// Sttore symbol pointer for later access
+		current_extension_node->sym_entry = symbol;
 
 		// Move to next
 		current_extension_node = current_extension_node->next;
