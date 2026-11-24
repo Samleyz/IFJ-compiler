@@ -15,16 +15,22 @@
 /** @brief Digits of size_t, space for the counter in the unique names of variables */
 #define SIZE_T_MAX_DIGITS 20
 
-typedef struct call_chain_item {
-	ast_node_t function_node;
-	struct call_chain_item *previous_item;
-} *call_chain_item_t;
+/**
+ * @brief Stack level struct that is used for keeping track of function call stack, that is
+ * currently analyzed in second pass
+ */
+typedef struct function_stack {
+	symbol_t symbol;			/**< Symbol of the analysed function */
+	ast_node_t definition_node; /**< Node NODE_FUNC_DEF of the analysed function */
+	stable_t local_scope;		/**< Current local sccope symbol table */
+	struct function_stack
+		*caller_function_stack; /**< Stack of the function that was calling this function */
+} function_stack_t;
 
-typedef struct {
-	call_chain_item_t top;
-	unsigned size;
-} call_chain_t;
-
+/**
+ * @brief Semantic context struct that holds all the necessary information for the semantic analysis
+ * so functions can share that between each other
+ */
 typedef struct {
 	stable_t symtable_local;			   /**< Table of local symbols */
 	stable_t symtable_functions;		   /**< Table of function symbols */
@@ -33,28 +39,9 @@ typedef struct {
 	size_t main_functions_count; /**< Count of main functions found */
 	size_t rename_counter;		 /**< Counter for generating unique names*/
 
-	char *current_function_name; /**< Name of the function currently being analyzed (nullptr if not
-									in function) */
-
-	char *extension_variable_name; /**< Name of the variable used in extension function calls to be
-									  stored in function symbol (nullptr if not in extension)*/
-
-	bool found_branch_without_return; /**< Flag indicating if a branch without return was found */
-	bool is_in_expression_if; /**< Flag indicating if currently analyzing an if as expression */
-
-	call_chain_t call_chain;
-	// TODO: Add more fields if needed for semantic context
+	function_stack_t
+		*function_stack; /**< Function currently analysed in the second pass (nullptr if none) */
 } semantic_context_t;
-
-void call_chain_init(semantic_context_t *context);
-
-bool call_chain_add(semantic_context_t *context, ast_node_t function_node);
-
-void call_chain_destroy(semantic_context_t *context);
-
-void call_chain_pop(semantic_context_t *context);
-
-bool call_chain_check_cycle(semantic_context_t *context, ast_node_t cycle_start);
 
 /**
  * @brief Initializes a semantic context structure
@@ -216,13 +203,11 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
 */
 
 /**
- * @brief Performs the second pass of semantic analysis
+ * @brief Performs the second pass of semantic analysis on node
  *
- * @param node Program root node to analyze
+ * @param node Root program node of AST to analyze
  * @param context Semantic analysis context
  * @return true Success
  * @return false Semantic error
  */
 bool sem_second(ast_node_t node, semantic_context_t *context);
-
-#endif
