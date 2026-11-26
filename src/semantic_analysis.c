@@ -1223,7 +1223,12 @@ bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool nee
 	case NODE_EXPR_STMT:
 		// Patch fix for if (whether it is statement or expression should decide semantics)
 		if (node->as.expr_stmt.expr->type == NODE_IF) {
-			return sem_second_if(node->as.expr_stmt.expr, context, need_value);
+			// Unwrap
+			ast_node_t to_delete = node->as.expr_stmt.expr;
+			node->as.expr_stmt.expr->next = node->next; // Preserve the next statement
+			*node = *node->as.expr_stmt.expr; // Replace the statement node with the if node
+			free(to_delete); // Free the old expression node (just the node - no dtor)
+			return sem_second_if(node, context, need_value);
 		}
 
 		if (!sem_second_expression(node->as.expr_stmt.expr, context)) {
@@ -1404,7 +1409,8 @@ bool sem_second_assign(ast_node_t node, semantic_context_t *context) {
 	}
 
 	// Find the variable in the local scope
-	symbol_t symbol = sem_find_symbol(context, node->as.assign.target_id);
+	symbol_t symbol =
+		stable_find_alllevel(context->function_stack->local_scope, node->as.assign.target_id);
 	if (!symbol) {
 		print_error(ERR_SEM_UNDEFINED, node->line_num, "Undefined variable");
 		return false;
@@ -1439,7 +1445,244 @@ bool sem_second_assign(ast_node_t node, semantic_context_t *context) {
 }
 
 bool sem_second_if(ast_node_t node, semantic_context_t *context, bool need_value) {
-	// TODO
+	assert(node && context && "Called sem_second_if on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_IF) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_if on non if node.");
+		return false;
+	}
+
+	// Resolve the condition
+	if (!sem_resolve_condition(node->as.if_stmt.condition, context)) {
+		return false;
+	}
+
+	// Resolve the then branch
+	if (!sem_second_scoped_resolve(node->as.if_stmt.then_branch, context, need_value)) {
+		return false;
+	}
+
+	// Resolve the else branch if it exists
+	if (node->as.if_stmt.else_branch) {
+		if (!sem_second_scoped_resolve(node->as.if_stmt.else_branch, context, need_value)) {
+			return false;
+		}
+	}
+
+	// Set isexpr flag
+	if (need_value && node->as.if_stmt.else_branch) {
+		node->as.if_stmt.is_expr = true;
+	} else {
+		node->as.if_stmt.is_expr = false;
+	}
+
+	// Resolve the type of the if statement
+	if (!need_value) {
+		// If shouldnt return a value, set the eval_type to TYPE_UNIT
+		node->eval_type = TYPE_UNIT;
+	} else {
+		/*
+		Tool: Claude Sonnet 5.5
+		Prompt paraphrase: Please correct and symplify this logic of type resolution for returning
+		branches for if statement so it is correct in all edge cases.
+		use same style, write clean code, dont break anything, explain what you did
+		+ other files as context
+		*/
+		data_type_t then_type = node->as.if_stmt.then_branch->eval_type;
+		// If no else branch, treat as unit
+		data_type_t else_type =
+			node->as.if_stmt.else_branch ? node->as.if_stmt.else_branch->eval_type : TYPE_UNIT;
+		if (sem_always_returns(node->as.if_stmt.then_branch)) { // A returning branch gives no value
+			// Set the type of the other branch to pass through, since the branch will be returning
+			then_type = else_type;
+		} else if (node->as.if_stmt.else_branch &&
+				   sem_always_returns(node->as.if_stmt.else_branch)) {
+			// Same here
+			else_type = then_type;
+		}
+
+		// Evaluate result type
+		data_type_t combined_type = sem_unify_types(then_type, else_type);
+		if (combined_type == TYPE_UNKNOWN) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Type mismatch between then and else branches of if statement.");
+			return false;
+		}
+
+		// Ensure both branches have the result type
+		if (node->as.if_stmt.is_expr) {
+			if (!sem_ensure_compatible_last_type(node->as.if_stmt.then_branch, combined_type,
+												 ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+			if (!sem_ensure_compatible_last_type(node->as.if_stmt.else_branch, combined_type,
+												 ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+		}
+
+		// Set the evaluation type
+		node->eval_type = combined_type;
+		return true;
+	}
+
+	return true;
+}
+
+/*
+Tool: Claude Sonnet 5.5
+Prompt paraphrase: Please correct and symplify this logic of type resolution for returning
+branches for if statement so it is correct in all edge cases.
+use same style, write clean code, dont break anything, explain what you did
++ other files as context
+*/
+bool sem_always_returns(ast_node_t stmt) {
+	if (!stmt) {
+		return false;
+	}
+
+	switch (stmt->type) {
+	case NODE_RETURN:
+		return true;
+	case NODE_BLOCK:
+		return sem_always_returns(stmt->as.block.statements.tail);
+	case NODE_IF:
+		return (bool)(stmt->as.if_stmt.else_branch &&
+					  sem_always_returns(stmt->as.if_stmt.then_branch) &&
+					  sem_always_returns(stmt->as.if_stmt.else_branch));
+	default:
+		return false;
+	}
+}
+
+data_type_t sem_unify_types(data_type_t type1, data_type_t type2) {
+	// Any
+	if (type1 == TYPE_ANY) {
+		return type2;
+	}
+	if (type2 == TYPE_ANY) {
+		return type1;
+	}
+
+	// Same
+	if (type1 == type2) {
+		return type1;
+	}
+
+	// DOUBLE and INT implicitely converts to double
+	if ((type1 == TYPE_DOUBLE && type2 == TYPE_INT) ||
+		(type1 == TYPE_INT && type2 == TYPE_DOUBLE)) {
+		return TYPE_DOUBLE;
+	}
+
+	// Incompatible
+	return TYPE_UNKNOWN;
+}
+
+bool sem_ensure_compatible_last_type(ast_node_t node, data_type_t expected_type,
+									 err_c_t potential_error_code) {
+	assert(node && expected_type && "Called sem_ensure_compatible_last_type on nullptr.");
+
+	if (sem_always_returns(node)) {
+		// Node always returns so not needed to check the type
+		return true;
+	}
+
+	switch (node->type) {
+	case NODE_BLOCK:
+		// Ensure the last statement in the block
+		if (!node->as.block.statements.tail) {
+			// Empty block is type unit
+			if (expected_type != TYPE_UNIT) {
+				print_error(potential_error_code, node->line_num,
+							"Block is empty but expected type is not Unit.");
+				return false;
+			}
+			return true;
+		}
+		if (!sem_ensure_compatible_last_type(node->as.block.statements.tail, expected_type,
+											 potential_error_code)) {
+			return false;
+		}
+
+		// Set the eval type
+		node->eval_type = node->as.block.statements.tail->eval_type;
+		return true;
+		break;
+	case NODE_IF:
+		// If used as statement or without else is Unit
+		if (!node->as.if_stmt.is_expr) {
+			return sem_ensure_compatible_type(node, expected_type, potential_error_code);
+		}
+
+		// Ensure both branches
+		if (!sem_ensure_compatible_last_type(node->as.if_stmt.then_branch, expected_type,
+											 potential_error_code)) {
+			return false;
+		}
+		if (!sem_ensure_compatible_last_type(node->as.if_stmt.else_branch, expected_type,
+											 potential_error_code)) {
+			return false;
+		}
+
+		// Unify the types of the branches
+		if (sem_always_returns(node->as.if_stmt.then_branch)) { // Branch always returns
+			// Set its type to the other one
+			node->as.if_stmt.then_branch->eval_type = node->as.if_stmt.else_branch->eval_type;
+		} else if (sem_always_returns(node->as.if_stmt.else_branch)) { // Same here
+			node->as.if_stmt.else_branch->eval_type = node->as.if_stmt.then_branch->eval_type;
+		}
+		node->eval_type = sem_unify_types(node->as.if_stmt.then_branch->eval_type,
+										  node->as.if_stmt.else_branch->eval_type);
+		if (node->eval_type == TYPE_UNKNOWN) {
+			print_error(potential_error_code, node->line_num,
+						"Type mismatch between then and else branches of if statement.");
+			return false;
+		}
+
+		// Check type compatibility
+		if (!((node->eval_type == expected_type) || (expected_type == TYPE_ANY) ||
+			  (expected_type == TYPE_DOUBLE && node->eval_type == TYPE_INT))) {
+			print_error(potential_error_code, node->line_num,
+						"Type mismatch between then and else branches of if statement.");
+			return false;
+		}
+
+		return true;
+		break;
+
+	case NODE_EXPR_STMT:
+		// Ensure the expression statement
+		if (!sem_ensure_compatible_type(node->as.expr_stmt.expr, expected_type,
+										potential_error_code)) {
+			return false;
+		}
+
+		// Set the eval type
+		node->eval_type = node->as.expr_stmt.expr->eval_type;
+		return true;
+		break;
+	default:
+		// Other statements
+		return sem_ensure_compatible_type(node, expected_type, potential_error_code);
+	}
+}
+
+bool sem_resolve_condition(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_resolve_condition on nullptr.");
+
+	// Resolve the condition expression
+	if (!sem_second_expression(node, context)) {
+		return false;
+	}
+
+	// Check that the condition is of type bool
+	if (!sem_ensure_compatible_type(node, TYPE_BOOL, ERR_SEM_TYPE_COMPAT)) {
+		return false;
+	}
+
+	// Success
 	return true;
 }
 

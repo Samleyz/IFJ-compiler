@@ -440,3 +440,46 @@ bool sem_ensure_compatible_type(ast_node_t node, data_type_t expected_type,
  * @return The wrapped node, or nullptr on error
  */
 ast_node_t sem_wrap_in_place(ast_node_t node, node_type_t wrapper);
+
+/**
+ * @brief Checks if node have return on all branches
+ *
+ * @param node Node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_always_returns(ast_node_t stmt);
+
+/**
+ * @brief Unifies two types into a single type
+ *
+ * @param type1 First type
+ * @param type2 Second type
+ * @return data_type_t Unified type (TYPE_UNKNOWN if they are incompatible)
+ */
+data_type_t sem_unify_types(data_type_t type1, data_type_t type2);
+
+/**
+ * @brief Ensures that the last type in all branches is comtatible with expexted
+ *
+ * @param node List of nodes to check
+ * @param expected_type Expected type
+ * @param potential_error_code Error code to use if the types are not compatible
+ * @return true If the types are compatible
+ * @return false If the types are not compatible
+ */
+bool sem_ensure_compatible_last_type(ast_node_t node, data_type_t expected_type,
+									 err_c_t potential_error_code);
+
+/**
+ * @brief Resolves the types of a condition expression
+ *
+ * @param node Condition expression node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_resolve_condition(ast_node_t node, semantic_context_t *context);
+
+#endif
