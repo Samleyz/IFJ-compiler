@@ -1144,6 +1144,7 @@ bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *contex
 		return false;
 	}
 	new_stmt->as.expr_stmt.expr = node->as.func_def.body;
+	node->as.func_def.body = new_block;
 	return true;
 }
 
@@ -1157,7 +1158,7 @@ bool sem_second_scoped_resolve(ast_node_t node, semantic_context_t *context, boo
 	}
 
 	// Resolve the block
-	if (!sem_second_block(node, context, need_value)) {
+	if (!sem_second_statement(node, context, need_value)) {
 		return false;
 	}
 
@@ -1168,8 +1169,118 @@ bool sem_second_scoped_resolve(ast_node_t node, semantic_context_t *context, boo
 	return true;
 }
 
+bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool need_value) {
+	assert(node && context && "Called sem_second_statement on nullptr.");
+
+	// Decide based on the type of statement
+	switch (node->type) {
+	case NODE_BLOCK:
+		if (!sem_second_block(node, context, need_value)) {
+			return false;
+		}
+		return true;
+		break;
+	case NODE_VAR_DEF:
+		if (!sem_second_var_def(node, context)) {
+			return false;
+		}
+		node->eval_type = TYPE_UNIT;
+		return true;
+		break;
+	case NODE_ASSIGN:
+		if (!sem_second_assign(node, context)) {
+			return false;
+		}
+		node->eval_type = TYPE_UNIT;
+		return true;
+		break;
+	case NODE_IF:
+		if (!sem_second_if(node, context, need_value)) {
+			return false;
+		}
+		return true;
+		break;
+	case NODE_WHILE:
+		if (!sem_second_while(node, context)) {
+			return false;
+		}
+		node->eval_type = TYPE_UNIT;
+		return true;
+		break;
+	case NODE_FOR:
+		if (!sem_second_for(node, context)) {
+			return false;
+		}
+		node->eval_type = TYPE_UNIT;
+		return true;
+		break;
+	case NODE_RETURN:
+		if (!sem_second_return(node, context)) {
+			return false;
+		}
+		return true;
+		break;
+	case NODE_EXPR_STMT:
+		// Patch fix for if (whether it is statement or expression should decide semantics)
+		if (node->as.expr_stmt.expr->type == NODE_IF) {
+			return sem_second_if(node->as.expr_stmt.expr, context, need_value);
+		}
+
+		if (!sem_second_expression(node->as.expr_stmt.expr, context)) {
+			return false;
+		}
+		node->eval_type = node->as.expr_stmt.expr->eval_type;
+		return true;
+		break;
+	default:
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_statement on invalid statement node type.");
+	}
+	return true;
+}
+
 bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_value) {
 	assert(node && context && "Called sem_second_block on nullptr.");
+	// TODO
+	return true;
+}
+
+bool sem_second_var_def(ast_node_t node, semantic_context_t *context) {
+	// TODO
+	return true;
+}
+
+bool sem_second_assign(ast_node_t node, semantic_context_t *context) {
+	// TODO
+	return true;
+}
+
+bool sem_second_if(ast_node_t node, semantic_context_t *context, bool need_value) {
+	// TODO
+	return true;
+}
+
+bool sem_second_while(ast_node_t node, semantic_context_t *context) {
+	// TODO
+	return true;
+}
+
+bool sem_second_for(ast_node_t node, semantic_context_t *context) {
+	// TODO
+	return true;
+}
+
+bool sem_second_return(ast_node_t node, semantic_context_t *context) {
+	// TODO
+	return true;
+}
+
+bool sem_second_expression(ast_node_t node, semantic_context_t *context) {
+	// TODO
+	return true;
+}
+
+bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool need_value) {
 	// TODO
 	return true;
 }

@@ -326,3 +326,96 @@ symbol_t declare_variable(semantic_context_t *context, const char *name, data_ty
  * @return Pointer to the unique name, or nullptr on error
  */
 char *make_name(semantic_context_t *context, const char *name, bool should_be_unique);
+
+/**
+ * @brief Resolves the types of a block
+ *
+ * @param node Block node to analyze
+ * @param context Semantic analysis context
+ * @param need_value Whether the block is expected to return a value
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_value);
+
+/**
+ * @brief Resolves the types of a variable definition
+ *
+ * @param node Variable definition node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_var_def(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Resolves the types of an assignment
+ *
+ * @param node Assignment node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_assign(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Resolves the types of an if statement
+ *
+ * @param node If statement node to analyze
+ * @param context Semantic analysis context
+ * @param need_value Whether the if statement is expected to return a value
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_if(ast_node_t node, semantic_context_t *context, bool need_value);
+
+/**
+ * @brief Resolves the types of a while statement
+ *
+ * @param node While statement node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_while(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Resolves the types of a for statement
+ *
+ * @param node For statement node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_for(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Resolves the types of a return statement
+ *
+ * @param node Return statement node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_return(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Resolves the types of an expression
+ *
+ * @param node Expression node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_expression(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Resolves the types of a statement
+ *
+ * @param node Statement node to analyze
+ * @param context Semantic analysis context
+ * @param need_value Whether the statement is expected to return a value
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool need_value);
