@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file error.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Contains implementation of error and warning functions for central error handling.

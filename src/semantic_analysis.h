@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file semantic_analysis.h
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
  * @brief Header file for semantic analysis functions

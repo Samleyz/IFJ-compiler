@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file parse_expr_helpers.c
  * @author Samuel Cehlarik (xcehlas00@vutbr.cz) , Claude Code (Sonnet 5.5)
  * @brief Expression stack helpers for precedence syntactic analysis of expressions

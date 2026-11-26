@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file parser.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Interface for parser, includes functions for work with parser

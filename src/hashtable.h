@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file hashtable.h
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
  * @brief Public interface for hastable ADT

@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file code_gen.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Code generation interface

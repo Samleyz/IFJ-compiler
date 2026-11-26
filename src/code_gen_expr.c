@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file code_gen_expr.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Implementation of the functions responsible for expression generation

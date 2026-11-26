@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file hashtable_private.h
  * @author Tomáš Černý (xcernyt00@vutbr.cz)
  * @brief Internal private declarations for hastable ADT

@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file instruction_set.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Instruction interface for code generation

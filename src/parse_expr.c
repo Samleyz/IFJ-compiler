@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file parse_expr.c
  * @author Samuel Cehlarik (xcehlas00@vutbr.cz) , Claude Code (Sonnet 5.5)
  * @brief Implementation of precedence syntactic analysis for expressions
