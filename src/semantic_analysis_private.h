@@ -273,15 +273,15 @@ bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *c
 bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Resolves the types of a body with separate scope according to if return value is expected
+ * @brief Resolves the types with separate scope according to if return value is expected
  *
- * @param body Body node to analyze
+ * @param node Node to analyze
  * @param context Semantic analysis context
  * @param need_value Whether the body is expected to return a value
  * @return true Success
  * @return false Error
  */
-bool sem_second_scoped_body_resolve(ast_node_t body, semantic_context_t *context, bool need_value);
+bool sem_second_scoped_resolve(ast_node_t node, semantic_context_t *context, bool need_value);
 
 /**
  * @brief Checks compatibility of a body return type with an expected type (inserts casts if needed)

@@ -964,7 +964,7 @@ bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context)
 	bool need_value = !( // Explicit unit function throw away return value
 		((symbol_t)node->sym_entry)->function.has_explicit_return_type && // Explicit return type
 		((symbol_t)node->sym_entry)->function.return_type == TYPE_UNIT);  // That is Unit
-	if (!sem_second_scoped_body_resolve(node->as.func_def.body, context, need_value)) {
+	if (!sem_second_scoped_resolve(node->as.func_def.body, context, need_value)) {
 		return false;
 	}
 
@@ -1147,8 +1147,29 @@ bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *contex
 	return true;
 }
 
-bool sem_second_scoped_body_resolve(ast_node_t body, semantic_context_t *context, bool need_value) {
-	assert(body && context && "Called sem_second_scoped_body_resolve on nullptr.");
+bool sem_second_scoped_resolve(ast_node_t node, semantic_context_t *context, bool need_value) {
+	assert(node && context && "Called sem_second_scoped_resolve on nullptr.");
+
+	// Enter into scope of the block
+	if (!stable_enter_scope(context->function_stack->local_scope)) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to enter scope of the block.");
+		return false;
+	}
+
+	// Resolve the block
+	if (!sem_second_block(node, context, need_value)) {
+		return false;
+	}
+
+	// Leave the scope of the block
+	stable_leave_scope(context->function_stack->local_scope);
+
+	// Success
+	return true;
+}
+
+bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_value) {
+	assert(node && context && "Called sem_second_block on nullptr.");
 	// TODO
 	return true;
 }
