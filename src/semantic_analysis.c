@@ -869,7 +869,7 @@ bool sem_second_want_function(ast_node_t node, semantic_context_t *context) {
 		function_stack_t *call_stack = context->function_stack;
 		while (call_stack) {
 			// Check each for explicit return type
-			if (!call_stack->sym->function.has_explicit_return_type) {
+			if (!call_stack->symbol->function.has_explicit_return_type) {
 				print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
 							"Recursive function does not have explicit return type, which is "
 							"required for recursive functions.");
@@ -877,7 +877,7 @@ bool sem_second_want_function(ast_node_t node, semantic_context_t *context) {
 			}
 
 			// Stop at the recursion function
-			if (call_stack->sym == node->sym_entry) {
+			if (call_stack->symbol == node->sym_entry) {
 				break;
 			}
 
@@ -895,6 +895,140 @@ bool sem_second_want_function(ast_node_t node, semantic_context_t *context) {
 
 bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_node_func_def on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_func_def on non function definition node.");
+		return false;
+	}
+	if (!node->as.func_def.body) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
+	}
+	if (!node->sym_entry) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function definition has no symbol entry for second pass.");
+		return false;
+	}
+
+	// Create level on function call stack for it
+	function_stack_t function_stack_level = {0};
+	function_stack_level.symbol = node->sym_entry;
+	function_stack_level.definition_node = node;
+	function_stack_level.caller_function_stack = context->function_stack;
+	function_stack_level.local_scope = stable_init(); // Create local scope for the function
+	if (!function_stack_level.local_scope) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to create local scope for function definition.");
+		return false;
+	}
+	// Set to context (push)
+	context->function_stack = &function_stack_level;
+	// Set function state
+	((symbol_t)node->sym_entry)->function.state = FUNCTION_VISITING;
+
+	// Check function body
+	bool status = sem_second_node_func_def_body(node, context);
+
+	// Remove from context (pop)
+	stable_dtor(function_stack_level.local_scope);
+	context->function_stack = function_stack_level.caller_function_stack;
+
+	// Set function state
+	((symbol_t)node->sym_entry)->function.state = FUNCTION_VISITED;
+
+	return status;
+}
+
+bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_func_def_body on nullptr.");
+
+	// Node checks
+	if (!node->as.func_def.body) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
+	}
+
+	// Put parameters to local scope
+	if (!sem_second_put_params_to_local_scope(node, context)) {
+		return false;
+	}
+
+	// Ensure function has body
+	if (!sem_second_ensure_enclosed_body(node, context)) {
+		return false;
+	}
+
+	// Check body types
+	bool need_value = !( // Explicit unit function throw away return value
+		((symbol_t)node->sym_entry)->function.has_explicit_return_type && // Explicit return type
+		((symbol_t)node->sym_entry)->function.return_type == TYPE_UNIT);  // That is Unit
+	if (!sem_second_scoped_body_resolve(node->as.func_def.body, context, need_value)) {
+		return false;
+	}
+
+	// Resolve return type
+	if (!((symbol_t)node->sym_entry)->function.has_explicit_return_type) {
+		if (node->as.func_def.body->eval_type == TYPE_UNKNOWN) {
+			print_error(ERR_INTERNAL, node->line_num, "Invalid return type for function.");
+			return false;
+		}
+		// Store implicit function return type
+		((symbol_t)node->sym_entry)->function.return_type = node->as.func_def.body->eval_type;
+	} else if (need_value) {
+		// Check return type compatibility
+		if (!sem_second_return_type_compatibility(
+				node->as.func_def.body, ((symbol_t)node->sym_entry)->function.return_type)) {
+			return false;
+		}
+	}
+
+	// Check implicit main return type to be unit
+	if (((symbol_t)node->sym_entry)->function.is_main &&
+		!((symbol_t)node->sym_entry)->function.has_explicit_return_type) {
+		if (node->as.func_def.body->eval_type != TYPE_UNIT) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Main function must have return type Unit.");
+			return false;
+		}
+	}
+
+	// Insert returns
+	if (!sem_second_insert_returns(node->as.func_def.body, context)) {
+		return false;
+	}
+
+	// Success
+	return true;
+}
+
+bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_put_params_to_local_scope on nullptr.");
+	// TODO
+	return true;
+}
+
+bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_ensure_enclosed_body on nullptr.");
+	// TODO
+	return true;
+}
+
+bool sem_second_scoped_body_resolve(ast_node_t body, semantic_context_t *context, bool need_value) {
+	assert(body && context && "Called sem_second_scoped_body_resolve on nullptr.");
+	// TODO
+	return true;
+}
+
+bool sem_second_return_type_compatibility(ast_node_t body, data_type_t expected_type) {
+	assert(body && expected_type && "Called sem_second_return_type_compatibility on nullptr.");
+	// TODO
+	return true;
+}
+
+bool sem_second_insert_returns(ast_node_t body, semantic_context_t *context) {
+	assert(body && context && "Called sem_second_insert_returns on nullptr.");
 	// TODO
 	return true;
 }

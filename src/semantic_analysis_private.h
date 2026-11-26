@@ -241,3 +241,64 @@ bool sem_second_want_function(ast_node_t node, semantic_context_t *context);
  * @return false Semantic error
  */
 bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs the second pass of semantic analysis on a function definition body
+ *
+ * @param node Function definition node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Puts the parameters of a function definition to its local scope
+ *
+ * @param node Function definition node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Ensures that a function definition body is enclosed in a block
+ *
+ * @param node Function definition node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Resolves the types of a body with separate scope according to if return value is expected
+ *
+ * @param body Body node to analyze
+ * @param context Semantic analysis context
+ * @param need_value Whether the body is expected to return a value
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_scoped_body_resolve(ast_node_t body, semantic_context_t *context, bool need_value);
+
+/**
+ * @brief Checks compatibility of a body return type with an expected type (inserts casts if needed)
+ *
+ * @param body Body node to analyze
+ * @param expected_type Expected return type
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_return_type_compatibility(ast_node_t body, data_type_t expected_type);
+
+/**
+ * @brief Inserts return statements in a body if needed (for code gen)
+ *
+ * @param body Body node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_insert_returns(ast_node_t body, semantic_context_t *context);
