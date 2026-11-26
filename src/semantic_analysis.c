@@ -1235,6 +1235,7 @@ bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool nee
 	default:
 		print_error(ERR_INTERNAL, node->line_num,
 					"Called sem_second_statement on invalid statement node type.");
+		return false;
 	}
 	return true;
 }
@@ -1273,8 +1274,122 @@ bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_va
 }
 
 bool sem_second_var_def(ast_node_t node, semantic_context_t *context) {
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_VAR_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_var_def on non variable definition node.");
+		return false;
+	}
+
+	// Resolve definition expression
+	if (!sem_second_expression(node->as.var_def.init_expr, context)) {
+		return false;
+	}
+
+	// Resolve type compatibility
+	data_type_t init_expr_type = node->as.var_def.init_expr->eval_type;
+	if (node->as.var_def.type_name) {
+		if (!get_data_type_from_string(node->as.var_def.type_name)) {
+			print_error(ERR_SEM_UNDEFINED, node->line_num,
+						"Variable definition has unknown type '%s'.", node->as.var_def.type_name);
+			return false;
+		}
+
+		// Explicit type - check compatibility
+		if (!sem_ensure_compatible_type(node->as.var_def.init_expr,
+										get_data_type_from_string(node->as.var_def.type_name),
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		init_expr_type = get_data_type_from_string(node->as.var_def.type_name);
+	} else {
+		// Implicit type - check not invalid
+		if (node->as.var_def.init_expr->eval_type == TYPE_UNKNOWN) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Variable definition has unknown type and no explicit type.");
+			return false;
+		}
+	}
+
+	// Declare variable in the local scope
+	symbol_t symbol = declare_variable(context, node->as.var_def.name, init_expr_type,
+									   !node->as.var_def.is_val, true);
+	if (!symbol) {
+		return false;
+	}
+
+	// Store unique name
+	if (!(node->as.var_def.unique_name = strdup(symbol->variable.unique_name))) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for variable unique name.");
+		return false;
+	}
+
+	// Success
 	return true;
+}
+
+/*
+Tool: Claude Sonnet 5.5
+Prompt paraphrase: Najdi v tom chyby a oprav to
+use same style, write clean code, dont break anything, explain what you did
++ other files as context
+*/
+bool sem_ensure_compatible_type(ast_node_t node, data_type_t expected_type,
+								err_c_t potential_error_code) {
+	assert(node && expected_type && "Called sem_ensure_compatible_type on nullptr.");
+
+	// Check compatibility
+	if (!(node->eval_type == expected_type || expected_type == TYPE_ANY ||
+		  (expected_type == TYPE_DOUBLE && node->eval_type == TYPE_INT))) {
+		print_error(potential_error_code, node->line_num, "Type mismatch");
+		return false;
+	}
+
+	// Implicit conversion if needed
+	if (expected_type == TYPE_DOUBLE && node->eval_type == TYPE_INT) {
+		/*
+		Tool: Claude Sonnet 5.5
+		Prompt paraphrase: Please write for me the wrapping logic of node into cast node
+		use same style, write clean code, dont break anything, explain what you did
+		+ other files as context
+		*/
+		ast_node_t wrapper_node = sem_wrap_in_place(node, NODE_TYPE_CAST);
+		if (!wrapper_node) {
+			print_error(ERR_INTERNAL, node->line_num, "Failed to wrap node in cast node.");
+			return false;
+		}
+		node->as.type_cast.target_type = TYPE_DOUBLE;
+		node->as.type_cast.operand = wrapper_node;
+		node->eval_type = TYPE_DOUBLE;
+	}
+
+	// Success
+	return true;
+}
+
+/*
+Tool: Claude Sonnet 5.5
+Prompt paraphrase: Please write for me the wrapping logic of node into cast node
+use same style, write clean code, dont break anything, explain what you did
++ other files as context
+*/
+ast_node_t sem_wrap_in_place(ast_node_t node, node_type_t wrapper) {
+	assert(node && "Called sem_wrap_in_place on nullptr.");
+
+	// Create node
+	ast_node_t inner = ast_create_node(node->type, node->line_num);
+	if (!inner) {
+		return nullptr;
+	}
+
+	// Copy and connect nodes
+	*inner = *node;
+	inner->next = nullptr;
+	ast_node_t next = node->next;
+	*node = (struct ast_node){.type = wrapper, .line_num = inner->line_num, .next = next};
+	return inner;
 }
 
 bool sem_second_assign(ast_node_t node, semantic_context_t *context) {

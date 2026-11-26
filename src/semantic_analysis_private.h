@@ -419,3 +419,24 @@ bool sem_second_return(ast_node_t node, semantic_context_t *context);
  * @return false Error
  */
 bool sem_second_expression(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Ensures that a node's type is compatible with an expected type
+ *
+ * @param node Node to check
+ * @param expected_type Expected type
+ * @param potential_error_code Error code to use if the types are not compatible
+ * @return true If the types are compatible
+ * @return false If the types are not compatible
+ */
+bool sem_ensure_compatible_type(ast_node_t node, data_type_t expected_type,
+								err_c_t potential_error_code);
+
+/**
+ * @brief Wraps a node in a other node
+ *
+ * @param node Node to wrap
+ * @param wrapper Type of the wrapper node
+ * @return The wrapped node, or nullptr on error
+ */
+ast_node_t sem_wrap_in_place(ast_node_t node, node_type_t wrapper);
