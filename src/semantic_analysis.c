@@ -773,3 +773,128 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
 # Second pass functions
 ####################################################################################################
 */
+
+bool sem_second(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_PROGRAM) {
+		print_error(ERR_INTERNAL, node->line_num, "Second pass called on non program node.");
+		return false;
+	}
+
+	// Go through items in the program
+	ast_node_t current_node = node->as.program.items.head;
+	while (current_node) {
+		if (current_node->type == NODE_FUNC_DEF) {
+			if (!sem_second_want_function(current_node, context)) {
+				return false;
+			}
+		} else if (current_node->type == NODE_EXTENSION) {
+			if (!sem_second_want_extension(current_node, context)) {
+				return false;
+			}
+		} else {
+			print_error(ERR_INTERNAL, current_node->line_num,
+						"Second pass called on invalid node type.");
+			return false;
+		}
+
+		// Move to next
+		current_node = current_node->next;
+	}
+
+	// Success
+	return true;
+}
+
+bool sem_second_want_extension(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_extension on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_EXTENSION) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_extension on non-extension node.");
+		return false;
+	}
+
+	// Go through extension method functions
+	ast_node_t current_extension_node = node->as.extension.methods.head;
+	while (current_extension_node) {
+		// Node check
+		if (current_extension_node->type != NODE_FUNC_DEF) {
+			print_error(ERR_INTERNAL, current_extension_node->line_num,
+						"Extension method is not a function definition.");
+			return false;
+		}
+
+		// Want to pass the funstion in extension
+		if (!sem_second_want_function(current_extension_node, context)) {
+			return false;
+		}
+		current_extension_node = current_extension_node->next;
+	}
+	return true;
+}
+
+bool sem_second_want_function(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_want_function on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_want_function on non function definition node.");
+		return false;
+	}
+	if (!node->as.func_def.body) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
+	}
+	if (!node->sym_entry) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function definition has no symbol entry for second pass.");
+		return false;
+	}
+
+	// Check state
+	if (((symbol_t)node->sym_entry)->function.state == FUNCTION_VISITED) {
+		// Skip already passed
+		return true;
+	} else if (((symbol_t)node->sym_entry)->function.state == FUNCTION_UNVISITED) {
+		// Should be passed
+		return sem_second_node_func_def(node, context);
+	} else if (((symbol_t)node->sym_entry)->function.state == FUNCTION_VISITING) {
+		// Recursive call detected
+		// Go through function of the call stack
+		function_stack_t *call_stack = context->function_stack;
+		while (call_stack) {
+			// Check each for explicit return type
+			if (!call_stack->sym->function.has_explicit_return_type) {
+				print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+							"Recursive function does not have explicit return type, which is "
+							"required for recursive functions.");
+				return false;
+			}
+
+			// Stop at the recursion function
+			if (call_stack->sym == node->sym_entry) {
+				break;
+			}
+
+			// Move to next
+			call_stack = call_stack->caller_function_stack;
+		}
+		return true;
+	}
+
+	// Invalid state
+	print_error(ERR_INTERNAL, node->line_num,
+				"Function definition has invalid state for second pass.");
+	return false;
+}
+
+bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_func_def on nullptr.");
+	// TODO
+	return true;
+}

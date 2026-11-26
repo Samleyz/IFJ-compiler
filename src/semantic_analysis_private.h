@@ -203,7 +203,7 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
 */
 
 /**
- * @brief Performs the second pass of semantic analysis on node
+ * @brief Performs the second pass of semantic analysis on program root node
  *
  * @param node Root program node of AST to analyze
  * @param context Semantic analysis context
@@ -211,3 +211,33 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
  * @return false Semantic error
  */
 bool sem_second(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Ensures that extension functions are passed in second pass
+ *
+ * @param node Extension function node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_want_extension(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Ensures that function are passed in second pass
+ *
+ * @param node Function definition node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_want_function(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs the second pass of semantic analysis on a function definition node
+ *
+ * @param node Function definition node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context);
