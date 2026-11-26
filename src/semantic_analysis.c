@@ -1687,7 +1687,25 @@ bool sem_resolve_condition(ast_node_t node, semantic_context_t *context) {
 }
 
 bool sem_second_while(ast_node_t node, semantic_context_t *context) {
-	// TODO
+	assert(node && context && "Called sem_second_while on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_WHILE) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_while on non while node.");
+		return false;
+	}
+
+	// Resolve the condition
+	if (!sem_resolve_condition(node->as.while_stmt.condition, context)) {
+		return false;
+	}
+
+	// Resolve the body
+	if (!sem_second_scoped_resolve(node->as.while_stmt.body, context, false)) {
+		return false;
+	}
+
+	// Success
 	return true;
 }
 
