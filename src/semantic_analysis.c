@@ -1005,8 +1005,116 @@ bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context)
 
 bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_put_params_to_local_scope on nullptr.");
-	// TODO
+
+	// Put receiver parameter if extension function
+	if (((symbol_t)node->sym_entry)->function.extension_parameter_name) {
+		if (!declare_variable(
+				context, ((symbol_t)node->sym_entry)->function.extension_parameter_name,
+				((symbol_t)node->sym_entry)->function.extension_parameter_type, false, false)) {
+			return false;
+		}
+	}
+
+	// Put parameters to local scope
+	// Go through parameter lists
+	ast_node_t current_param_list_node = node->as.func_def.param_lists.head;
+	while (current_param_list_node) {
+		// Node checks
+		// TODO
+
+		// Go through parameters in the list
+		ast_node_t current_param_node = current_param_list_node->as.param_list.params.head;
+		while (current_param_node) {
+			// Node checks
+			// TODO
+
+			// Declare the parameter
+			symbol_t param_symbol = declare_variable(context, current_param_node->as.param.name,
+													 current_param_node->eval_type, false, false);
+			if (!param_symbol) {
+				return false;
+			}
+
+			// Store unique name
+			if (!(current_param_node->as.param.unique_name =
+					  strdup(param_symbol->variable.unique_name))) {
+				print_error(ERR_INTERNAL, current_param_node->line_num,
+							"Failed to allocate memory for parameter unique name.");
+				return false;
+			}
+
+			// Move to next parameter
+			current_param_node = current_param_node->next;
+		}
+
+		// Move to next parameter list
+		current_param_list_node = current_param_list_node->next;
+	}
+
 	return true;
+}
+
+symbol_t declare_variable(semantic_context_t *context, const char *name, data_type_t type,
+						  bool is_mutable, bool should_be_unique) {
+	assert(context && name && type && "Called declare_variable with invalid parameters.");
+
+	// Check if not defined in the current scope
+	if (stable_find_curlevel(context->function_stack->local_scope, name)) {
+		print_error(ERR_SEM_REDEFINITION, 0,
+					"Variable '%s' is already defined in the current scope.", name);
+		return nullptr;
+	}
+
+	// Create symbol
+	symbol_t symbol = stable_init_symbol();
+	if (!symbol) {
+		print_error(ERR_INTERNAL, 0, "Failed to create variable symbol.");
+		return nullptr;
+	}
+
+	// Fill out symbol
+	symbol->variable.unique_name = make_name(context, name, should_be_unique);
+	if (!symbol->variable.unique_name) {
+		print_error(ERR_INTERNAL, 0, "Failed to generate unique name for variable '%s'.", name);
+		stable_destroy_symbol(symbol);
+		return nullptr;
+	}
+	symbol->symbol_variant = SYMBOL_VARIABLE;
+	symbol->variable.type = type;
+	symbol->variable.is_mutable = is_mutable;
+
+	// Write symbol to the symbol table
+	if (!stable_write(context->function_stack->local_scope, name, symbol)) {
+		print_error(ERR_INTERNAL, 0, "Failed to write variable '%s' to symbol table.", name);
+		stable_destroy_symbol(symbol);
+		return nullptr;
+	}
+
+	return symbol;
+}
+
+char *make_name(semantic_context_t *context, const char *name, bool should_be_unique) {
+	assert(context && name && "Called make_name with invalid parameters.");
+
+	if (should_be_unique) {
+		// Generate unique name with counter
+		char *unique_name =
+			malloc(strlen(name) + SIZE_T_MAX_DIGITS + 1 + 1); // Enough for name + counter
+		if (!unique_name) {
+			print_error(ERR_INTERNAL, 0, "Failed to allocate memory for unique name.");
+			return nullptr;
+		}
+		sprintf(unique_name, "%s$%zu", name, context->rename_counter++);
+		return unique_name;
+	} else {
+		// Return a copy of the name
+		char *unique_name = strdup(name);
+		if (!unique_name) {
+			print_error(ERR_INTERNAL, 0, "Failed to allocate memory for unique name.");
+			return nullptr;
+		}
+		return unique_name;
+	}
 }
 
 bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *context) {

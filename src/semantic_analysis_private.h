@@ -208,7 +208,7 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
  * @param node Root program node of AST to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second(ast_node_t node, semantic_context_t *context);
 
@@ -218,7 +218,7 @@ bool sem_second(ast_node_t node, semantic_context_t *context);
  * @param node Extension function node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second_want_extension(ast_node_t node, semantic_context_t *context);
 
@@ -228,7 +228,7 @@ bool sem_second_want_extension(ast_node_t node, semantic_context_t *context);
  * @param node Function definition node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second_want_function(ast_node_t node, semantic_context_t *context);
 
@@ -238,7 +238,7 @@ bool sem_second_want_function(ast_node_t node, semantic_context_t *context);
  * @param node Function definition node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context);
 
@@ -248,7 +248,7 @@ bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context);
  * @param node Function definition node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context);
 
@@ -258,7 +258,7 @@ bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context)
  * @param node Function definition node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *context);
 
@@ -268,7 +268,7 @@ bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *c
  * @param node Function definition node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *context);
 
@@ -279,7 +279,7 @@ bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *contex
  * @param context Semantic analysis context
  * @param need_value Whether the body is expected to return a value
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second_scoped_body_resolve(ast_node_t body, semantic_context_t *context, bool need_value);
 
@@ -289,7 +289,7 @@ bool sem_second_scoped_body_resolve(ast_node_t body, semantic_context_t *context
  * @param body Body node to analyze
  * @param expected_type Expected return type
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second_return_type_compatibility(ast_node_t body, data_type_t expected_type);
 
@@ -299,6 +299,30 @@ bool sem_second_return_type_compatibility(ast_node_t body, data_type_t expected_
  * @param body Body node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second_insert_returns(ast_node_t body, semantic_context_t *context);
+
+/**
+ * @brief Declares a new variable in the current scope
+ *
+ * @param context Semantic analysis context
+ * @param name Name of the variable
+ * @param type Type of the variable
+ * @param is_mutable Whether the variable is mutable
+ * @param should_be_unique Whether the variable should be renamed
+ * @return true Success
+ * @return false Error
+ */
+symbol_t declare_variable(semantic_context_t *context, const char *name, data_type_t type,
+						  bool is_mutable, bool should_be_unique);
+
+/**
+ * @brief Creates name for a variable (unique if needed)
+ *
+ * @param context Semantic analysis context
+ * @param name Name of the variable
+ * @param should_be_unique Whether the variable should be renamed
+ * @return Pointer to the unique name, or nullptr on error
+ */
+char *make_name(semantic_context_t *context, const char *name, bool should_be_unique);
