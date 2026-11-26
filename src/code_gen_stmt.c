@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file code_gen_stmt.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Implementation of the functions responsible for statement and program flow control

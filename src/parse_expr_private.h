@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file parse_expr_private.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz) , Samuel Cehlarik (xcehlas00@vutbr.cz) , Claude Code
  * (Sonnet 5.5)

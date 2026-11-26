@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file stack_private.h
  * @author Michal Sobek (xsobekm00@vutbr.cz)
  * @brief Private declarations of ADT linked list stack, and helper functions for LL items

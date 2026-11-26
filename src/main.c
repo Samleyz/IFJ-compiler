@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file main.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Performs translation from laguage IFJ26 to IFJ26code

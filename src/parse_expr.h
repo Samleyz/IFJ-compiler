@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file parse_expr.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @author Samuel Cehlarik (xcehlas00@vutbr.cz)

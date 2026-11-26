@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file code_gen_builtins.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Implementation of the IFJcode26 built-in runtime functions

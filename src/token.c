@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file token.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Implementation of functions for work with tokens

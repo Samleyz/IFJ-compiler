@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file ast.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @author Michal Sobek (xsobekm00@vutbr.cz)

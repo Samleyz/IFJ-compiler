@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file parser_helpers.c
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Implementation of helper functions for parser

@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file lexer.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Interface for lexer, provides tokens on demand

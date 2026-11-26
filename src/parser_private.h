@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file parser_private.h
  * @author Jan Mejzlík (xmejzlj00@vutbr.cz)
  * @brief Internal declarations for parser

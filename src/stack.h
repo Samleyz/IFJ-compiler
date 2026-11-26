@@ -1,4 +1,6 @@
 /**
+ * Implementation of a compiler for the imperative language IFJ26
+ *
  * @file stack.h
  * @author Michal Sobek (xsobekm00@vutbr.cz)
  * @brief public interface for stack adt
