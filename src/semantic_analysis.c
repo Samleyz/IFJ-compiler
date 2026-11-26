@@ -1241,7 +1241,34 @@ bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool nee
 
 bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_value) {
 	assert(node && context && "Called sem_second_block on nullptr.");
-	// TODO
+
+	// Node checks
+	if (node->type != NODE_BLOCK) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_block on non block node.");
+		return false;
+	}
+
+	// Go through statements in the block
+	ast_node_t current_stmt_node = node->as.block.statements.head;
+	node->eval_type = TYPE_UNIT;
+	while (current_stmt_node) {
+		// Check if last statement that needs value for block
+		bool need_value_really = false;
+		if (current_stmt_node->next == nullptr) { // Last statement in the block
+			need_value_really = need_value;
+		}
+
+		// Pass the statement
+		if (!sem_second_statement(current_stmt_node, context, need_value_really)) {
+			return false;
+		}
+
+		// Store evaluated type
+		node->eval_type = current_stmt_node->eval_type;
+
+		// Move to next
+		current_stmt_node = current_stmt_node->next;
+	}
 	return true;
 }
 
@@ -1276,11 +1303,6 @@ bool sem_second_return(ast_node_t node, semantic_context_t *context) {
 }
 
 bool sem_second_expression(ast_node_t node, semantic_context_t *context) {
-	// TODO
-	return true;
-}
-
-bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool need_value) {
 	// TODO
 	return true;
 }

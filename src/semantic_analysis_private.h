@@ -328,6 +328,17 @@ symbol_t declare_variable(semantic_context_t *context, const char *name, data_ty
 char *make_name(semantic_context_t *context, const char *name, bool should_be_unique);
 
 /**
+ * @brief Resolves the types of a statement
+ *
+ * @param node Statement node to analyze
+ * @param context Semantic analysis context
+ * @param need_value Whether the statement is expected to return a value
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool need_value);
+
+/**
  * @brief Resolves the types of a block
  *
  * @param node Block node to analyze
@@ -408,14 +419,3 @@ bool sem_second_return(ast_node_t node, semantic_context_t *context);
  * @return false Error
  */
 bool sem_second_expression(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Resolves the types of a statement
- *
- * @param node Statement node to analyze
- * @param context Semantic analysis context
- * @param need_value Whether the statement is expected to return a value
- * @return true Success
- * @return false Error
- */
-bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool need_value);
