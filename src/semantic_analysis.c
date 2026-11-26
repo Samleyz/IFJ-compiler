@@ -1119,7 +1119,31 @@ char *make_name(semantic_context_t *context, const char *name, bool should_be_un
 
 bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_ensure_enclosed_body on nullptr.");
-	// TODO
+
+	// Already in block
+	if (node->as.func_def.body->type == NODE_BLOCK) {
+		return true;
+	}
+
+	// Create new block and statement nodes to enclose the body in
+	ast_node_t new_block = ast_create_node(NODE_BLOCK, node->as.func_def.body->line_num);
+	ast_node_t new_stmt = ast_create_node(NODE_EXPR_STMT, node->as.func_def.body->line_num);
+	if (!new_block || !new_stmt) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to create new block or statement node.");
+		ast_dtor(new_block);
+		ast_dtor(new_stmt);
+		return false;
+	}
+
+	// Enclose
+	ast_list_init(&(new_block->as.block.statements));
+	if (!ast_list_append(&(new_block->as.block.statements), new_stmt)) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to append new statement to new block.");
+		ast_dtor(new_block);
+		ast_dtor(new_stmt);
+		return false;
+	}
+	new_stmt->as.expr_stmt.expr = node->as.func_def.body;
 	return true;
 }
 
