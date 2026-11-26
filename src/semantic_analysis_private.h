@@ -339,7 +339,7 @@ char *make_name(semantic_context_t *context, const char *name, bool should_be_un
 bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool need_value);
 
 /**
- * @brief Resolves the types of a block
+ * @brief Resolves the types of a block node
  *
  * @param node Block node to analyze
  * @param context Semantic analysis context
@@ -350,7 +350,7 @@ bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool nee
 bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_value);
 
 /**
- * @brief Resolves the types of a variable definition
+ * @brief Resolves the types of a variable definition node
  *
  * @param node Variable definition node to analyze
  * @param context Semantic analysis context
@@ -360,7 +360,7 @@ bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_va
 bool sem_second_var_def(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Resolves the types of an assignment
+ * @brief Resolves the types of an assignment node
  *
  * @param node Assignment node to analyze
  * @param context Semantic analysis context
@@ -381,7 +381,7 @@ bool sem_second_assign(ast_node_t node, semantic_context_t *context);
 bool sem_second_if(ast_node_t node, semantic_context_t *context, bool need_value);
 
 /**
- * @brief Resolves the types of a while statement
+ * @brief Resolves the types of a while statement node
  *
  * @param node While statement node to analyze
  * @param context Semantic analysis context
@@ -391,7 +391,7 @@ bool sem_second_if(ast_node_t node, semantic_context_t *context, bool need_value
 bool sem_second_while(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Resolves the types of a for statement
+ * @brief Resolves the types of a for statement node
  *
  * @param node For statement node to analyze
  * @param context Semantic analysis context
@@ -401,7 +401,7 @@ bool sem_second_while(ast_node_t node, semantic_context_t *context);
 bool sem_second_for(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Resolves the types of a return statement
+ * @brief Resolves the types of a return statement node
  *
  * @param node Return statement node to analyze
  * @param context Semantic analysis context

@@ -1274,6 +1274,7 @@ bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_va
 }
 
 bool sem_second_var_def(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_var_def on nullptr.");
 
 	// Node checks
 	if (node->type != NODE_VAR_DEF) {
@@ -1393,7 +1394,47 @@ ast_node_t sem_wrap_in_place(ast_node_t node, node_type_t wrapper) {
 }
 
 bool sem_second_assign(ast_node_t node, semantic_context_t *context) {
-	// TODO
+	assert(node && context && "Called sem_second_assign on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_ASSIGN) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_assign on non assignment node.");
+		return false;
+	}
+
+	// Find the variable in the local scope
+	symbol_t symbol = sem_find_symbol(context, node->as.assign.target_id);
+	if (!symbol) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num, "Undefined variable");
+		return false;
+	}
+
+	// Check mutability
+	if (!symbol->variable.is_mutable) {
+		print_error(ERR_SEM_IMMUTABLE, node->line_num, "Cannot assign to immutable variable");
+		return false;
+	}
+
+	// Resolve the expression
+	if (!sem_second_expression(node->as.assign.expr, context)) {
+		return false;
+	}
+
+	// Check type compatibility
+	if (!sem_ensure_compatible_type(node->as.assign.expr, symbol->variable.type,
+									ERR_SEM_TYPE_COMPAT)) {
+		return false;
+	}
+
+	// Set unique name
+	if (!(node->as.assign.unique_target_id = strdup(symbol->variable.unique_name))) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for assignment unique name.");
+		return false;
+	}
+
+	// Success
 	return true;
 }
 
