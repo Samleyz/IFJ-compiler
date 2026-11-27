@@ -559,7 +559,8 @@ bool sem_first_node_extension(ast_node_t node, semantic_context_t *context) {
 	}
 
 	// Name of receiver (always unique in the scope of extension)
-	if (!(node->as.extension.unique_receiver_name = strdup(node->as.extension.receiver_name))) {
+	node->as.extension.unique_receiver_name = strdup(node->as.extension.receiver_name);
+	if (!node->as.extension.unique_receiver_name) {
 		print_error(ERR_INTERNAL, node->line_num, "Failed to duplicate receiver name.");
 		return false;
 	}
@@ -1078,8 +1079,8 @@ bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *c
 			}
 
 			// Store unique name
-			if (!(current_param_node->as.param.unique_name =
-					  strdup(param_symbol->variable.unique_name))) {
+			current_param_node->as.param.unique_name = strdup(param_symbol->variable.unique_name);
+			if (!current_param_node->as.param.unique_name) {
 				print_error(ERR_INTERNAL, current_param_node->line_num,
 							"Failed to allocate memory for parameter unique name.");
 				return false;
@@ -1416,7 +1417,8 @@ bool sem_second_var_def(ast_node_t node, semantic_context_t *context) {
 	}
 
 	// Store unique name
-	if (!(node->as.var_def.unique_name = strdup(symbol->variable.unique_name))) {
+	node->as.var_def.unique_name = strdup(symbol->variable.unique_name);
+	if (!node->as.var_def.unique_name) {
 		print_error(ERR_INTERNAL, node->line_num,
 					"Failed to allocate memory for variable unique name.");
 		return false;
@@ -1536,7 +1538,8 @@ bool sem_second_assign(ast_node_t node, semantic_context_t *context) {
 	}
 
 	// Set unique name
-	if (!(node->as.assign.unique_target_id = strdup(symbol->variable.unique_name))) {
+	node->as.assign.unique_target_id = strdup(symbol->variable.unique_name);
+	if (!node->as.assign.unique_target_id) {
 		print_error(ERR_INTERNAL, node->line_num,
 					"Failed to allocate memory for assignment unique name.");
 		return false;
@@ -1912,7 +1915,8 @@ bool sem_second_for(ast_node_t node, semantic_context_t *context) {
 	if (!symbol) {
 		return false;
 	}
-	if (!(node->as.for_stmt.unique_var_name = strdup(symbol->variable.unique_name))) {
+	node->as.for_stmt.unique_var_name = strdup(symbol->variable.unique_name);
+	if (!node->as.for_stmt.unique_var_name) {
 		print_error(ERR_INTERNAL, node->line_num,
 					"Failed to allocate memory for loop variable unique name.");
 		return false;
@@ -2112,7 +2116,8 @@ bool sem_second_identifier(ast_node_t node, semantic_context_t *context) {
 		// Fill out symbol
 		node->sym_entry = symbol;
 		node->eval_type = symbol->variable.type;
-		if (!(node->as.id.unique_name = strdup(symbol->variable.unique_name))) {
+		node->as.id.unique_name = strdup(symbol->variable.unique_name);
+		if (!node->as.id.unique_name) {
 			print_error(ERR_INTERNAL, node->line_num,
 						"Failed to allocate memory for identifier unique name.");
 			return false;
