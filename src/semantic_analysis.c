@@ -2030,8 +2030,42 @@ bool sem_arguments(ast_node_t node, semantic_context_t *context, symbol_t functi
 }
 
 bool sem_second_unary_operator(ast_node_t node, semantic_context_t *context) {
-	// TODO
-	return true;
+	assert(node && context && "Called sem_second_unary_operator on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_UNARY_OP) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_unary_operator on non unary operator node.");
+		return false;
+	}
+
+	// Resolve expression
+	if (!sem_second_expression(node->as.unary_op.operand, context)) {
+		return false;
+	}
+
+	// Type compatinility checking
+	if (node->as.unary_op.operator_type == OPERATOR_PLUS ||
+		node->as.unary_op.operator_type == OPERATOR_MINUS) {
+		if (node->as.unary_op.operand->eval_type != TYPE_INT &&
+			node->as.unary_op.operand->eval_type != TYPE_DOUBLE) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Unary operator '+' or '-' requires operand of type Int or Double.");
+			return false;
+		}
+		node->eval_type = node->as.unary_op.operand->eval_type;
+		return true;
+	} else if (node->as.unary_op.operator_type == OPERATOR_EX_MARK) {
+		if (!sem_ensure_compatible_type(node->as.unary_op.operand, TYPE_BOOL,
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		node->eval_type = TYPE_BOOL;
+		return true;
+	}
+
+	print_error(ERR_INTERNAL, node->line_num, "Unknown unary operator.");
+	return false;
 }
 
 bool sem_second_binary_operator(ast_node_t node, semantic_context_t *context) {
