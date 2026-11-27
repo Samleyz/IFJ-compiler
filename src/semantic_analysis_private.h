@@ -482,4 +482,13 @@ bool sem_ensure_compatible_last_type(ast_node_t node, data_type_t expected_type,
  */
 bool sem_resolve_condition(ast_node_t node, semantic_context_t *context);
 
+/**
+ * @brief Checks if a node is a zero literal
+ *
+ * @param node Node to check
+ * @return true If the node is a zero literal
+ * @return false If the node is not a zero literal
+ */
+bool is_zero_literal(ast_node_t node);
+
 #endif

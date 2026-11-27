@@ -1710,8 +1710,96 @@ bool sem_second_while(ast_node_t node, semantic_context_t *context) {
 }
 
 bool sem_second_for(ast_node_t node, semantic_context_t *context) {
-	// TODO
+	assert(node && context && "Called sem_second_for on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_FOR) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_for on non for node.");
+		return false;
+	}
+
+	// Check bounds
+	// From
+	if (!sem_second_expression(node->as.for_stmt.from_expr, context)) {
+		return false;
+	}
+	if (!sem_ensure_compatible_type(node->as.for_stmt.from_expr, TYPE_INT, ERR_SEM_TYPE_COMPAT)) {
+		return false;
+	}
+	// To
+	if (!sem_second_expression(node->as.for_stmt.to_expr, context)) {
+		return false;
+	}
+	if (!sem_ensure_compatible_type(node->as.for_stmt.to_expr, TYPE_INT, ERR_SEM_TYPE_COMPAT)) {
+		return false;
+	}
+	// Step
+	if (node->as.for_stmt.step_expr) {
+		if (!sem_second_expression(node->as.for_stmt.step_expr, context)) {
+			return false;
+		}
+		if (!sem_ensure_compatible_type(node->as.for_stmt.step_expr, TYPE_INT,
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		if (is_zero_literal(node->as.for_stmt.step_expr)) {
+			// Zero as step
+			print_error(ERR_SEM_OTHER, node->line_num, "For loop step cannot be zero.");
+			return false;
+		}
+	}
+
+	// Create scope
+	if (!stable_enter_scope(context->function_stack->local_scope)) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to enter scope of the for loop.");
+		return false;
+	}
+
+	// Declare loop variable
+	symbol_t symbol = declare_variable(context, node->as.for_stmt.var_name, TYPE_INT, false, true);
+	if (!symbol) {
+		return false;
+	}
+	if (!(node->as.for_stmt.unique_var_name = strdup(symbol->variable.unique_name))) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for loop variable unique name.");
+		return false;
+	}
+
+	// Check guards
+	for (ast_node_t current_guard_node = node->as.for_stmt.guards.head; current_guard_node;
+		 current_guard_node = current_guard_node->next) {
+		// Resolve the guard condition
+		if (!sem_resolve_condition(current_guard_node, context)) {
+			return false;
+		}
+	}
+
+	// Resolve the body
+	if (!sem_second_scoped_resolve(node->as.for_stmt.body, context, false)) {
+		return false;
+	}
+
+	// Leave the scope of the for loop
+	stable_leave_scope(context->function_stack->local_scope);
+
+	// Success
 	return true;
+}
+
+bool is_zero_literal(ast_node_t node) {
+	assert(node && "Called is_zero_literal on nullptr.");
+
+	if (node->type == NODE_LIT_INT) {
+		return node->as.int_val == 0;
+	}
+
+	if (node->type == NODE_UNARY_OP && (node->as.unary_op.operator_type == OPERATOR_MINUS ||
+										node->as.unary_op.operator_type == OPERATOR_PLUS)) {
+		return is_zero_literal(node->as.unary_op.operand);
+	}
+
+	return false;
 }
 
 bool sem_second_return(ast_node_t node, semantic_context_t *context) {
