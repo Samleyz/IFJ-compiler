@@ -978,8 +978,9 @@ bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context)
 		((symbol_t)node->sym_entry)->function.return_type = node->as.func_def.body->eval_type;
 	} else if (need_value) {
 		// Check return type compatibility
-		if (!sem_second_return_type_compatibility(
-				node->as.func_def.body, ((symbol_t)node->sym_entry)->function.return_type)) {
+		if (!sem_ensure_compatible_last_type(node->as.func_def.body,
+											 ((symbol_t)node->sym_entry)->function.return_type,
+											 ERR_SEM_TYPE_COMPAT)) {
 			return false;
 		}
 	}
@@ -2338,12 +2339,6 @@ symbol_t sem_find_extension_symbol(ast_node_t node, semantic_context_t *context)
 
 	free(key);
 	return symbol;
-}
-
-bool sem_second_return_type_compatibility(ast_node_t body, data_type_t expected_type) {
-	assert(body && expected_type && "Called sem_second_return_type_compatibility on nullptr.");
-	// TODO
-	return true;
 }
 
 bool sem_second_insert_returns(ast_node_t body, semantic_context_t *context) {

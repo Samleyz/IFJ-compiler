@@ -284,16 +284,6 @@ bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *contex
 bool sem_second_scoped_resolve(ast_node_t node, semantic_context_t *context, bool need_value);
 
 /**
- * @brief Checks compatibility of a body return type with an expected type (inserts casts if needed)
- *
- * @param body Body node to analyze
- * @param expected_type Expected return type
- * @return true Success
- * @return false Error
- */
-bool sem_second_return_type_compatibility(ast_node_t body, data_type_t expected_type);
-
-/**
  * @brief Inserts return statements in a body if needed (for code gen)
  *
  * @param body Body node to analyze
