@@ -1885,8 +1885,67 @@ bool sem_discard_return_value(ast_node_t node) {
 }
 
 bool sem_second_expression(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_expression on nullptr.");
+
+	switch (node->type) {
+	case NODE_IF:
+		return sem_second_if(node, context, true);
+	case NODE_BINARY_OP:
+		return sem_second_binary_operator(node, context);
+	case NODE_UNARY_OP:
+		return sem_second_unary_operator(node, context);
+	case NODE_FUNC_CALL:
+		return sem_second_function_call(node, context);
+	case NODE_MEMBER_ACCESS:
+		return sem_second_member_access(node, context);
+	case NODE_STRING_INTERP:
+		return sem_second_interpolateds(node, context);
+	case NODE_IDENTIFIER:
+		return sem_second_identifier(node, context);
+	case NODE_LIT_INT:
+		node->eval_type = TYPE_INT;
+		return true;
+	case NODE_LIT_DOUBLE:
+		node->eval_type = TYPE_DOUBLE;
+		return true;
+	case NODE_LIT_STRING:
+		node->eval_type = TYPE_STRING;
+		return true;
+	case NODE_LIT_BOOL:
+		node->eval_type = TYPE_BOOL;
+		return true;
+	case NODE_LIT_UNIT:
+		node->eval_type = TYPE_UNIT;
+		return true;
+	default:
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_expression on unexpected node type.");
+		return false;
+	}
+}
+
+bool sem_second_identifier(ast_node_t node, semantic_context_t *context) {
 	// TODO
-	return true;
+}
+
+bool sem_second_unary_operator(ast_node_t node, semantic_context_t *context) {
+	// TODO
+}
+
+bool sem_second_binary_operator(ast_node_t node, semantic_context_t *context) {
+	// TODO
+}
+
+bool sem_second_interpolateds(ast_node_t node, semantic_context_t *context) {
+	// TODO
+}
+
+bool sem_second_function_call(ast_node_t node, semantic_context_t *context) {
+	// TODO
+}
+
+bool sem_second_member_access(ast_node_t node, semantic_context_t *context) {
+	// TODO
 }
 
 bool sem_second_return_type_compatibility(ast_node_t body, data_type_t expected_type) {

@@ -500,4 +500,64 @@ bool is_zero_literal(ast_node_t node);
  */
 bool sem_discard_return_value(ast_node_t node);
 
+/**
+ * @brief Performs second pass of semantic analysis on an identifier
+ *
+ * @param node Identifier node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_identifier(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs second pass of semantic analysis on a unary operator
+ *
+ * @param node Unary operator node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_unary_operator(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs second pass of semantic analysis on a binary operator
+ *
+ * @param node Binary operator node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_binary_operator(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs second pass of semantic analysis on interpolated strings
+ *
+ * @param node Interpolated string node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_interpolateds(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs second pass of semantic analysis on a function call
+ *
+ * @param node Function call node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_function_call(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs second pass of semantic analysis on a member access
+ *
+ * @param node Member access node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_member_access(ast_node_t node, semantic_context_t *context);
+
 #endif
