@@ -1803,7 +1803,84 @@ bool is_zero_literal(ast_node_t node) {
 }
 
 bool sem_second_return(ast_node_t node, semantic_context_t *context) {
-	// TODO
+	assert(node && context && "Called sem_second_return on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_RETURN) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_return on non return node.");
+		return false;
+	}
+
+	// Default unit
+	node->eval_type = TYPE_UNIT;
+
+	// Check explicit return type
+	if (!context->function_stack->symbol->function.has_explicit_return_type) {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+					"Return statement in function without explicit return type.");
+		return false;
+	}
+
+	// Check empty return
+	if (!node->as.return_stmt.expr) {
+		if (context->function_stack->symbol->function.return_type != TYPE_UNIT) {
+			print_error(ERR_SEM_OTHER, node->line_num,
+						"Return without a value is allowed only in a function returning Unit.");
+			return false;
+		}
+		return true;
+	}
+
+	// Resolve the return expression
+	if (!sem_second_expression(node->as.return_stmt.expr, context)) {
+		return false;
+	}
+
+	// Discard return value for unit functions
+	if (context->function_stack->symbol->function.return_type == TYPE_UNIT) {
+		return sem_discard_return_value(node);
+	}
+
+	// Check return type compatibility
+	return sem_ensure_compatible_type(node->as.return_stmt.expr,
+									  context->function_stack->symbol->function.return_type,
+									  ERR_SEM_TYPE_COMPAT);
+
+	// Success
+	return true;
+}
+
+bool sem_discard_return_value(ast_node_t node) {
+	assert(node && "Called sem_discard_return_value on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_RETURN) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_discard_return_value on non return node.");
+		return false;
+	}
+
+	// Discard by creating block with expression and return
+	// Create nodes
+	ast_node_t expr_stmt_node = ast_create_node(NODE_EXPR_STMT, node->line_num);
+	ast_node_t return_node = ast_create_node(NODE_RETURN, node->line_num);
+	if (!expr_stmt_node || !return_node) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to create new expression statement or return node.");
+		ast_dtor(expr_stmt_node);
+		ast_dtor(return_node);
+		return false;
+	}
+	// Connect nodes
+	expr_stmt_node->as.expr_stmt.expr = node->as.return_stmt.expr;
+	expr_stmt_node->eval_type = expr_stmt_node->as.expr_stmt.expr->eval_type;
+	return_node->eval_type = TYPE_UNIT;
+	node->type = NODE_BLOCK;
+	node->eval_type = TYPE_UNIT;
+	ast_list_init(&(node->as.block.statements));
+	ast_list_append(&(node->as.block.statements), expr_stmt_node);
+	ast_list_append(&(node->as.block.statements), return_node);
+
 	return true;
 }
 

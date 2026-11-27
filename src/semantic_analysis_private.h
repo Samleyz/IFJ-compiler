@@ -491,4 +491,13 @@ bool sem_resolve_condition(ast_node_t node, semantic_context_t *context);
  */
 bool is_zero_literal(ast_node_t node);
 
+/**
+ * @brief Discards return value of return statement (by wraping to block - doesnt break anything)
+ *
+ * @param node Return statement node to analyze
+ * @return true Success
+ * @return false Error
+ */
+bool sem_discard_return_value(ast_node_t node);
+
 #endif
