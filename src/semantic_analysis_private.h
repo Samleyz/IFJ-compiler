@@ -62,7 +62,7 @@ void semantic_context_dtor(semantic_context_t *context);
 /**
  * @brief Prefills the symbol table with builtin functions
  *
- * @param symtable Symbol table to prefill
+ * @param stab Symbol table to prefill
  * @return true Success
  * @return false Failed to prefill
  */
@@ -83,7 +83,7 @@ bool prefill_builtin_extension_functions(stable_t stab);
  * @param stab Symbol table to register the function in
  * @param name Name of the function (string literal)
  * @param return_type Return type of the function
- * @param param_types Array of parameter types as data_type_t (nullptr if no parameter list)
+ * @param param_types Array of parameter types as data_type_t
  * @param param_count How long is param_types array
  * @return true Success
  * @return false Failed to register
@@ -110,7 +110,7 @@ bool register_builtin_extension_function(stable_t stab, const char *name, data_t
 /**
  * @brief Create a parameter list for builtin function
  *
- * @param param_lists List of parameter lists to append the new parameter list to (in situ)
+ * @param param_lists List of parameter lists to write the new parameter list to (in situ)
  * @param param_types Array of parameter types as data_type_t
  * @param param_count How long is param_types array
  * @return true Success
@@ -223,7 +223,7 @@ bool sem_second(ast_node_t node, semantic_context_t *context);
 bool sem_second_want_extension(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Ensures that function are passed in second pass
+ * @brief Ensures that function was passed in second pass
  *
  * @param node Function definition node to analyze
  * @param context Semantic analysis context
@@ -301,8 +301,7 @@ bool sem_second_insert_returns(ast_node_t body, semantic_context_t *context);
  * @param type Type of the variable
  * @param is_mutable Whether the variable is mutable
  * @param should_be_unique Whether the variable should be renamed
- * @return true Success
- * @return false Error
+ * @return symbol_t Pointer to the symbol of the variable, or nullptr on error
  */
 symbol_t declare_variable(semantic_context_t *context, const char *name, data_type_t type,
 						  bool is_mutable, bool should_be_unique);
@@ -434,8 +433,7 @@ ast_node_t sem_wrap_in_place(ast_node_t node, node_type_t wrapper);
 /**
  * @brief Checks if node have return on all branches
  *
- * @param node Node to analyze
- * @param context Semantic analysis context
+ * @param stmt Statement node to analyze
  * @return true Success
  * @return false Error
  */
@@ -451,9 +449,9 @@ bool sem_always_returns(ast_node_t stmt);
 data_type_t sem_unify_types(data_type_t type1, data_type_t type2);
 
 /**
- * @brief Ensures that the last type in all branches is comtatible with expexted
+ * @brief Ensures that the last type in all branches is comtatible with expexted type
  *
- * @param node List of nodes to check
+ * @param node Node to check
  * @param expected_type Expected type
  * @param potential_error_code Error code to use if the types are not compatible
  * @return true If the types are compatible

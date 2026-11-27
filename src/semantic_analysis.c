@@ -774,6 +774,13 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
 ####################################################################################################
 */
 
+/*
+Tool: Claude Opus 5.5
+Prompt paraphrase: Add node checks (nullptr fields, wrong node type passed to the function) to the
+functions of the second pass
+use same style, dont break anything
+*/
+
 bool sem_second(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second on nullptr.");
 
@@ -945,8 +952,18 @@ bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context)
 	assert(node && context && "Called sem_second_node_func_def_body on nullptr.");
 
 	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_func_def_body on non function definition node.");
+		return false;
+	}
 	if (!node->as.func_def.body) {
 		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
+	}
+	if (!node->sym_entry) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function definition has no symbol entry for second pass.");
 		return false;
 	}
 
@@ -1007,6 +1024,18 @@ bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context)
 bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_put_params_to_local_scope on nullptr.");
 
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_put_params_to_local_scope on non function definition node.");
+		return false;
+	}
+	if (!node->sym_entry) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function definition has no symbol entry for second pass.");
+		return false;
+	}
+
 	// Put receiver parameter if extension function
 	if (((symbol_t)node->sym_entry)->function.extension_parameter_name) {
 		if (!declare_variable(
@@ -1021,13 +1050,25 @@ bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *c
 	ast_node_t current_param_list_node = node->as.func_def.param_lists.head;
 	while (current_param_list_node) {
 		// Node checks
-		// TODO
+		if (current_param_list_node->type != NODE_PARAM_LIST) {
+			print_error(ERR_INTERNAL, current_param_list_node->line_num,
+						"Invalid node type in parameter lists.");
+			return false;
+		}
 
 		// Go through parameters in the list
 		ast_node_t current_param_node = current_param_list_node->as.param_list.params.head;
 		while (current_param_node) {
 			// Node checks
-			// TODO
+			if (current_param_node->type != NODE_PARAM) {
+				print_error(ERR_INTERNAL, current_param_node->line_num,
+							"Invalid node type in parameter list.");
+				return false;
+			}
+			if (!current_param_node->as.param.name) {
+				print_error(ERR_INTERNAL, current_param_node->line_num, "Parameter has no name.");
+				return false;
+			}
 
 			// Declare the parameter
 			symbol_t param_symbol = declare_variable(context, current_param_node->as.param.name,
@@ -1058,6 +1099,16 @@ bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *c
 symbol_t declare_variable(semantic_context_t *context, const char *name, data_type_t type,
 						  bool is_mutable, bool should_be_unique) {
 	assert(context && name && type && "Called declare_variable with invalid parameters.");
+
+	// Context checks
+	if (!context->function_stack) {
+		print_error(ERR_INTERNAL, 0, "Variable '%s' declared outside of a function.", name);
+		return nullptr;
+	}
+	if (!context->function_stack->local_scope) {
+		print_error(ERR_INTERNAL, 0, "Variable '%s' declared outside of a function.", name);
+		return nullptr;
+	}
 
 	// Check if not defined in the current scope
 	if (stable_find_curlevel(context->function_stack->local_scope, name)) {
@@ -1121,6 +1172,17 @@ char *make_name(semantic_context_t *context, const char *name, bool should_be_un
 bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_ensure_enclosed_body on nullptr.");
 
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_ensure_enclosed_body on non function definition node.");
+		return false;
+	}
+	if (!node->as.func_def.body) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
+	}
+
 	// Already in block
 	if (node->as.func_def.body->type == NODE_BLOCK) {
 		return true;
@@ -1151,6 +1213,18 @@ bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *contex
 
 bool sem_second_scoped_resolve(ast_node_t node, semantic_context_t *context, bool need_value) {
 	assert(node && context && "Called sem_second_scoped_resolve on nullptr.");
+
+	// Context checks
+	if (!context->function_stack) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_scoped_resolve outside of a function.");
+		return false;
+	}
+	if (!context->function_stack->local_scope) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_scoped_resolve outside of a function.");
+		return false;
+	}
 
 	// Enter into scope of the block
 	if (!stable_enter_scope(context->function_stack->local_scope)) {
@@ -1222,6 +1296,12 @@ bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool nee
 		return true;
 		break;
 	case NODE_EXPR_STMT:
+		// Node checks
+		if (!node->as.expr_stmt.expr) {
+			print_error(ERR_INTERNAL, node->line_num, "Expression statement has no expression.");
+			return false;
+		}
+
 		// Patch fix for if (whether it is statement or expression should decide semantics)
 		if (node->as.expr_stmt.expr->type == NODE_IF) {
 			// Unwrap
@@ -1286,6 +1366,15 @@ bool sem_second_var_def(ast_node_t node, semantic_context_t *context) {
 	if (node->type != NODE_VAR_DEF) {
 		print_error(ERR_INTERNAL, node->line_num,
 					"Called sem_second_var_def on non variable definition node.");
+		return false;
+	}
+	if (!node->as.var_def.name) {
+		print_error(ERR_INTERNAL, node->line_num, "Variable definition has no name.");
+		return false;
+	}
+	if (!node->as.var_def.init_expr) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Variable definition has no initialization expression.");
 		return false;
 	}
 
@@ -1408,12 +1497,24 @@ bool sem_second_assign(ast_node_t node, semantic_context_t *context) {
 					"Called sem_second_assign on non assignment node.");
 		return false;
 	}
+	if (!node->as.assign.target_id) {
+		print_error(ERR_INTERNAL, node->line_num, "Assignment has no target.");
+		return false;
+	}
+	if (!node->as.assign.expr) {
+		print_error(ERR_INTERNAL, node->line_num, "Assignment has no expression.");
+		return false;
+	}
 
 	// Find the variable in the local scope
 	symbol_t symbol =
 		stable_find_alllevel(context->function_stack->local_scope, node->as.assign.target_id);
 	if (!symbol) {
 		print_error(ERR_SEM_UNDEFINED, node->line_num, "Undefined variable");
+		return false;
+	}
+	if (symbol->symbol_variant != SYMBOL_VARIABLE) {
+		print_error(ERR_INTERNAL, node->line_num, "Local symbol is not a variable.");
 		return false;
 	}
 
@@ -1451,6 +1552,14 @@ bool sem_second_if(ast_node_t node, semantic_context_t *context, bool need_value
 	// Node checks
 	if (node->type != NODE_IF) {
 		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_if on non if node.");
+		return false;
+	}
+	if (!node->as.if_stmt.condition) {
+		print_error(ERR_INTERNAL, node->line_num, "If statement has no condition.");
+		return false;
+	}
+	if (!node->as.if_stmt.then_branch) {
+		print_error(ERR_INTERNAL, node->line_num, "If statement has no then branch.");
 		return false;
 	}
 
@@ -1616,6 +1725,14 @@ bool sem_ensure_compatible_last_type(ast_node_t node, data_type_t expected_type,
 		if (!node->as.if_stmt.is_expr) {
 			return sem_ensure_compatible_type(node, expected_type, potential_error_code);
 		}
+		if (!node->as.if_stmt.then_branch) {
+			print_error(ERR_INTERNAL, node->line_num, "If expression is missing a then branch.");
+			return false;
+		}
+		if (!node->as.if_stmt.else_branch) {
+			print_error(ERR_INTERNAL, node->line_num, "If expression is missing an else branch.");
+			return false;
+		}
 
 		// Ensure both branches
 		if (!sem_ensure_compatible_last_type(node->as.if_stmt.then_branch, expected_type,
@@ -1654,6 +1771,12 @@ bool sem_ensure_compatible_last_type(ast_node_t node, data_type_t expected_type,
 		break;
 
 	case NODE_EXPR_STMT:
+		// Node checks
+		if (!node->as.expr_stmt.expr) {
+			print_error(ERR_INTERNAL, node->line_num, "Expression statement has no expression.");
+			return false;
+		}
+
 		// Ensure the expression statement
 		if (!sem_ensure_compatible_type(node->as.expr_stmt.expr, expected_type,
 										potential_error_code)) {
@@ -1695,6 +1818,14 @@ bool sem_second_while(ast_node_t node, semantic_context_t *context) {
 		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_while on non while node.");
 		return false;
 	}
+	if (!node->as.while_stmt.condition) {
+		print_error(ERR_INTERNAL, node->line_num, "While loop has no condition.");
+		return false;
+	}
+	if (!node->as.while_stmt.body) {
+		print_error(ERR_INTERNAL, node->line_num, "While loop has no body.");
+		return false;
+	}
 
 	// Resolve the condition
 	if (!sem_resolve_condition(node->as.while_stmt.condition, context)) {
@@ -1716,6 +1847,26 @@ bool sem_second_for(ast_node_t node, semantic_context_t *context) {
 	// Node checks
 	if (node->type != NODE_FOR) {
 		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_for on non for node.");
+		return false;
+	}
+	if (!node->as.for_stmt.var_name) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no variable.");
+		return false;
+	}
+	if (!node->as.for_stmt.from_expr) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no from expression.");
+		return false;
+	}
+	if (!node->as.for_stmt.to_expr) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no to expression.");
+		return false;
+	}
+	if (!node->as.for_stmt.body) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no body.");
+		return false;
+	}
+	if (!node->as.for_stmt.to_expr || !node->as.for_stmt.body) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no variable, range bound or body.");
 		return false;
 	}
 
@@ -1811,6 +1962,14 @@ bool sem_second_return(ast_node_t node, semantic_context_t *context) {
 		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_return on non return node.");
 		return false;
 	}
+	if (!context->function_stack) {
+		print_error(ERR_INTERNAL, node->line_num, "Return statement outside of a function.");
+		return false;
+	}
+	if (!context->function_stack->symbol) {
+		print_error(ERR_INTERNAL, node->line_num, "Return statement outside of a function.");
+		return false;
+	}
 
 	// Default unit
 	node->eval_type = TYPE_UNIT;
@@ -1858,6 +2017,10 @@ bool sem_discard_return_value(ast_node_t node) {
 	if (node->type != NODE_RETURN) {
 		print_error(ERR_INTERNAL, node->line_num,
 					"Called sem_discard_return_value on non return node.");
+		return false;
+	}
+	if (!node->as.return_stmt.expr) {
+		print_error(ERR_INTERNAL, node->line_num, "Return statement has no value to discard.");
 		return false;
 	}
 
@@ -1934,10 +2097,18 @@ bool sem_second_identifier(ast_node_t node, semantic_context_t *context) {
 					"Called sem_second_identifier on non identifier node.");
 		return false;
 	}
+	if (!node->as.id.name) {
+		print_error(ERR_INTERNAL, node->line_num, "Identifier has no name.");
+		return false;
+	}
 
 	// Find the variable in the local scope
 	symbol_t symbol = stable_find_alllevel(context->function_stack->local_scope, node->as.id.name);
 	if (symbol) {
+		if (symbol->symbol_variant != SYMBOL_VARIABLE) {
+			print_error(ERR_INTERNAL, node->line_num, "Local symbol is not a variable.");
+			return false;
+		}
 		// Fill out symbol
 		node->sym_entry = symbol;
 		node->eval_type = symbol->variable.type;
@@ -1955,7 +2126,7 @@ bool sem_second_identifier(ast_node_t node, semantic_context_t *context) {
 		print_error(ERR_SEM_UNDEFINED, node->line_num, "Undefined identifier.");
 		return false;
 	}
-	// Convert to extension function
+	// Convert to function call without parentheses
 	ast_node_t callee_node = sem_wrap_in_place(node, NODE_FUNC_CALL);
 	if (!callee_node) {
 		print_error(ERR_INTERNAL, node->line_num,
@@ -1984,6 +2155,17 @@ bool sem_arguments(ast_node_t node, semantic_context_t *context, symbol_t functi
 	assert(node && context && function_symbol &&
 		   "Called sem_arguments on nullptr or invalid function symbol.");
 
+	// Node checks
+	if (node->type != NODE_FUNC_CALL) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_arguments on non function call node.");
+		return false;
+	}
+	if (function_symbol->symbol_variant != SYMBOL_FUNCTION) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_arguments with non function symbol.");
+		return false;
+	}
+
 	// Check list lengths
 	if (function_symbol->function.parameter_lists.count != node->as.func_call.arg_lists.count) {
 		print_error(ERR_SEM_PARAMS, node->line_num, "Invalid arguments count for function call.");
@@ -1994,6 +2176,18 @@ bool sem_arguments(ast_node_t node, semantic_context_t *context, symbol_t functi
 	ast_node_t current_arg_list_node = node->as.func_call.arg_lists.head;
 	ast_node_t current_param_list_node = function_symbol->function.parameter_lists.head;
 	while (current_arg_list_node && current_param_list_node) {
+		// Node checks
+		if (current_arg_list_node->type != NODE_ARG_LIST) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Invalid node type in argument or parameter lists.");
+			return false;
+		}
+		if (current_param_list_node->type != NODE_PARAM_LIST) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Invalid node type in argument or parameter lists.");
+			return false;
+		}
+
 		// Check list lengths
 		if (current_param_list_node->as.param_list.params.count !=
 			current_arg_list_node->as.arg_list.args.count) {
@@ -2039,6 +2233,10 @@ bool sem_second_unary_operator(ast_node_t node, semantic_context_t *context) {
 					"Called sem_second_unary_operator on non unary operator node.");
 		return false;
 	}
+	if (!node->as.unary_op.operand) {
+		print_error(ERR_INTERNAL, node->line_num, "Unary operator has no operand.");
+		return false;
+	}
 
 	// Resolve expression
 	if (!sem_second_expression(node->as.unary_op.operand, context)) {
@@ -2076,6 +2274,14 @@ bool sem_second_binary_operator(ast_node_t node, semantic_context_t *context) {
 	if (node->type != NODE_BINARY_OP) {
 		print_error(ERR_INTERNAL, node->line_num,
 					"Called sem_second_binary_operator on non binary operator node.");
+		return false;
+	}
+	if (!node->as.binary_op.left) {
+		print_error(ERR_INTERNAL, node->line_num, "Binary operator is missing an operand.");
+		return false;
+	}
+	if (!node->as.binary_op.right) {
+		print_error(ERR_INTERNAL, node->line_num, "Binary operator is missing an operand.");
 		return false;
 	}
 
@@ -2234,13 +2440,36 @@ bool sem_second_interpolateds(ast_node_t node, semantic_context_t *context) {
 bool sem_second_function_call(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_function_call on nullptr.");
 
+	// Node checks
+	if (node->type != NODE_FUNC_CALL) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_function_call on non function call node.");
+		return false;
+	}
+	if (!node->as.func_call.callee) {
+		print_error(ERR_INTERNAL, node->line_num, "Function call has no callee.");
+		return false;
+	}
+
 	// Find function symbol
 	symbol_t symbol = nullptr;
 	if (node->as.func_call.callee->type == NODE_IDENTIFIER) {
+		// Node checks
+		if (!node->as.func_call.callee->as.id.name) {
+			print_error(ERR_INTERNAL, node->line_num, "Function call callee has no name.");
+			return false;
+		}
+
 		// Search
 		symbol = stable_find_alllevel(context->symtable_functions,
 									  node->as.func_call.callee->as.id.name);
 	} else if (node->as.func_call.callee->type == NODE_MEMBER_ACCESS) {
+		// Node checks
+		if (!node->as.func_call.callee->as.member_access.target) {
+			print_error(ERR_INTERNAL, node->line_num, "Method call has no target.");
+			return false;
+		}
+
 		// Resolve the target expression
 		if (!sem_second_expression(node->as.func_call.callee->as.member_access.target, context)) {
 			return false;
@@ -2273,6 +2502,17 @@ bool sem_second_function_call(ast_node_t node, semantic_context_t *context) {
 
 bool sem_second_member_access(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_member_access on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_MEMBER_ACCESS) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_member_access on non member access node.");
+		return false;
+	}
+	if (!node->as.member_access.target) {
+		print_error(ERR_INTERNAL, node->line_num, "Member access has no target.");
+		return false;
+	}
 
 	// Resolve the target expression
 	if (!sem_second_expression(node->as.member_access.target, context)) {
@@ -2322,6 +2562,17 @@ bool sem_second_member_access(ast_node_t node, semantic_context_t *context) {
 symbol_t sem_find_extension_symbol(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_find_extension_symbol on nullptr.");
 
+	// Node checks
+	if (node->type != NODE_MEMBER_ACCESS) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_find_extension_symbol on non member access node.");
+		return nullptr;
+	}
+	if (!node->as.member_access.member_name || !node->as.member_access.target) {
+		print_error(ERR_INTERNAL, node->line_num, "Member access has no member name or target.");
+		return nullptr;
+	}
+
 	// Create key
 	char *key =
 		malloc(strlen(node->as.member_access.member_name) + 1 +
@@ -2350,6 +2601,18 @@ use same style, write clean code, dont break anything, explain what you did
 */
 bool sem_second_insert_returns(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second_insert_returns on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_BLOCK) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_insert_returns on non block node.");
+		return false;
+	}
+	if (!context->function_stack || !context->function_stack->symbol) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_insert_returns outside of a function.");
+		return false;
+	}
 
 	ast_node_t tail = node->as.block.statements.tail;
 
