@@ -17,16 +17,22 @@
 /** @brief Digits of size_t, space for the counter in the unique names of variables */
 #define SIZE_T_MAX_DIGITS 20
 
-typedef struct call_chain_item {
-	ast_node_t function_node;
-	struct call_chain_item *previous_item;
-} *call_chain_item_t;
+/**
+ * @brief Stack level struct that is used for keeping track of function call stack, that is
+ * currently analyzed in second pass
+ */
+typedef struct function_stack {
+	symbol_t symbol;			/**< Symbol of the analysed function */
+	ast_node_t definition_node; /**< Node NODE_FUNC_DEF of the analysed function */
+	stable_t local_scope;		/**< Current local sccope symbol table */
+	struct function_stack
+		*caller_function_stack; /**< Stack of the function that was calling this function */
+} function_stack_t;
 
-typedef struct {
-	call_chain_item_t top;
-	unsigned size;
-} call_chain_t;
-
+/**
+ * @brief Semantic context struct that holds all the necessary information for the semantic analysis
+ * so functions can share that between each other
+ */
 typedef struct {
 	stable_t symtable_local;			   /**< Table of local symbols */
 	stable_t symtable_functions;		   /**< Table of function symbols */
@@ -35,28 +41,9 @@ typedef struct {
 	size_t main_functions_count; /**< Count of main functions found */
 	size_t rename_counter;		 /**< Counter for generating unique names*/
 
-	char *current_function_name; /**< Name of the function currently being analyzed (nullptr if not
-									in function) */
-
-	char *extension_variable_name; /**< Name of the variable used in extension function calls to be
-									  stored in function symbol (nullptr if not in extension)*/
-
-	bool found_branch_without_return; /**< Flag indicating if a branch without return was found */
-	bool is_in_expression_if; /**< Flag indicating if currently analyzing an if as expression */
-
-	call_chain_t call_chain;
-	// TODO: Add more fields if needed for semantic context
+	function_stack_t
+		*function_stack; /**< Function currently analysed in the second pass (nullptr if none) */
 } semantic_context_t;
-
-void call_chain_init(semantic_context_t *context);
-
-bool call_chain_add(semantic_context_t *context, ast_node_t function_node);
-
-void call_chain_destroy(semantic_context_t *context);
-
-void call_chain_pop(semantic_context_t *context);
-
-bool call_chain_check_cycle(semantic_context_t *context, ast_node_t cycle_start);
 
 /**
  * @brief Initializes a semantic context structure
@@ -77,7 +64,7 @@ void semantic_context_dtor(semantic_context_t *context);
 /**
  * @brief Prefills the symbol table with builtin functions
  *
- * @param symtable Symbol table to prefill
+ * @param stab Symbol table to prefill
  * @return true Success
  * @return false Failed to prefill
  */
@@ -98,7 +85,7 @@ bool prefill_builtin_extension_functions(stable_t stab);
  * @param stab Symbol table to register the function in
  * @param name Name of the function (string literal)
  * @param return_type Return type of the function
- * @param param_types Array of parameter types as data_type_t (nullptr if no parameter list)
+ * @param param_types Array of parameter types as data_type_t
  * @param param_count How long is param_types array
  * @return true Success
  * @return false Failed to register
@@ -125,7 +112,7 @@ bool register_builtin_extension_function(stable_t stab, const char *name, data_t
 /**
  * @brief Create a parameter list for builtin function
  *
- * @param param_lists List of parameter lists to append the new parameter list to (in situ)
+ * @param param_lists List of parameter lists to write the new parameter list to (in situ)
  * @param param_types Array of parameter types as data_type_t
  * @param param_count How long is param_types array
  * @return true Success
@@ -218,319 +205,369 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
 */
 
 /**
- * @brief Checks the semantic correctness of a statement
+ * @brief Performs the second pass of semantic analysis on program root node
  *
- * @param node Statement node to analyze
- * @param context Semantic analysis context
- * @return true	Success
- * @return false Semantic error
- */
-bool sem_second_stmt(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Checks the semantic correctness of an expression
- *
- * @param node Expression node to analyze
+ * @param node Root program node of AST to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
- */
-bool sem_second_expr(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_PROGRAM
- *
- * @param node Program node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
 bool sem_second(ast_node_t node, semantic_context_t *context);
 
-bool sem_second_node_block_body(ast_node_t node, semantic_context_t *context);
-
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_BLOCK
+ * @brief Ensures that extension functions are passed in second pass
  *
- * @param node Block node to analyze
+ * @param node Extension function node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_block(ast_node_t node, semantic_context_t *context);
+bool sem_second_want_extension(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_EXTENSION
- *
- * @param node Extension node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_extension(ast_node_t node, semantic_context_t *context);
-
-bool sem_second_append_empty_return(ast_node_t block_node);
-
-bool sem_second_check_branch_type(ast_node_t branch, unsigned line_num, data_type_t expected);
-
-bool sem_second_insert_return_into_branch(ast_node_t branch, semantic_context_t *context,
-										  data_type_t expected);
-
-bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *context,
-									   data_type_t expected);
-
-bool sem_second_func_analyze_body(ast_node_t node, semantic_context_t *context,
-								  symbol_t current_function);
-
-bool sem_second_check_return_type(ast_node_t node, symbol_t current_function);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_FUNC_DEF
+ * @brief Ensures that function was passed in second pass
  *
  * @param node Function definition node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
+ */
+bool sem_second_want_function(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs the second pass of semantic analysis on a function definition node
+ *
+ * @param node Function definition node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
  */
 bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Analyzes the body of a function or an extension method with its symbol
+ * @brief Performs the second pass of semantic analysis on a function definition body
  *
- * @param node Function definition node
+ * @param node Function definition node to analyze
  * @param context Semantic analysis context
- * @param current_function Symbol of the function
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_analyze_function(ast_node_t node, semantic_context_t *context,
-								 symbol_t current_function);
+bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_VAR_DEF
+ * @brief Puts the parameters of a function definition to its local scope
+ *
+ * @param node Function definition node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Ensures that a function definition body is enclosed in a block
+ *
+ * @param node Function definition node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Resolves the types with separate scope according to if return value is expected
+ *
+ * @param node Node to analyze
+ * @param context Semantic analysis context
+ * @param need_value Whether the body is expected to return a value
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_scoped_resolve(ast_node_t node, semantic_context_t *context, bool need_value);
+
+/**
+ * @brief Inserts return statements in a body if needed (for code gen)
+ *
+ * @param body Body node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_insert_returns(ast_node_t body, semantic_context_t *context);
+
+/**
+ * @brief Declares a new variable in the current scope
+ *
+ * @param context Semantic analysis context
+ * @param name Name of the variable
+ * @param type Type of the variable
+ * @param is_mutable Whether the variable is mutable
+ * @param should_be_unique Whether the variable should be renamed
+ * @return symbol_t Pointer to the symbol of the variable, or nullptr on error
+ */
+symbol_t declare_variable(semantic_context_t *context, const char *name, data_type_t type,
+						  bool is_mutable, bool should_be_unique);
+
+/**
+ * @brief Creates name for a variable (unique if needed)
+ *
+ * @param context Semantic analysis context
+ * @param name Name of the variable
+ * @param should_be_unique Whether the variable should be renamed
+ * @return Pointer to the unique name, or nullptr on error
+ */
+char *make_name(semantic_context_t *context, const char *name, bool should_be_unique);
+
+/**
+ * @brief Resolves the types of a statement
+ *
+ * @param node Statement node to analyze
+ * @param context Semantic analysis context
+ * @param need_value Whether the statement is expected to return a value
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool need_value);
+
+/**
+ * @brief Resolves the types of a block node
+ *
+ * @param node Block node to analyze
+ * @param context Semantic analysis context
+ * @param need_value Whether the block is expected to return a value
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_value);
+
+/**
+ * @brief Resolves the types of a variable definition node
  *
  * @param node Variable definition node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context);
+bool sem_second_var_def(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_ASSIGN
+ * @brief Resolves the types of an assignment node
  *
  * @param node Assignment node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_assign(ast_node_t node, semantic_context_t *context);
-
-bool sem_second_branch_body(ast_node_t branch, semantic_context_t *context);
-
-bool sem_second_if_branch_to_double(ast_node_t branch);
+bool sem_second_assign(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_IF (statement)
+ * @brief Resolves the types of an if statement
  *
  * @param node If statement node to analyze
  * @param context Semantic analysis context
+ * @param need_value Whether the if statement is expected to return a value
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_if_stmt(ast_node_t node, semantic_context_t *context);
+bool sem_second_if(ast_node_t node, semantic_context_t *context, bool need_value);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_IF (expression)
- *
- * @param node If expression node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_if_expr(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_WHILE
+ * @brief Resolves the types of a while statement node
  *
  * @param node While statement node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_while(ast_node_t node, semantic_context_t *context);
-
-bool sem_second_for_range(ast_node_t node, semantic_context_t *context);
-
-bool sem_second_for_variable(ast_node_t node, semantic_context_t *context);
+bool sem_second_while(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_FOR
+ * @brief Resolves the types of a for statement node
  *
  * @param node For statement node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_for(ast_node_t node, semantic_context_t *context);
+bool sem_second_for(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_RETURN
+ * @brief Resolves the types of a return statement node
  *
  * @param node Return statement node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_return(ast_node_t node, semantic_context_t *context);
+bool sem_second_return(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_EXPR_STMT
+ * @brief Resolves the types of an expression
  *
- * @param node Expression statement node to analyze
+ * @param node Expression node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_expr_stmt(ast_node_t node, semantic_context_t *context);
+bool sem_second_expression(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_BINARY_OP
+ * @brief Ensures that a node's type is compatible with an expected type
  *
- * @param node Binary operation node to analyze
+ * @param node Node to check
+ * @param expected_type Expected type
+ * @param potential_error_code Error code to use if the types are not compatible
+ * @return true If the types are compatible
+ * @return false If the types are not compatible
+ */
+bool sem_ensure_compatible_type(ast_node_t node, data_type_t expected_type,
+								err_c_t potential_error_code);
+
+/**
+ * @brief Wraps a node in a other node
+ *
+ * @param node Node to wrap
+ * @param wrapper Type of the wrapper node
+ * @return The wrapped node, or nullptr on error
+ */
+ast_node_t sem_wrap_in_place(ast_node_t node, node_type_t wrapper);
+
+/**
+ * @brief Checks if node have return on all branches
+ *
+ * @param stmt Statement node to analyze
+ * @return true Success
+ * @return false Error
+ */
+bool sem_always_returns(ast_node_t stmt);
+
+/**
+ * @brief Unifies two types into a single type
+ *
+ * @param type1 First type
+ * @param type2 Second type
+ * @return data_type_t Unified type (TYPE_UNKNOWN if they are incompatible)
+ */
+data_type_t sem_unify_types(data_type_t type1, data_type_t type2);
+
+/**
+ * @brief Ensures that the last type in all branches is comtatible with expexted type
+ *
+ * @param node Node to check
+ * @param expected_type Expected type
+ * @param potential_error_code Error code to use if the types are not compatible
+ * @return true If the types are compatible
+ * @return false If the types are not compatible
+ */
+bool sem_ensure_compatible_last_type(ast_node_t node, data_type_t expected_type,
+									 err_c_t potential_error_code);
+
+/**
+ * @brief Resolves the types of a condition expression
+ *
+ * @param node Condition expression node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_binary_op_result_type(op_type_t operator_type, data_type_t left_type,
-									  data_type_t right_type, data_type_t *result_type);
-
-bool sem_second_insert_double_cast(ast_node_t *operand);
-
-bool sem_second_node_binary_op(ast_node_t node, semantic_context_t *context);
+bool sem_resolve_condition(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_UNARY_OP
+ * @brief Checks if a node is a zero literal
  *
- * @param node Unary operation node to analyze
+ * @param node Node to check
+ * @return true If the node is a zero literal
+ * @return false If the node is not a zero literal
+ */
+bool is_zero_literal(ast_node_t node);
+
+/**
+ * @brief Discards return value of return statement (by wraping to block - doesnt break anything)
+ *
+ * @param node Return statement node to analyze
+ * @return true Success
+ * @return false Error
+ */
+bool sem_discard_return_value(ast_node_t node);
+
+/**
+ * @brief Performs second pass of semantic analysis on an identifier
+ *
+ * @param node Identifier node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_unary_op(ast_node_t node, semantic_context_t *context);
+bool sem_second_identifier(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_FUNC_CALL
+ * @brief Performs second pass of semantic analysis on a unary operator
+ *
+ * @param node Unary operator node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_unary_operator(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs second pass of semantic analysis on a binary operator
+ *
+ * @param node Binary operator node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_binary_operator(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs second pass of semantic analysis on interpolated strings
+ *
+ * @param node Interpolated string node to analyze
+ * @param context Semantic analysis context
+ * @return true Success
+ * @return false Error
+ */
+bool sem_second_interpolateds(ast_node_t node, semantic_context_t *context);
+
+/**
+ * @brief Performs second pass of semantic analysis on a function call
  *
  * @param node Function call node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-symbol_t sem_second_find_extension_symbol(ast_node_t member_access_node,
-										  semantic_context_t *context);
-
-bool sem_second_node_func_call(ast_node_t node, semantic_context_t *context);
+bool sem_second_function_call(ast_node_t node, semantic_context_t *context);
 
 /**
- * @brief Performs the second pass of semantic analysis on a NODE_MEMBER_ACCESS
+ * @brief Performs second pass of semantic analysis on a member access
  *
  * @param node Member access node to analyze
  * @param context Semantic analysis context
  * @return true Success
- * @return false Semantic error
+ * @return false Error
  */
-bool sem_second_node_member_access(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_STRING_INTERP
- *
- * @param node String interpolation node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_string_interp(ast_node_t node, semantic_context_t *context);
+bool sem_second_member_access(ast_node_t node, semantic_context_t *context);
 
 /**
  * @brief Checks the semantic correctness of a parameter list in a function call
  *
  * @param node Node with a parameter list to analyze
  * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_IDENTIFIER
- *
- * @param node Identifier node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_identifier(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_LIT_INT
- *
- * @param node Integer literal node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_lit_int(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_LIT_DOUBLE
- *
- * @param node Double literal node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_lit_double(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_LIT_STRING
- *
- * @param node String literal node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_lit_string(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_LIT_BOOL
- *
- * @param node Boolean literal node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_lit_bool(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Performs the second pass of semantic analysis on a NODE_LIT_UNIT
- *
- * @param node Unit literal node to analyze
- * @param context Semantic analysis context
- * @return true Success
- * @return false Semantic error
- */
-bool sem_second_node_lit_unit(ast_node_t node, semantic_context_t *context);
-
-/**
- * @brief Loads the parameters for a function body pass into local symtable
- *
- * @param node Function node
- * @param context Semantic analysis context
  * @param function_symbol Symbol of the function (or of the extension method)
  * @return true Success
- * @return false Failed to load parameters
+ * @return false Semantic error
  */
-bool sem_second_load_params(ast_node_t node, semantic_context_t *context, symbol_t function_symbol);
+bool sem_arguments(ast_node_t node, semantic_context_t *context, symbol_t function_symbol);
+
+/**
+ * @brief Finds the symbol of an extension method
+ *
+ * @param node Member access node to find the symbol for
+ * @param context Semantic analysis context
+ * @return symbol_t Symbol of the extension method, or nullptr if not found
+ */
+symbol_t sem_find_extension_symbol(ast_node_t node, semantic_context_t *context);
 
 #endif

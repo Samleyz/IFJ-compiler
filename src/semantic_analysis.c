@@ -90,10 +90,6 @@ void semantic_context_dtor(semantic_context_t *context) {
 		stable_dtor(context->symtable_extension_functions);
 	}
 
-	if (context->call_chain.top != nullptr) {
-		call_chain_destroy(context);
-	}
-
 	// Zero out the structure
 	*context = (semantic_context_t){0};
 }
@@ -540,6 +536,9 @@ bool sem_first_node_func_def(ast_node_t node, semantic_context_t *context) {
 		return false;
 	}
 
+	// Sttore symbol pointer for later access
+	node->sym_entry = symbol;
+
 	return true;
 }
 
@@ -558,6 +557,13 @@ bool sem_first_node_extension(ast_node_t node, semantic_context_t *context) {
 	}
 	if (!node->as.extension.receiver_type) {
 		print_error(ERR_INTERNAL, node->line_num, "Extension has no receiver type.");
+		return false;
+	}
+
+	// Name of receiver (always unique in the scope of extension)
+	node->as.extension.unique_receiver_name = strdup(node->as.extension.receiver_name);
+	if (!node->as.extension.unique_receiver_name) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to duplicate receiver name.");
 		return false;
 	}
 
@@ -646,6 +652,8 @@ bool sem_first_node_extension(ast_node_t node, semantic_context_t *context) {
 			return false;
 		}
 		free(key);
+		// Sttore symbol pointer for later access
+		current_extension_node->sym_entry = symbol;
 
 		// Move to next
 		current_extension_node = current_extension_node->next;
@@ -769,565 +777,598 @@ bool sem_first_validate_parameter_uniqueness(ast_list_t *param_lists, const char
 ####################################################################################################
 */
 
-bool sem_second_stmt(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_stmt on nullptr.");
-
-	switch (node->type) {
-	case NODE_VAR_DEF:
-		return sem_second_node_var_def(node, context);
-	case NODE_ASSIGN:
-		return sem_second_node_assign(node, context);
-	case NODE_IF:
-		return sem_second_node_if_stmt(node, context); // if - statement
-	case NODE_WHILE:
-		return sem_second_node_while(node, context);
-	case NODE_FOR:
-		return sem_second_node_for(node, context);
-	case NODE_RETURN:
-		return sem_second_node_return(node, context);
-	case NODE_EXPR_STMT:
-		return sem_second_node_expr_stmt(node, context);
-	default:
-		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_stmt on non statement node.");
-		return false;
-	}
-}
-
-bool sem_second_expr(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_expr on nullptr.");
-
-	switch (node->type) {
-	case NODE_BINARY_OP:
-		return sem_second_node_binary_op(node, context);
-	case NODE_UNARY_OP:
-		return sem_second_node_unary_op(node, context);
-	case NODE_FUNC_CALL:
-		return sem_second_node_func_call(node, context);
-	case NODE_MEMBER_ACCESS:
-		return sem_second_node_member_access(node, context);
-	case NODE_STRING_INTERP:
-		return sem_second_node_string_interp(node, context);
-	case NODE_IF:
-		// Need value from if
-		bool storage1 = context->is_in_expression_if;
-		context->is_in_expression_if = true;
-
-		bool status = sem_second_node_if_expr(node, context); // if - expression
-
-		// Restore
-		context->is_in_expression_if = storage1;
-
-		return status;
-	case NODE_IDENTIFIER:
-		return sem_second_node_identifier(node, context);
-	case NODE_LIT_INT:
-		return sem_second_node_lit_int(node, context);
-	case NODE_LIT_DOUBLE:
-		return sem_second_node_lit_double(node, context);
-	case NODE_LIT_STRING:
-		return sem_second_node_lit_string(node, context);
-	case NODE_LIT_BOOL:
-		return sem_second_node_lit_bool(node, context);
-	case NODE_LIT_UNIT:
-		return sem_second_node_lit_unit(node, context);
-	default:
-		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_expr on non expression node.");
-		return false;
-	}
-}
+/*
+Tool: Claude Opus 5.5
+Prompt paraphrase: Add node checks (nullptr fields, wrong node type passed to the function) to the
+functions of the second pass
+use same style, dont break anything
+*/
 
 bool sem_second(ast_node_t node, semantic_context_t *context) {
 	assert(node && context && "Called sem_second on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_PROGRAM) {
+		print_error(ERR_INTERNAL, node->line_num, "Second pass called on non program node.");
+		return false;
+	}
+
+	// Go through items in the program
 	ast_node_t current_node = node->as.program.items.head;
-
 	while (current_node) {
-		switch (current_node->type) {
-		case NODE_FUNC_DEF:
-			if (!sem_second_node_func_def(current_node, context)) {
+		if (current_node->type == NODE_FUNC_DEF) {
+			if (!sem_second_want_function(current_node, context)) {
 				return false;
 			}
-			break;
-		case NODE_EXTENSION:
-			if (!sem_second_node_extension(current_node, context)) {
+		} else if (current_node->type == NODE_EXTENSION) {
+			if (!sem_second_want_extension(current_node, context)) {
 				return false;
 			}
-			break;
-		default:
-			print_error(ERR_INTERNAL, current_node->line_num, "Wrong node in program found!");
-		}
-		current_node = current_node->next;
-	}
-	return true;
-}
-
-bool sem_second_node_block_body(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_block_body on nullptr.");
-
-	ast_node_t current_node = node->as.block.statements.head;
-	ast_node_t last_node = current_node;
-
-	while (current_node) {
-		if (!sem_second_stmt(current_node, context)) {
+		} else {
+			print_error(ERR_INTERNAL, current_node->line_num,
+						"Second pass called on invalid node type.");
 			return false;
 		}
 
+		// Move to next
 		current_node = current_node->next;
-		if (current_node != nullptr) {
-			last_node = last_node->next;
-		}
 	}
 
-	if (!node->as.block.statements.head) {
-		node->eval_type = TYPE_UNIT;
-	} else {
-		node->eval_type = last_node->eval_type;
-	}
-
+	// Success
 	return true;
 }
 
-bool sem_second_node_block(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_block on nullptr.");
-	if (!stable_enter_scope(context->symtable_local)) {
-		print_error(ERR_INTERNAL, node->line_num, "Symtable enter scope failed!");
-		return false;
-	}
+bool sem_second_want_extension(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_extension on nullptr.");
 
-	if (!sem_second_node_block_body(node, context)) {
-		stable_leave_scope(context->symtable_local);
-		return false;
-	}
-
-	stable_leave_scope(context->symtable_local);
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Second pass of the extension implemented with AI assistance according to the design of the
-// author (the symbol of each method is found by the key name$Type and analyzed).
-// Prompt: Write sem_second_node_extension. Set the unique receiver name and analyze every method
-// of the extension with its symbol.
-bool sem_second_node_extension(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_extension on nullptr.");
-	ast_node_t method = node->as.extension.methods.head;
-	symbol_t method_symbol;
-	char *key;
-
-	// The receiver variable is declared with this name by the code generator
-	node->as.extension.unique_receiver_name = strdup(node->as.extension.receiver_name);
-	if (!node->as.extension.unique_receiver_name) {
+	// Node checks
+	if (node->type != NODE_EXTENSION) {
 		print_error(ERR_INTERNAL, node->line_num,
-					"Failed to allocate memory for the unique receiver name.");
+					"Called sem_second_extension on non-extension node.");
 		return false;
 	}
 
-	while (method) {
-		key =
-			malloc(strlen(method->as.func_def.name) + strlen(node->as.extension.receiver_type) + 2);
-		if (!key) {
-			print_error(ERR_INTERNAL, method->line_num,
-						"Failed to allocate memory for extension function key.");
-			return false;
-		}
-		sprintf(key, "%s$%s", method->as.func_def.name, node->as.extension.receiver_type);
-
-		method_symbol = stable_find_curlevel(context->symtable_extension_functions, key);
-		free(key);
-
-		if (!sem_second_analyze_function(method, context, method_symbol)) {
+	// Go through extension method functions
+	ast_node_t current_extension_node = node->as.extension.methods.head;
+	while (current_extension_node) {
+		// Node check
+		if (current_extension_node->type != NODE_FUNC_DEF) {
+			print_error(ERR_INTERNAL, current_extension_node->line_num,
+						"Extension method is not a function definition.");
 			return false;
 		}
 
-		method = method->next;
-	}
-
-	return true;
-}
-
-// Appends an empty return (Unit) to the end of a block
-bool sem_second_append_empty_return(ast_node_t block_node) {
-	ast_node_t return_node = ast_create_node(NODE_RETURN, block_node->line_num);
-	if (!return_node) {
-		print_error(ERR_INTERNAL, block_node->line_num, "AST node allocation failed!");
-		return false;
-	}
-
-	return_node->as.return_stmt.expr = nullptr;
-	return_node->eval_type = TYPE_UNIT;
-
-	if (!ast_list_append(&block_node->as.block.statements, return_node)) {
-		print_error(ERR_INTERNAL, block_node->line_num, "AST node append failed!");
-		ast_dtor(return_node);
-		return false;
-	}
-
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Helper of the implicit returns implemented with AI assistance according to the design of the
-// author (the third rule of the return type in the specification).
-// Prompt: Write a function that checks the value type of a branch of the if at the end of a
-// function. A missing branch has the Unit value, without the explicit type all branches are Unit.
-bool sem_second_check_branch_type(ast_node_t branch, unsigned line_num, data_type_t expected) {
-	data_type_t branch_type = TYPE_UNIT;
-
-	if (branch) {
-		branch_type = branch->eval_type;
-
-		if (branch->type == NODE_BLOCK && branch->as.block.statements.tail &&
-			branch->as.block.statements.tail->type == NODE_IF) {
-			return true;
+		// Want to pass the funstion in extension
+		if (!sem_second_want_function(current_extension_node, context)) {
+			return false;
 		}
+		current_extension_node = current_extension_node->next;
+	}
+	return true;
+}
+
+bool sem_second_want_function(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_want_function on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_want_function on non function definition node.");
+		return false;
+	}
+	if (!node->as.func_def.body) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
+	}
+	if (!node->sym_entry) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function definition has no symbol entry for second pass.");
+		return false;
 	}
 
-	// The explicit Unit discards the values
-	if (expected == TYPE_UNIT) {
+	// Check state
+	if (((symbol_t)node->sym_entry)->function.state == FUNCTION_VISITED) {
+		// Skip already passed
+		return true;
+	} else if (((symbol_t)node->sym_entry)->function.state == FUNCTION_UNVISITED) {
+		// Should be passed
+		return sem_second_node_func_def(node, context);
+	} else if (((symbol_t)node->sym_entry)->function.state == FUNCTION_VISITING) {
+		// Recursive call detected
+		// Go through function of the call stack
+		function_stack_t *call_stack = context->function_stack;
+		while (call_stack) {
+			// Check each for explicit return type
+			if (!call_stack->symbol->function.has_explicit_return_type) {
+				print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+							"Recursive function does not have explicit return type, which is "
+							"required for recursive functions.");
+				return false;
+			}
+
+			// Stop at the recursion function
+			if (call_stack->symbol == node->sym_entry) {
+				break;
+			}
+
+			// Move to next
+			call_stack = call_stack->caller_function_stack;
+		}
 		return true;
 	}
 
-	// Without the explicit type all the branches have to be Unit
-	if (expected == TYPE_UNKNOWN) {
-		expected = TYPE_UNIT;
-	}
-	if (branch_type == expected || (expected == TYPE_DOUBLE && branch_type == TYPE_INT)) {
-		return true;
-	}
-
-	print_error(ERR_SEM_TYPE_COMPAT, line_num,
-				"The value of a branch does not match the return type of the function.");
+	// Invalid state
+	print_error(ERR_INTERNAL, node->line_num,
+				"Function definition has invalid state for second pass.");
 	return false;
 }
 
-// Inserts the implicit return into one branch of an if (block or one-line statement)
-bool sem_second_insert_return_into_branch(ast_node_t branch, semantic_context_t *context,
-										  data_type_t expected) {
-	assert(branch && context && "Called sem_second_insert_return_into_branch on nullptr.");
-	ast_node_t conversion_node;
+bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_func_def on nullptr.");
 
-	switch (branch->type) {
-	case NODE_BLOCK:
-		return sem_second_insert_implicit_return(branch, context, expected);
-	case NODE_EXPR_STMT:
-		// One-line branch, Int is converted to the declared Double
-		if (expected == TYPE_DOUBLE && branch->as.expr_stmt.expr->eval_type == TYPE_INT) {
-			// Tool: Claude Code (Claude Sonnet 5.5)
-			// Insertion of the Int -> Double type cast into the implicit returns implemented
-			// with AI assistance (pattern taken from sem_second_node_assign).
-			// Prompt: Insert the type cast in the implicit return, pass the expected type.
-			conversion_node = ast_create_node(NODE_TYPE_CAST, branch->line_num);
-			if (!conversion_node) {
-				print_error(ERR_INTERNAL, branch->line_num,
-							"Failed to create type cast node for the implicit return.");
-				return false;
-			}
-
-			conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
-			conversion_node->as.type_cast.operand = branch->as.expr_stmt.expr;
-			conversion_node->eval_type = TYPE_DOUBLE;
-			branch->as.expr_stmt.expr = conversion_node;
-			branch->eval_type = TYPE_DOUBLE;
-		}
-		branch->type = NODE_RETURN;
-		return true;
-	// Tool: Claude Code (Claude Sonnet 5.5)
-	// One-line branches that are not an expression implemented with AI assistance.
-	// Prompt: Let a one-line return, assignment and variable definition pass, a return already
-	// returns and the other two are Unit (the type was checked by sem_second_check_branch_type,
-	// the return after the if is appended by sem_second_insert_implicit_return).
-	case NODE_RETURN:
-	case NODE_ASSIGN:
-	case NODE_VAR_DEF:
-		return true;
-	default:
-		print_error(ERR_INTERNAL, branch->line_num, "Pasting node return into if failed!");
-		return false;
-	}
-}
-
-// Inserts the implicit return at the end of a block
-bool sem_second_insert_implicit_return(ast_node_t node, semantic_context_t *context,
-									   data_type_t expected) {
-	assert(node && context && "Called sem_second_insert_implicit_return on nullptr.");
-	bool returns_unit = expected == TYPE_UNIT;
-	ast_node_t current_if;
-	ast_node_t branch;
-
-	ast_node_t last_stmt_node = node->as.block.statements.tail;
-
-	// Empty block
-	if (last_stmt_node == nullptr) {
-		return sem_second_append_empty_return(node);
-	}
-
-	switch (last_stmt_node->type) {
-	case NODE_RETURN:
-		// Already returns
-		return true;
-	case NODE_BLOCK:
-		// A block in the last position (the rewritten return of a Unit function), look inside
-		return sem_second_insert_implicit_return(last_stmt_node, context, expected);
-	case NODE_EXPR_STMT:
-		// Unit: value is discarded, add an empty return; otherwise return the value
-		if (returns_unit) {
-			return sem_second_append_empty_return(node);
-		}
-		return sem_second_insert_return_into_branch(last_stmt_node, context, expected);
-	case NODE_VAR_DEF:
-	case NODE_ASSIGN:
-	case NODE_FOR:
-	case NODE_WHILE:
-		// Result is Unit
-		return sem_second_append_empty_return(node);
-	case NODE_IF:
-		// Unit: one empty return after the if, otherwise return in every branch
-		if (returns_unit) {
-			return sem_second_append_empty_return(node);
-		}
-
-		current_if = last_stmt_node;
-		// Walk the if / else if chain
-		while (current_if) {
-			if (!sem_second_check_branch_type(current_if->as.if_stmt.then_branch,
-											  current_if->line_num, expected) ||
-				!sem_second_insert_return_into_branch(current_if->as.if_stmt.then_branch, context,
-													  expected)) {
-				return false;
-			}
-
-			branch = current_if->as.if_stmt.else_branch;
-			if (branch != nullptr && branch->type == NODE_IF) {
-				current_if = branch;
-			} else {
-				if (!sem_second_check_branch_type(branch, current_if->line_num, expected) ||
-					(branch != nullptr &&
-					 !sem_second_insert_return_into_branch(branch, context, expected))) {
-					return false;
-				}
-				current_if = nullptr;
-			}
-		}
-
-		// Tool: Claude Code (Claude Sonnet 5.5)
-		// The return after an if of a function without the explicit type implemented with AI
-		// assistance (replaces the pre-check of the missing else, the types of the branches are
-		// checked by the loop above).
-		// Prompt: Without the explicit type all the branches are Unit, so append one empty return
-		// after the if, the path where no branch returns must not fall through.
-		if (expected == TYPE_UNKNOWN) {
-			return sem_second_append_empty_return(node);
-		}
-		return true;
-	default:
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
 		print_error(ERR_INTERNAL, node->line_num,
-					"Wrong type in a block, failed to paste returns!");
+					"Called sem_second_node_func_def on non function definition node.");
 		return false;
 	}
-}
-
-// Analyzes the function body and inserts the implicit returns
-bool sem_second_func_analyze_body(ast_node_t node, semantic_context_t *context,
-								  symbol_t current_function) {
-	assert(node && context && current_function &&
-		   "Called sem_second_func_analyze_body on nullptr.");
-	data_type_t expected_type;
-	ast_node_t block_node;
-	ast_node_t statement_node;
-
-	// Tool: Claude Code (Claude Sonnet 5.5)
-	// The one-line body is a block with one statement, changed with AI assistance.
-	// Prompt: Wrap the one-line body of a function into a block with an expression statement.
-	if (node->as.func_def.body->type != NODE_BLOCK) {
-		block_node = ast_create_node(NODE_BLOCK, node->as.func_def.body->line_num);
-		statement_node = ast_create_node(NODE_EXPR_STMT, node->as.func_def.body->line_num);
-		if (!block_node || !statement_node ||
-			!ast_list_append(&block_node->as.block.statements, statement_node)) {
-			print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed");
-			ast_dtor(block_node);
-			ast_dtor(statement_node);
-			return false;
-		}
-
-		statement_node->as.expr_stmt.expr = node->as.func_def.body;
-		node->as.func_def.body = block_node;
+	if (!node->as.func_def.body) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
 	}
-
-	// checks the whole block and sets block eval type
-	if (!sem_second_node_block_body(node->as.func_def.body, context)) {
+	if (!node->sym_entry) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function definition has no symbol entry for second pass.");
 		return false;
 	}
 
-	// TYPE_UNKNOWN means that the return type is not explicit
-	expected_type = TYPE_UNKNOWN;
-	if (current_function->function.has_explicit_return_type) {
-		expected_type = current_function->function.return_type;
+	// Create level on function call stack for it
+	function_stack_t function_stack_level = {0};
+	function_stack_level.symbol = node->sym_entry;
+	function_stack_level.definition_node = node;
+	function_stack_level.caller_function_stack = context->function_stack;
+	function_stack_level.local_scope = stable_init(); // Create local scope for the function
+	if (!function_stack_level.local_scope) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to create local scope for function definition.");
+		return false;
 	}
+	// Set to context (push)
+	context->function_stack = &function_stack_level;
+	// Set function state
+	((symbol_t)node->sym_entry)->function.state = FUNCTION_VISITING;
 
-	return sem_second_insert_implicit_return(node->as.func_def.body, context, expected_type);
+	// Check function body
+	bool status = sem_second_node_func_def_body(node, context);
+
+	// Remove from context (pop)
+	stable_dtor(function_stack_level.local_scope);
+	context->function_stack = function_stack_level.caller_function_stack;
+
+	// Set function state
+	((symbol_t)node->sym_entry)->function.state = FUNCTION_VISITED;
+
+	return status;
 }
 
-// Checks the body type against the declared return type or infers the return type
-bool sem_second_check_return_type(ast_node_t node, symbol_t current_function) {
-	assert(node && current_function && "Called sem_second_check_return_type on nullptr.");
-	data_type_t body_type;
-	ast_node_t last_node = node->as.func_def.body;
+bool sem_second_node_func_def_body(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_node_func_def_body on nullptr.");
 
-	// Tool: Claude Code (Claude Sonnet 5.5)
-	// Type of the last statement instead of the block type, changed with AI assistance.
-	// Prompt: Fix check_return_type to use the type of the last statement of the body.
-	if (last_node->type == NODE_BLOCK) {
-		last_node = last_node->as.block.statements.tail;
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_node_func_def_body on non function definition node.");
+		return false;
+	}
+	if (!node->as.func_def.body) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
+	}
+	if (!node->sym_entry) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function definition has no symbol entry for second pass.");
+		return false;
 	}
 
-	// Ends with if, the returns in its branches decide the type
-	if (last_node->type != NODE_RETURN) {
-		if (!current_function->function.has_explicit_return_type) {
-			current_function->function.return_type = TYPE_UNIT;
-		}
-		return true;
+	// Put parameters to local scope
+	if (!sem_second_put_params_to_local_scope(node, context)) {
+		return false;
 	}
 
-	body_type = last_node->eval_type;
+	// Ensure function has body
+	if (!sem_second_ensure_enclosed_body(node, context)) {
+		return false;
+	}
 
-	if (current_function->function.has_explicit_return_type) {
-		data_type_t expected = current_function->function.return_type;
+	// Check body types
+	bool need_value = !( // Explicit unit function throw away return value
+		((symbol_t)node->sym_entry)->function.has_explicit_return_type && // Explicit return type
+		((symbol_t)node->sym_entry)->function.return_type == TYPE_UNIT);  // That is Unit
+	if (!sem_second_scoped_resolve(node->as.func_def.body, context, need_value)) {
+		return false;
+	}
 
-		if (expected != TYPE_UNIT && body_type != expected) {
-			if (body_type == TYPE_INT && expected == TYPE_DOUBLE) {
-				// Tool: Claude Code (Claude Sonnet 5.5)
-				// Insertion of the Int -> Double type cast into the return of a one-line body
-				// implemented with AI assistance (pattern taken from sem_second_node_assign).
-				// Prompt: Add insertion of the type cast node.
-				if (node->as.func_def.body->type == NODE_RETURN) {
-					ast_node_t return_node = node->as.func_def.body;
-					ast_node_t conversion_node =
-						ast_create_node(NODE_TYPE_CAST, return_node->line_num);
-					if (!conversion_node) {
-						print_error(ERR_INTERNAL, return_node->line_num,
-									"Failed to create type cast node for the function return.");
-						return false;
-					}
-
-					conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
-					conversion_node->as.type_cast.operand = return_node->as.return_stmt.expr;
-					conversion_node->eval_type = TYPE_DOUBLE;
-					return_node->as.return_stmt.expr = conversion_node;
-					return_node->eval_type = TYPE_DOUBLE;
-				}
-				// Block body: the cast is inserted together with the returns
-			} else {
-				print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-							"Function return type does not match the declared return type");
-				return false;
-			}
-		}
-	} else {
-		if (body_type == TYPE_UNKNOWN) {
-			print_error(ERR_INTERNAL, node->line_num, "Function body type has not been set!");
+	// Resolve return type
+	if (!((symbol_t)node->sym_entry)->function.has_explicit_return_type) {
+		if (node->as.func_def.body->eval_type == TYPE_UNKNOWN) {
+			print_error(ERR_INTERNAL, node->line_num, "Invalid return type for function.");
 			return false;
 		}
-		current_function->function.return_type = body_type;
-		if (current_function->function.is_main && body_type != TYPE_UNIT) {
+		// Store implicit function return type
+		((symbol_t)node->sym_entry)->function.return_type = node->as.func_def.body->eval_type;
+	} else if (need_value) {
+		// Check return type compatibility
+		if (!sem_ensure_compatible_last_type(node->as.func_def.body,
+											 ((symbol_t)node->sym_entry)->function.return_type,
+											 ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+	}
+
+	// Check implicit main return type to be unit
+	if (((symbol_t)node->sym_entry)->function.is_main &&
+		!((symbol_t)node->sym_entry)->function.has_explicit_return_type) {
+		if (node->as.func_def.body->eval_type != TYPE_UNIT) {
 			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
 						"Main function must have return type Unit.");
 			return false;
 		}
 	}
 
+	// Insert returns
+	if (!sem_second_insert_returns(node->as.func_def.body, context)) {
+		return false;
+	}
+
+	// Success
 	return true;
 }
 
-// Tool: Claude Code (Claude Sonnet 5.5)
-// The body of sem_second_node_func_def was moved here with AI assistance, the symbol is passed
-// as a parameter so it works for functions and for extension methods.
-// Prompt: Split func_def so the analysis gets the function symbol as a parameter.
-bool sem_second_analyze_function(ast_node_t node, semantic_context_t *context,
-								 symbol_t current_function) {
-	assert(node && context && current_function && "Called sem_second_analyze_function on nullptr.");
-	bool success = true;
-	bool pushed = false; // if malloc fails
+bool sem_second_put_params_to_local_scope(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_put_params_to_local_scope on nullptr.");
 
-	// store previous local table
-	stable_t prev_local_table = context->symtable_local;
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_put_params_to_local_scope on non function definition node.");
+		return false;
+	}
+	if (!node->sym_entry) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function definition has no symbol entry for second pass.");
+		return false;
+	}
 
-	// store previous function name
-	char *prev_function_name = context->current_function_name;
-	context->current_function_name = node->as.func_def.name;
+	// Put receiver parameter if extension function
+	if (((symbol_t)node->sym_entry)->function.extension_parameter_name) {
+		if (!declare_variable(
+				context, ((symbol_t)node->sym_entry)->function.extension_parameter_name,
+				((symbol_t)node->sym_entry)->function.extension_parameter_type, false, false)) {
+			return false;
+		}
+	}
 
-	if (current_function->function.state == FUNCTION_VISITED) {
-		context->current_function_name = prev_function_name;
+	// Put parameters to local scope
+	// Go through parameter lists
+	ast_node_t current_param_list_node = node->as.func_def.param_lists.head;
+	while (current_param_list_node) {
+		// Node checks
+		if (current_param_list_node->type != NODE_PARAM_LIST) {
+			print_error(ERR_INTERNAL, current_param_list_node->line_num,
+						"Invalid node type in parameter lists.");
+			return false;
+		}
+
+		// Go through parameters in the list
+		ast_node_t current_param_node = current_param_list_node->as.param_list.params.head;
+		while (current_param_node) {
+			// Node checks
+			if (current_param_node->type != NODE_PARAM) {
+				print_error(ERR_INTERNAL, current_param_node->line_num,
+							"Invalid node type in parameter list.");
+				return false;
+			}
+			if (!current_param_node->as.param.name) {
+				print_error(ERR_INTERNAL, current_param_node->line_num, "Parameter has no name.");
+				return false;
+			}
+
+			// Declare the parameter
+			symbol_t param_symbol = declare_variable(context, current_param_node->as.param.name,
+													 current_param_node->eval_type, false, false);
+			if (!param_symbol) {
+				return false;
+			}
+
+			// Store unique name
+			current_param_node->as.param.unique_name = strdup(param_symbol->variable.unique_name);
+			if (!current_param_node->as.param.unique_name) {
+				print_error(ERR_INTERNAL, current_param_node->line_num,
+							"Failed to allocate memory for parameter unique name.");
+				return false;
+			}
+
+			// Move to next parameter
+			current_param_node = current_param_node->next;
+		}
+
+		// Move to next parameter list
+		current_param_list_node = current_param_list_node->next;
+	}
+
+	return true;
+}
+
+symbol_t declare_variable(semantic_context_t *context, const char *name, data_type_t type,
+						  bool is_mutable, bool should_be_unique) {
+	assert(context && name && type && "Called declare_variable with invalid parameters.");
+
+	// Context checks
+	if (!context->function_stack) {
+		print_error(ERR_INTERNAL, 0, "Variable '%s' declared outside of a function.", name);
+		return nullptr;
+	}
+	if (!context->function_stack->local_scope) {
+		print_error(ERR_INTERNAL, 0, "Variable '%s' declared outside of a function.", name);
+		return nullptr;
+	}
+
+	// Check if not defined in the current scope
+	if (stable_find_curlevel(context->function_stack->local_scope, name)) {
+		print_error(ERR_SEM_REDEFINITION, 0,
+					"Variable '%s' is already defined in the current scope.", name);
+		return nullptr;
+	}
+
+	// Create symbol
+	symbol_t symbol = stable_init_symbol();
+	if (!symbol) {
+		print_error(ERR_INTERNAL, 0, "Failed to create variable symbol.");
+		return nullptr;
+	}
+
+	// Fill out symbol
+	symbol->variable.unique_name = make_name(context, name, should_be_unique);
+	if (!symbol->variable.unique_name) {
+		print_error(ERR_INTERNAL, 0, "Failed to generate unique name for variable '%s'.", name);
+		stable_destroy_symbol(symbol);
+		return nullptr;
+	}
+	symbol->symbol_variant = SYMBOL_VARIABLE;
+	symbol->variable.type = type;
+	symbol->variable.is_mutable = is_mutable;
+
+	// Write symbol to the symbol table
+	if (!stable_write(context->function_stack->local_scope, name, symbol)) {
+		print_error(ERR_INTERNAL, 0, "Failed to write variable '%s' to symbol table.", name);
+		stable_destroy_symbol(symbol);
+		return nullptr;
+	}
+
+	return symbol;
+}
+
+char *make_name(semantic_context_t *context, const char *name, bool should_be_unique) {
+	assert(context && name && "Called make_name with invalid parameters.");
+
+	if (should_be_unique) {
+		// Generate unique name with counter
+		char *unique_name =
+			malloc(strlen(name) + SIZE_T_MAX_DIGITS + 1 + 1); // Enough for name + counter
+		if (!unique_name) {
+			print_error(ERR_INTERNAL, 0, "Failed to allocate memory for unique name.");
+			return nullptr;
+		}
+		sprintf(unique_name, "%s$%zu", name, context->rename_counter++);
+		return unique_name;
+	} else {
+		// Return a copy of the name
+		char *unique_name = strdup(name);
+		if (!unique_name) {
+			print_error(ERR_INTERNAL, 0, "Failed to allocate memory for unique name.");
+			return nullptr;
+		}
+		return unique_name;
+	}
+}
+
+bool sem_second_ensure_enclosed_body(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_ensure_enclosed_body on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_FUNC_DEF) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_ensure_enclosed_body on non function definition node.");
+		return false;
+	}
+	if (!node->as.func_def.body) {
+		print_error(ERR_INTERNAL, node->line_num, "Function definition has no body.");
+		return false;
+	}
+
+	// Already in block
+	if (node->as.func_def.body->type == NODE_BLOCK) {
 		return true;
 	}
 
-	current_function->function.state = FUNCTION_VISITING;
-
-	if (!call_chain_add(context, node)) {
-		print_error(ERR_INTERNAL, node->line_num, "Call chain node allocation failed!");
-		success = false;
-		goto cleanup;
+	// Create new block and statement nodes to enclose the body in
+	ast_node_t new_block = ast_create_node(NODE_BLOCK, node->as.func_def.body->line_num);
+	ast_node_t new_stmt = ast_create_node(NODE_EXPR_STMT, node->as.func_def.body->line_num);
+	if (!new_block || !new_stmt) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to create new block or statement node.");
+		ast_dtor(new_block);
+		ast_dtor(new_stmt);
+		return false;
 	}
 
-	pushed = true;
-
-	context->symtable_local = stable_init();
-
-	if (!context->symtable_local) {
-		print_error(ERR_INTERNAL, node->line_num, "Symtable init failed!");
-		success = false;
-		goto cleanup;
+	// Enclose
+	ast_list_init(&(new_block->as.block.statements));
+	if (!ast_list_append(&(new_block->as.block.statements), new_stmt)) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to append new statement to new block.");
+		ast_dtor(new_block);
+		ast_dtor(new_stmt);
+		return false;
 	}
-
-	// load params to local symtable - set is_mutable = false
-	if (!sem_second_load_params(node, context, current_function)) {
-		success = false;
-		goto cleanup;
-	}
-
-	// analyze the body and paste returns
-	if (!sem_second_func_analyze_body(node, context, current_function)) {
-		success = false;
-		goto cleanup;
-	}
-
-	// check or infer the return type
-	if (!sem_second_check_return_type(node, current_function)) {
-		success = false;
-		goto cleanup;
-	}
-
-cleanup:
-	context->current_function_name = prev_function_name;
-	stable_dtor(context->symtable_local);
-	context->symtable_local = prev_local_table;
-
-	if (success) {
-		current_function->function.state = FUNCTION_VISITED;
-	}
-
-	if (pushed) {
-		call_chain_pop(context);
-	}
-
-	return success;
+	new_stmt->as.expr_stmt.expr = node->as.func_def.body;
+	node->as.func_def.body = new_block;
+	return true;
 }
 
-bool sem_second_node_func_def(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_func_def on nullptr.");
+bool sem_second_scoped_resolve(ast_node_t node, semantic_context_t *context, bool need_value) {
+	assert(node && context && "Called sem_second_scoped_resolve on nullptr.");
 
-	symbol_t current_function =
-		stable_find_curlevel(context->symtable_functions, node->as.func_def.name);
-	assert(current_function != nullptr);
+	// Context checks
+	if (!context->function_stack) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_scoped_resolve outside of a function.");
+		return false;
+	}
+	if (!context->function_stack->local_scope) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_scoped_resolve outside of a function.");
+		return false;
+	}
 
-	return sem_second_analyze_function(node, context, current_function);
+	// Enter into scope of the block
+	if (!stable_enter_scope(context->function_stack->local_scope)) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to enter scope of the block.");
+		return false;
+	}
+
+	// Resolve the block
+	if (!sem_second_statement(node, context, need_value)) {
+		return false;
+	}
+
+	// Leave the scope of the block
+	stable_leave_scope(context->function_stack->local_scope);
+
+	// Success
+	return true;
 }
 
-bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_var_def on nullptr.");
+bool sem_second_statement(ast_node_t node, semantic_context_t *context, bool need_value) {
+	assert(node && context && "Called sem_second_statement on nullptr.");
+
+	// Decide based on the type of statement
+	switch (node->type) {
+	case NODE_BLOCK:
+		if (!sem_second_block(node, context, need_value)) {
+			return false;
+		}
+		return true;
+		break;
+	case NODE_VAR_DEF:
+		if (!sem_second_var_def(node, context)) {
+			return false;
+		}
+		node->eval_type = TYPE_UNIT;
+		return true;
+		break;
+	case NODE_ASSIGN:
+		if (!sem_second_assign(node, context)) {
+			return false;
+		}
+		node->eval_type = TYPE_UNIT;
+		return true;
+		break;
+	case NODE_IF:
+		if (!sem_second_if(node, context, need_value)) {
+			return false;
+		}
+		return true;
+		break;
+	case NODE_WHILE:
+		if (!sem_second_while(node, context)) {
+			return false;
+		}
+		node->eval_type = TYPE_UNIT;
+		return true;
+		break;
+	case NODE_FOR:
+		if (!sem_second_for(node, context)) {
+			return false;
+		}
+		node->eval_type = TYPE_UNIT;
+		return true;
+		break;
+	case NODE_RETURN:
+		if (!sem_second_return(node, context)) {
+			return false;
+		}
+		return true;
+		break;
+	case NODE_EXPR_STMT:
+		// Node checks
+		if (!node->as.expr_stmt.expr) {
+			print_error(ERR_INTERNAL, node->line_num, "Expression statement has no expression.");
+			return false;
+		}
+
+		// Patch fix for if (whether it is statement or expression should decide semantics)
+		if (node->as.expr_stmt.expr->type == NODE_IF) {
+			// Unwrap
+			ast_node_t to_delete = node->as.expr_stmt.expr;
+			node->as.expr_stmt.expr->next = node->next; // Preserve the next statement
+			*node = *node->as.expr_stmt.expr; // Replace the statement node with the if node
+			free(to_delete); // Free the old expression node (just the node - no dtor)
+			return sem_second_if(node, context, need_value);
+		}
+
+		if (!sem_second_expression(node->as.expr_stmt.expr, context)) {
+			return false;
+		}
+		node->eval_type = node->as.expr_stmt.expr->eval_type;
+		return true;
+		break;
+	default:
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_statement on invalid statement node type.");
+		return false;
+	}
+	return true;
+}
+
+bool sem_second_block(ast_node_t node, semantic_context_t *context, bool need_value) {
+	assert(node && context && "Called sem_second_block on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_BLOCK) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_block on non block node.");
+		return false;
+	}
+
+	// Go through statements in the block
+	ast_node_t current_stmt_node = node->as.block.statements.head;
+	node->eval_type = TYPE_UNIT;
+	while (current_stmt_node) {
+		// Check if last statement that needs value for block
+		bool need_value_really = false;
+		if (current_stmt_node->next == nullptr) { // Last statement in the block
+			need_value_really = need_value;
+		}
+
+		// Pass the statement
+		if (!sem_second_statement(current_stmt_node, context, need_value_really)) {
+			return false;
+		}
+
+		// Store evaluated type
+		node->eval_type = current_stmt_node->eval_type;
+
+		// Move to next
+		current_stmt_node = current_stmt_node->next;
+	}
+	return true;
+}
+
+bool sem_second_var_def(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_var_def on nullptr.");
 
 	// Node checks
 	if (node->type != NODE_VAR_DEF) {
 		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_var_def on non variable definition node.");
+					"Called sem_second_var_def on non variable definition node.");
 		return false;
 	}
 	if (!node->as.var_def.name) {
@@ -1340,119 +1381,124 @@ bool sem_second_node_var_def(ast_node_t node, semantic_context_t *context) {
 		return false;
 	}
 
-	// Check if variable is already defined in the current scope
-	if (stable_find_curlevel(context->symtable_local, node->as.var_def.name)) {
-		print_error(ERR_SEM_REDEFINITION, node->line_num,
-					"Variable '%s' is already defined in the current scope.",
-					node->as.var_def.name);
+	// Resolve definition expression
+	if (!sem_second_expression(node->as.var_def.init_expr, context)) {
 		return false;
 	}
 
-	// Pass expression
-	if (!sem_second_expr(node->as.var_def.init_expr, context)) {
-		throw_warning(node->line_num,
-					  "Failed to process variable definition value for variable '%s'.",
-					  node->as.var_def.name);
+	// Resolve type compatibility
+	data_type_t init_expr_type = node->as.var_def.init_expr->eval_type;
+	if (node->as.var_def.type_name) {
+		if (!get_data_type_from_string(node->as.var_def.type_name)) {
+			print_error(ERR_SEM_UNDEFINED, node->line_num,
+						"Variable definition has unknown type '%s'.", node->as.var_def.type_name);
+			return false;
+		}
+
+		// Explicit type - check compatibility
+		if (!sem_ensure_compatible_type(node->as.var_def.init_expr,
+										get_data_type_from_string(node->as.var_def.type_name),
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		init_expr_type = get_data_type_from_string(node->as.var_def.type_name);
+	} else {
+		// Implicit type - check not invalid
+		if (node->as.var_def.init_expr->eval_type == TYPE_UNKNOWN) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Variable definition has unknown type and no explicit type.");
+			return false;
+		}
+	}
+
+	// Declare variable in the local scope
+	symbol_t symbol = declare_variable(context, node->as.var_def.name, init_expr_type,
+									   !node->as.var_def.is_val, true);
+	if (!symbol) {
 		return false;
 	}
 
-	// Create symbol
-	symbol_t sym = stable_init_symbol();
-	if (!sym) {
-		print_error(ERR_INTERNAL, node->line_num, "Failed to create symbol for variable '%s'.",
-					node->as.var_def.name);
-		return false;
-	}
-	sym->symbol_variant = SYMBOL_VARIABLE;
-
-	// Create unique name
-	sym->variable.unique_name =
-		malloc(strlen(node->as.var_def.name) + SIZE_T_MAX_DIGITS + 1 + 1); // Digits + \0 + $
-	if (!sym->variable.unique_name) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Failed to allocate memory for variable unique name.");
-		stable_destroy_symbol(sym);
-		return false;
-	}
-	sprintf(sym->variable.unique_name, "%s$%zu", node->as.var_def.name, context->rename_counter++);
-	node->as.var_def.unique_name = strdup(sym->variable.unique_name);
+	// Store unique name
+	node->as.var_def.unique_name = strdup(symbol->variable.unique_name);
 	if (!node->as.var_def.unique_name) {
 		print_error(ERR_INTERNAL, node->line_num,
-					"Failed to allocate memory for variable unique name in AST.");
-		stable_destroy_symbol(sym);
+					"Failed to allocate memory for variable unique name.");
 		return false;
 	}
 
-	// Fill out symbol
-	sym->variable.is_mutable = !node->as.var_def.is_val;
-	if (node->as.var_def.type_name) {
-		// Explicit type
-		sym->variable.type = get_data_type_from_string(node->as.var_def.type_name);
-		if (sym->variable.type == TYPE_UNKNOWN) {
-			print_error(ERR_SEM_UNDEFINED, node->line_num, "Variable '%s' has unknown type '%s'.",
-						node->as.var_def.name, node->as.var_def.type_name);
-			stable_destroy_symbol(sym);
-			return false;
-		}
-		// Check implicit conversion
-		if (sym->variable.type != node->as.var_def.init_expr->eval_type) {
-			if (sym->variable.type == TYPE_DOUBLE &&
-				node->as.var_def.init_expr->eval_type == TYPE_INT) {
-				// Implicit conversion from Int to Double
-				ast_node_t conversion_node = ast_create_node(NODE_TYPE_CAST, node->line_num);
-				if (!conversion_node) {
-					print_error(ERR_INTERNAL, node->line_num,
-								"Failed to create type cast node for implicit conversion from Int "
-								"to Double.");
-					stable_destroy_symbol(sym);
-					return false;
-				}
-				conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
-				conversion_node->eval_type = TYPE_DOUBLE;
-				conversion_node->as.type_cast.operand = node->as.var_def.init_expr;
-				node->as.var_def.init_expr = conversion_node;
-
-			} else {
-				print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-							"Type mismatch in variable definition for variable '%s'.",
-							node->as.var_def.name);
-				stable_destroy_symbol(sym);
-				return false;
-			}
-		}
-	} else {
-		if (node->as.var_def.init_expr->eval_type == TYPE_UNKNOWN) {
-			print_error(ERR_SEM_TYPE_COMPAT, node->line_num, "Variable '%s' has unknown type.",
-						node->as.var_def.name);
-			stable_destroy_symbol(sym);
-			return false;
-		}
-
-		// Implicit type from initialization expression
-		sym->variable.type = node->as.var_def.init_expr->eval_type;
-	}
-
-	// Set eval type
-	node->eval_type = TYPE_UNIT;
-
-	// Write symbol to the symbol table
-	if (!stable_write(context->symtable_local, node->as.var_def.name, sym)) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Failed to write symbol for variable '%s' to the symbol table.",
-					node->as.var_def.name);
-		stable_destroy_symbol(sym);
-		return false;
-	}
+	// Success
 	return true;
 }
 
-bool sem_second_node_assign(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_assign on nullptr.");
+/*
+Tool: Claude Sonnet 5.5
+Prompt paraphrase: Find misstakes and correct them
+use same style, write clean code, dont break anything, explain what you did
++ other files as context
+*/
+bool sem_ensure_compatible_type(ast_node_t node, data_type_t expected_type,
+								err_c_t potential_error_code) {
+	assert(node && expected_type && "Called sem_ensure_compatible_type on nullptr.");
+
+	// Check compatibility
+	if (!(node->eval_type == expected_type || expected_type == TYPE_ANY ||
+		  (expected_type == TYPE_DOUBLE && node->eval_type == TYPE_INT))) {
+		print_error(potential_error_code, node->line_num, "Type mismatch");
+		return false;
+	}
+
+	// Implicit conversion if needed
+	if (expected_type == TYPE_DOUBLE && node->eval_type == TYPE_INT) {
+		/*
+		Tool: Claude Sonnet 5.5
+		Prompt paraphrase: Please write for me the wrapping logic of node into cast node
+		use same style, write clean code, dont break anything, explain what you did
+		+ other files as context
+		*/
+		ast_node_t wrapper_node = sem_wrap_in_place(node, NODE_TYPE_CAST);
+		if (!wrapper_node) {
+			print_error(ERR_INTERNAL, node->line_num, "Failed to wrap node in cast node.");
+			return false;
+		}
+		node->as.type_cast.target_type = TYPE_DOUBLE;
+		node->as.type_cast.operand = wrapper_node;
+		node->eval_type = TYPE_DOUBLE;
+	}
+
+	// Success
+	return true;
+}
+
+/*
+Tool: Claude Sonnet 5.5
+Prompt paraphrase: Please write for me the wrapping logic of node into cast node
+use same style, write clean code, dont break anything, explain what you did
++ other files as context
+*/
+ast_node_t sem_wrap_in_place(ast_node_t node, node_type_t wrapper) {
+	assert(node && "Called sem_wrap_in_place on nullptr.");
+
+	// Create node
+	ast_node_t inner = ast_create_node(node->type, node->line_num);
+	if (!inner) {
+		return nullptr;
+	}
+
+	// Copy and connect nodes
+	*inner = *node;
+	inner->next = nullptr;
+	ast_node_t next = node->next;
+	*node = (struct ast_node){.type = wrapper, .line_num = inner->line_num, .next = next};
+	return inner;
+}
+
+bool sem_second_assign(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_assign on nullptr.");
 
 	// Node checks
 	if (node->type != NODE_ASSIGN) {
 		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_assign on non assignment node.");
+					"Called sem_second_assign on non assignment node.");
 		return false;
 	}
 	if (!node->as.assign.target_id) {
@@ -1460,1310 +1506,1163 @@ bool sem_second_node_assign(ast_node_t node, semantic_context_t *context) {
 		return false;
 	}
 	if (!node->as.assign.expr) {
-		print_error(ERR_INTERNAL, node->line_num, "Assignment has no value.");
+		print_error(ERR_INTERNAL, node->line_num, "Assignment has no expression.");
 		return false;
 	}
 
-	// Check if defined
-	symbol_t sym = stable_find_alllevel(context->symtable_local, node->as.assign.target_id);
-	if (!sym) {
-		print_error(ERR_SEM_UNDEFINED, node->line_num,
-					"Variable '%s' is not defined in the current scope.",
-					node->as.assign.target_id);
+	// Find the variable in the local scope
+	symbol_t symbol =
+		stable_find_alllevel(context->function_stack->local_scope, node->as.assign.target_id);
+	if (!symbol) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num, "Undefined variable");
+		return false;
+	}
+	if (symbol->symbol_variant != SYMBOL_VARIABLE) {
+		print_error(ERR_INTERNAL, node->line_num, "Local symbol is not a variable.");
 		return false;
 	}
 
-	// Check if mutable
-	if (!sym->variable.is_mutable) {
-		print_error(ERR_SEM_IMMUTABLE, node->line_num, "Cannot assign to immutable variable '%s'.",
-					node->as.assign.target_id);
+	// Check mutability
+	if (!symbol->variable.is_mutable) {
+		print_error(ERR_SEM_IMMUTABLE, node->line_num, "Cannot assign to immutable variable");
 		return false;
 	}
 
-	// Check types
-	if (!sem_second_expr(node->as.assign.expr, context)) {
-		throw_warning(node->line_num, "Failed to process assignment value for variable '%s'.",
-					  node->as.assign.target_id);
-		return false;
-	}
-	if (sym->variable.type == node->as.assign.expr->eval_type) {
-		// Types match
-	} else if (sym->variable.type == TYPE_DOUBLE && node->as.assign.expr->eval_type == TYPE_INT) {
-		// Implicit conversion from Int to Double
-		ast_node_t conversion_node = ast_create_node(NODE_TYPE_CAST, node->line_num);
-		if (!conversion_node) {
-			print_error(
-				ERR_INTERNAL, node->line_num,
-				"Failed to create type cast node for implicit conversion from Int to Double.");
-			return false;
-		}
-		conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
-		conversion_node->as.type_cast.operand = node->as.assign.expr;
-		node->as.assign.expr = conversion_node;
-		conversion_node->eval_type = TYPE_DOUBLE;
-	} else {
-		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-					"Type mismatch in assignment to variable '%s': expected '%s', got '%s'.",
-					node->as.assign.target_id, data_type_string_forms[sym->variable.type],
-					data_type_string_forms[node->as.assign.expr->eval_type]);
+	// Resolve the expression
+	if (!sem_second_expression(node->as.assign.expr, context)) {
 		return false;
 	}
 
-	// Set unique name for the target variable
-	node->as.assign.unique_target_id = strdup(sym->variable.unique_name);
+	// Check type compatibility
+	if (!sem_ensure_compatible_type(node->as.assign.expr, symbol->variable.type,
+									ERR_SEM_TYPE_COMPAT)) {
+		return false;
+	}
+
+	// Set unique name
+	node->as.assign.unique_target_id = strdup(symbol->variable.unique_name);
 	if (!node->as.assign.unique_target_id) {
 		print_error(ERR_INTERNAL, node->line_num,
-					"Failed to allocate memory for variable unique name in assignment.");
+					"Failed to allocate memory for assignment unique name.");
 		return false;
 	}
 
-	// Set eval type
-	node->eval_type = TYPE_UNIT;
-
+	// Success
 	return true;
 }
 
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Implemented with AI assistance, the if statement and the if expression share the analysis and
-// the is_expr flag of the node decides.
-// Prompt: Write sem_second_node_if_expr, it only calls the analysis of the if statement.
-bool sem_second_node_if_expr(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_if_expr on nullptr.");
+bool sem_second_if(ast_node_t node, semantic_context_t *context, bool need_value) {
+	assert(node && context && "Called sem_second_if on nullptr.");
 
-	return sem_second_node_if_stmt(node, context);
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Helper of the if and the for implemented with AI assistance according to the design of the
-// author.
-// Prompt: Write a function that analyzes a branch of an if or a body of a for, a block has its own
-// scope and a one-line body is a statement.
-bool sem_second_branch_body(ast_node_t branch, semantic_context_t *context) {
-	assert(branch && context && "Called sem_second_branch_body on nullptr.");
-
-	if (branch->type == NODE_BLOCK) {
-		return sem_second_node_block(branch, context);
+	// Node checks
+	if (node->type != NODE_IF) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_if on non if node.");
+		return false;
+	}
+	if (!node->as.if_stmt.condition) {
+		print_error(ERR_INTERNAL, node->line_num, "If statement has no condition.");
+		return false;
+	}
+	if (!node->as.if_stmt.then_branch) {
+		print_error(ERR_INTERNAL, node->line_num, "If statement has no then branch.");
+		return false;
 	}
 
-	return sem_second_stmt(branch, context);
-}
+	// Resolve the condition
+	if (!sem_resolve_condition(node->as.if_stmt.condition, context)) {
+		return false;
+	}
 
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Helper of the if expression implemented with AI assistance according to the design of the
-// author.
-// Prompt: Write a function that converts the value of an Int branch of an if expression to
-// Double. The branch is an expression statement, a block or a nested if.
-bool sem_second_if_branch_to_double(ast_node_t branch) {
-	assert(branch && "Called sem_second_if_branch_to_double on nullptr.");
-	ast_node_t value_node = branch;
+	// Resolve the then branch
+	if (!sem_second_scoped_resolve(node->as.if_stmt.then_branch, context, need_value)) {
+		return false;
+	}
 
-	// else if, all the branches of the nested if have the value
-	if (branch->type == NODE_IF) {
-		if (!sem_second_if_branch_to_double(branch->as.if_stmt.then_branch) ||
-			!sem_second_if_branch_to_double(branch->as.if_stmt.else_branch)) {
+	// Resolve the else branch if it exists
+	if (node->as.if_stmt.else_branch) {
+		if (!sem_second_scoped_resolve(node->as.if_stmt.else_branch, context, need_value)) {
 			return false;
 		}
-		branch->eval_type = TYPE_DOUBLE;
-		return true;
 	}
 
-	// The value of a block is the expression statement at its end
-	if (branch->type == NODE_BLOCK) {
-		value_node = branch->as.block.statements.tail;
+	// Set isexpr flag
+	if (need_value && node->as.if_stmt.else_branch) {
+		node->as.if_stmt.is_expr = true;
+	} else {
+		node->as.if_stmt.is_expr = false;
 	}
 
-	if (!sem_second_insert_double_cast(&value_node->as.expr_stmt.expr)) {
-		return false;
-	}
-	value_node->eval_type = TYPE_DOUBLE;
-	branch->eval_type = TYPE_DOUBLE;
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// If statement and if expression implemented with AI assistance step by step according to the
-// design of the author (one function, the is_expr flag of the node decides what it is).
-// Prompt: Write sem_second_node_if_stmt. Analyze the condition and check that it is Boolean, the
-// branches have their own scope. The statement has the Unit type, the branches of the expression
-// have the same type or Int is converted to Double.
-bool sem_second_node_if_stmt(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_if_stmt on nullptr.");
-	data_type_t then_type;
-	data_type_t else_type;
-
-	if (!sem_second_expr(node->as.if_stmt.condition, context)) {
-		return false;
-	}
-
-	if (node->as.if_stmt.condition->eval_type != TYPE_BOOL) {
-		print_error(ERR_SEM_TYPE_COMPAT, node->line_num, "The condition of if must be Boolean.");
-		return false;
-	}
-
-	if (!sem_second_branch_body(node->as.if_stmt.then_branch, context)) {
-		return false;
-	}
-
-	// The else branch can be missing, else if is a nested if
-	if (node->as.if_stmt.else_branch &&
-		!sem_second_branch_body(node->as.if_stmt.else_branch, context)) {
-		return false;
-	}
-
-	if (!node->as.if_stmt.is_expr) {
+	// Resolve the type of the if statement
+	if (!need_value) {
+		// If shouldnt return a value, set the eval_type to TYPE_UNIT
 		node->eval_type = TYPE_UNIT;
-		return true;
-	}
-
-	if (!node->as.if_stmt.else_branch) {
-		print_error(ERR_INTERNAL, node->line_num, "The if expression has no else branch.");
-		return false;
-	}
-
-	// If expression, the type of the value is the type of the branches
-	then_type = node->as.if_stmt.then_branch->eval_type;
-	else_type = node->as.if_stmt.else_branch->eval_type;
-	node->eval_type = then_type;
-
-	if (then_type == TYPE_INT && else_type == TYPE_DOUBLE) {
-		node->eval_type = TYPE_DOUBLE;
-		return sem_second_if_branch_to_double(node->as.if_stmt.then_branch);
-	}
-	if (then_type == TYPE_DOUBLE && else_type == TYPE_INT) {
-		return sem_second_if_branch_to_double(node->as.if_stmt.else_branch);
-	}
-
-	if (then_type != else_type) {
-		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-					"The branches of the if expression have different types.");
-		return false;
-	}
-
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// While cycle implemented with AI assistance according to the design of the author.
-// Prompt: Write sem_second_node_while. The condition has to be Boolean, the body is a block with
-// its own scope and the cycle has the Unit type.
-bool sem_second_node_while(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_while on nullptr.");
-
-	if (!sem_second_expr(node->as.while_stmt.condition, context)) {
-		return false;
-	}
-
-	if (node->as.while_stmt.condition->eval_type != TYPE_BOOL) {
-		print_error(ERR_SEM_TYPE_COMPAT, node->line_num, "The condition of while must be Boolean.");
-		return false;
-	}
-
-	if (!sem_second_node_block(node->as.while_stmt.body, context)) {
-		return false;
-	}
-
-	node->eval_type = TYPE_UNIT;
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Helper of the for implemented with AI assistance according to the design of the author.
-// Prompt: Write a function that analyzes the bounds and the step of the for range, they are Int
-// and a literal zero step is an error.
-bool sem_second_for_range(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_for_range on nullptr.");
-	ast_node_t bounds[3] = {node->as.for_stmt.from_expr, node->as.for_stmt.to_expr,
-							node->as.for_stmt.step_expr};
-
-	for (int i = 0; i < 3; i++) {
-		// Missing step
-		if (!bounds[i]) {
-			continue;
+	} else {
+		/*
+		Tool: Claude Sonnet 5.5
+		Prompt paraphrase: Please correct and symplify this logic of type resolution for returning
+		branches for if statement so it is correct in all edge cases.
+		use same style, write clean code, dont break anything, explain what you did
+		+ other files as context
+		*/
+		data_type_t then_type = node->as.if_stmt.then_branch->eval_type;
+		// If no else branch, treat as unit
+		data_type_t else_type =
+			node->as.if_stmt.else_branch ? node->as.if_stmt.else_branch->eval_type : TYPE_UNIT;
+		if (sem_always_returns(node->as.if_stmt.then_branch)) { // A returning branch gives no value
+			// Set the type of the other branch to pass through, since the branch will be returning
+			then_type = else_type;
+		} else if (node->as.if_stmt.else_branch &&
+				   sem_always_returns(node->as.if_stmt.else_branch)) {
+			// Same here
+			else_type = then_type;
 		}
 
-		if (!sem_second_expr(bounds[i], context)) {
-			return false;
-		}
-
-		if (bounds[i]->eval_type != TYPE_INT) {
+		// Evaluate result type
+		data_type_t combined_type = sem_unify_types(then_type, else_type);
+		if (combined_type == TYPE_UNKNOWN) {
 			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-						"The bounds and the step of the for range must be Int.");
+						"Type mismatch between then and else branches of if statement.");
 			return false;
 		}
-	}
 
-	// Literal zero step
-	if (node->as.for_stmt.step_expr && node->as.for_stmt.step_expr->type == NODE_LIT_INT &&
-		node->as.for_stmt.step_expr->as.int_val == 0) {
-		print_error(ERR_SEM_OTHER, node->line_num, "The step of the for range cannot be zero.");
-		return false;
-	}
-
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Helper of the for implemented with AI assistance according to the design of the author.
-// Prompt: Write a function that creates the loop variable of the for, an immutable Int with a
-// unique name stored in the symtable and in the node.
-bool sem_second_for_variable(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_for_variable on nullptr.");
-	symbol_t loop_symbol = stable_init_symbol();
-
-	if (loop_symbol) {
-		loop_symbol->symbol_variant = SYMBOL_VARIABLE;
-		loop_symbol->variable.type = TYPE_INT;
-		loop_symbol->variable.is_mutable = false;
-		loop_symbol->variable.unique_name =
-			malloc(strlen(node->as.for_stmt.var_name) + SIZE_T_MAX_DIGITS + 1 + 1);
-	}
-	if (!loop_symbol || !loop_symbol->variable.unique_name) {
-		print_error(ERR_INTERNAL, node->line_num, "Failed to create the loop variable.");
-		stable_destroy_symbol(loop_symbol);
-		return false;
-	}
-	sprintf(loop_symbol->variable.unique_name, "%s$%zu", node->as.for_stmt.var_name,
-			context->rename_counter++);
-
-	node->as.for_stmt.unique_var_name = strdup(loop_symbol->variable.unique_name);
-	if (!node->as.for_stmt.unique_var_name ||
-		!stable_write(context->symtable_local, node->as.for_stmt.var_name, loop_symbol)) {
-		print_error(ERR_INTERNAL, node->line_num, "Failed to store the loop variable.");
-		stable_destroy_symbol(loop_symbol);
-		return false;
-	}
-
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// For cycle implemented with AI assistance step by step according to the design of the author.
-// Prompt: Write sem_second_node_for. The range and the step are Int, the loop variable has its own
-// scope, the guards are Boolean and the body is analyzed.
-bool sem_second_node_for(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_for on nullptr.");
-	bool success = true;
-
-	if (!sem_second_for_range(node, context)) {
-		return false;
-	}
-
-	// The loop variable has its own scope
-	if (!stable_enter_scope(context->symtable_local)) {
-		print_error(ERR_INTERNAL, node->line_num, "Symtable enter scope failed!");
-		return false;
-	}
-
-	if (!sem_second_for_variable(node, context)) {
-		success = false;
-		goto cleanup;
-	}
-
-	// Guards see the loop variable
-	for (ast_node_t guard = node->as.for_stmt.guards.head; guard; guard = guard->next) {
-		if (!sem_second_expr(guard, context)) {
-			success = false;
-			goto cleanup;
-		}
-
-		if (guard->eval_type != TYPE_BOOL) {
-			print_error(ERR_SEM_TYPE_COMPAT, guard->line_num, "The guard of for must be Boolean.");
-			success = false;
-			goto cleanup;
-		}
-	}
-
-	// The body is a block with its own scope or a one-line statement
-	if (!sem_second_branch_body(node->as.for_stmt.body, context)) {
-		success = false;
-		goto cleanup;
-	}
-
-	node->eval_type = TYPE_UNIT;
-
-cleanup:
-	stable_leave_scope(context->symtable_local);
-	return success;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Return statement implemented with AI assistance according to the design of the author (the
-// function is the top of the call chain, the type is checked against the explicit return type).
-// Prompt: Write sem_second_node_return. Return needs an explicit return type, the empty return is
-// allowed only for Unit, Int is converted to Double, other mismatch is the error 6.
-// Rewrites "return expr" of a Unit function in place into the block { expr; return }, the value
-// is evaluated and discarded and the function returns (). The generator needs no knowledge of the
-// function return type.
-static bool sem_second_discard_return_value(ast_node_t node) {
-	assert(node && node->type == NODE_RETURN && node->as.return_stmt.expr &&
-		   "Called sem_second_discard_return_value on a return without a value.");
-
-	ast_node_t value_node = ast_create_node(NODE_EXPR_STMT, node->line_num);
-	ast_node_t return_node = ast_create_node(NODE_RETURN, node->line_num);
-	if (!value_node || !return_node) {
-		print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed!");
-		ast_dtor(value_node);
-		ast_dtor(return_node);
-		return false;
-	}
-
-	value_node->as.expr_stmt.expr = node->as.return_stmt.expr;
-	value_node->eval_type = node->as.return_stmt.expr->eval_type;
-	return_node->as.return_stmt.expr = nullptr;
-	return_node->eval_type = TYPE_UNIT;
-
-	// The union is overwritten here, the expression is already owned by value_node
-	node->type = NODE_BLOCK;
-	node->eval_type = TYPE_UNIT;
-	ast_list_init(&node->as.block.statements);
-	if (!ast_list_append(&node->as.block.statements, value_node) ||
-		!ast_list_append(&node->as.block.statements, return_node)) {
-		print_error(ERR_INTERNAL, node->line_num, "AST node append failed!");
-		return false;
-	}
-
-	return true;
-}
-
-bool sem_second_node_return(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_return on nullptr.");
-	ast_node_t function_node;
-	ast_node_t conversion_node;
-	data_type_t expected;
-
-	function_node = context->call_chain.top->function_node;
-
-	if (!function_node->as.func_def.return_type) {
-		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-					"Function with return needs an explicit return type.");
-		return false;
-	}
-	expected = get_data_type_from_string(function_node->as.func_def.return_type);
-
-	// Empty return
-	if (!node->as.return_stmt.expr) {
-		if (expected != TYPE_UNIT) {
-			print_error(ERR_SEM_OTHER, node->line_num,
-						"Return without a value in a function that does not return Unit.");
-			return false;
-		}
-		node->eval_type = TYPE_UNIT;
-		return true;
-	}
-
-	if (!sem_second_expr(node->as.return_stmt.expr, context)) {
-		return false;
-	}
-	node->eval_type = node->as.return_stmt.expr->eval_type;
-
-	// Unit discards the value (this applies to return too), same types are fine
-	if (expected == TYPE_UNIT) {
-		return sem_second_discard_return_value(node);
-	}
-	if (node->eval_type == expected) {
-		return true;
-	}
-
-	if (node->eval_type != TYPE_INT || expected != TYPE_DOUBLE) {
-		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-					"Returned value does not match the declared return type.");
-		return false;
-	}
-
-	// Implicit conversion from Int to Double
-	conversion_node = ast_create_node(NODE_TYPE_CAST, node->line_num);
-	if (!conversion_node) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Failed to create type cast node for the returned value.");
-		return false;
-	}
-	conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
-	conversion_node->as.type_cast.operand = node->as.return_stmt.expr;
-	conversion_node->eval_type = TYPE_DOUBLE;
-	node->as.return_stmt.expr = conversion_node;
-	node->eval_type = TYPE_DOUBLE;
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Expression statement implemented with AI assistance according to the design of the author.
-// Prompt: Write sem_second_node_expr_stmt. Analyze the expression and copy its eval type.
-bool sem_second_node_expr_stmt(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_expr_stmt on nullptr.");
-
-	if (!sem_second_expr(node->as.expr_stmt.expr, context)) {
-		return false;
-	}
-
-	node->eval_type = node->as.expr_stmt.expr->eval_type;
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Helper of the binary operator implemented with AI assistance according to the design of the
-// author (the rules of the operators are taken from the specification, chapter 3).
-// Prompt: Write a function that decides if the operand types are valid for the binary operator
-// and what is the type of the result.
-bool sem_second_binary_op_result_type(op_type_t operator_type, data_type_t left_type,
-									  data_type_t right_type, data_type_t *result_type) {
-	assert(result_type && "Called sem_second_binary_op_result_type on nullptr.");
-	bool numbers = (bool)((left_type == TYPE_INT || left_type == TYPE_DOUBLE) &&
-						  (right_type == TYPE_INT || right_type == TYPE_DOUBLE));
-
-	switch (operator_type) {
-	case OPERATOR_PLUS:
-	case OPERATOR_MINUS:
-	case OPERATOR_STAR:
-	case OPERATOR_SLASH:
-		if (numbers) {
-			*result_type = TYPE_DOUBLE;
-			if (left_type == TYPE_INT && right_type == TYPE_INT) {
-				*result_type = TYPE_INT;
+		// Ensure both branches have the result type
+		if (node->as.if_stmt.is_expr) {
+			if (!sem_ensure_compatible_last_type(node->as.if_stmt.then_branch, combined_type,
+												 ERR_SEM_TYPE_COMPAT)) {
+				return false;
 			}
-			return true;
+			if (!sem_ensure_compatible_last_type(node->as.if_stmt.else_branch, combined_type,
+												 ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
 		}
-		// Concatenation
-		if (operator_type == OPERATOR_PLUS && left_type == TYPE_STRING &&
-			right_type == TYPE_STRING) {
-			*result_type = TYPE_STRING;
-			return true;
-		}
+
+		// Set the evaluation type
+		node->eval_type = combined_type;
+		return true;
+	}
+
+	return true;
+}
+
+/*
+Tool: Claude Sonnet 5.5
+Prompt paraphrase: Please correct and symplify this logic of type resolution for returning
+branches for if statement so it is correct in all edge cases.
+use same style, write clean code, dont break anything, explain what you did
++ other files as context
+*/
+bool sem_always_returns(ast_node_t stmt) {
+	if (!stmt) {
 		return false;
-	case OPERATOR_LESS:
-	case OPERATOR_LESS_EQUAL:
-	case OPERATOR_GREATER:
-	case OPERATOR_GREATER_EQUAL:
-		*result_type = TYPE_BOOL;
-		return (bool)(numbers || (left_type == TYPE_STRING && right_type == TYPE_STRING));
-	case OPERATOR_EQUAL:
-	case OPERATOR_NOT_EQUAL:
-		*result_type = TYPE_BOOL;
-		return (bool)(numbers || left_type == right_type);
-	case OPERATOR_AND:
-	case OPERATOR_OR:
-		*result_type = TYPE_BOOL;
-		return (bool)(left_type == TYPE_BOOL && right_type == TYPE_BOOL);
+	}
+
+	switch (stmt->type) {
+	case NODE_RETURN:
+		return true;
+	case NODE_BLOCK:
+		return sem_always_returns(stmt->as.block.statements.tail);
+	case NODE_IF:
+		return (bool)(stmt->as.if_stmt.else_branch &&
+					  sem_always_returns(stmt->as.if_stmt.then_branch) &&
+					  sem_always_returns(stmt->as.if_stmt.else_branch));
 	default:
 		return false;
 	}
 }
 
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Implemented with AI assistance (pattern taken from sem_second_node_assign).
-// Prompt: Write a function that wraps an operand into the type cast node from Int to Double.
-bool sem_second_insert_double_cast(ast_node_t *operand) {
-	assert(operand && *operand && "Called sem_second_insert_double_cast on nullptr.");
-
-	ast_node_t conversion_node = ast_create_node(NODE_TYPE_CAST, (*operand)->line_num);
-	if (!conversion_node) {
-		print_error(ERR_INTERNAL, (*operand)->line_num, "Failed to create type cast node.");
-		return false;
+data_type_t sem_unify_types(data_type_t type1, data_type_t type2) {
+	// Any
+	if (type1 == TYPE_ANY) {
+		return type2;
+	}
+	if (type2 == TYPE_ANY) {
+		return type1;
 	}
 
-	conversion_node->as.type_cast.target_type = TYPE_DOUBLE;
-	conversion_node->as.type_cast.operand = *operand;
-	conversion_node->eval_type = TYPE_DOUBLE;
-	*operand = conversion_node;
-	return true;
+	// Same
+	if (type1 == type2) {
+		return type1;
+	}
+
+	// DOUBLE and INT implicitely converts to double
+	if ((type1 == TYPE_DOUBLE && type2 == TYPE_INT) ||
+		(type1 == TYPE_INT && type2 == TYPE_DOUBLE)) {
+		return TYPE_DOUBLE;
+	}
+
+	// Incompatible
+	return TYPE_UNKNOWN;
 }
 
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Binary operator implemented with AI assistance step by step according to the design of the
-// author (the rules of the operators are taken from the specification, chapter 3).
-// Prompt: Write sem_second_node_binary_op. Analyze the operands, check their types, convert Int to
-// Double and set the type of the result.
-bool sem_second_node_binary_op(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_binary_op on nullptr.");
-	data_type_t left_type;
-	data_type_t right_type;
-	data_type_t result_type;
+bool sem_ensure_compatible_last_type(ast_node_t node, data_type_t expected_type,
+									 err_c_t potential_error_code) {
+	assert(node && expected_type && "Called sem_ensure_compatible_last_type on nullptr.");
 
-	if (!sem_second_expr(node->as.binary_op.left, context) ||
-		!sem_second_expr(node->as.binary_op.right, context)) {
-		return false;
+	if (sem_always_returns(node)) {
+		// Node always returns so not needed to check the type
+		return true;
 	}
 
-	left_type = node->as.binary_op.left->eval_type;
-	right_type = node->as.binary_op.right->eval_type;
-
-	if (!sem_second_binary_op_result_type(node->as.binary_op.operator_type, left_type, right_type,
-										  &result_type)) {
-		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-					"Type mismatch of the operands of the binary operator.");
-		return false;
-	}
-
-	// The Int operand is converted if the other one is Double
-	if (left_type == TYPE_INT && right_type == TYPE_DOUBLE &&
-		!sem_second_insert_double_cast(&node->as.binary_op.left)) {
-		return false;
-	}
-	if (left_type == TYPE_DOUBLE && right_type == TYPE_INT &&
-		!sem_second_insert_double_cast(&node->as.binary_op.right)) {
-		return false;
-	}
-
-	node->eval_type = result_type;
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Unary operator implemented with AI assistance according to the design of the author (the rules
-// are taken from the specification, chapter 3 and the extension BOOLTHEN).
-// Prompt: Write sem_second_node_unary_op. The unary + and - are for numbers, the ! is for Boolean,
-// the type of the result is the type of the operand.
-bool sem_second_node_unary_op(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_unary_op on nullptr.");
-	data_type_t operand_type;
-	bool valid;
-
-	if (!sem_second_expr(node->as.unary_op.operand, context)) {
-		return false;
-	}
-	operand_type = node->as.unary_op.operand->eval_type;
-
-	if (node->as.unary_op.operator_type == OPERATOR_EX_MARK) {
-		valid = operand_type == TYPE_BOOL;
-	} else {
-		valid = (bool)(operand_type == TYPE_INT || operand_type == TYPE_DOUBLE);
-	}
-
-	if (!valid) {
-		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-					"Type mismatch of the operand of the unary operator.");
-		return false;
-	}
-
-	node->eval_type = operand_type;
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Helper that finds the symbol of an extension method for a member access, implemented with AI
-// assistance according to the specification of the author (pattern of the lookup is taken from
-// sem_second_node_arg_list).
-// Prompt: Write sem_second_find_extension_symbol, it analyzes the target of the member access,
-// builds the key name$Type, searches symtable_extension_functions and prints an error when the
-// method is not found.
-symbol_t sem_second_find_extension_symbol(ast_node_t member_access_node,
-										  semantic_context_t *context) {
-	assert(member_access_node && context && "Called sem_second_find_extension_symbol on nullptr.");
-	ast_node_t target = member_access_node->as.member_access.target;
-	char *member_name = member_access_node->as.member_access.member_name;
-	char *key;
-	symbol_t extension_symbol;
-
-	if (!sem_second_expr(target, context)) {
-		return nullptr;
-	}
-
-	// Key is name$Type, the same as in the first pass
-	key = malloc(strlen(member_name) + strlen(data_type_string_forms[target->eval_type]) + 2);
-	if (!key) {
-		print_error(ERR_INTERNAL, member_access_node->line_num,
-					"Failed to allocate memory for extension function key.");
-		return nullptr;
-	}
-	sprintf(key, "%s$%s", member_name, data_type_string_forms[target->eval_type]);
-
-	extension_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
-	free(key);
-
-	if (!extension_symbol) {
-		print_error(ERR_SEM_UNDEFINED, member_access_node->line_num,
-					"Extension function '%s' for type '%s' is not defined.", member_name,
-					data_type_string_forms[target->eval_type]);
-	}
-
-	return extension_symbol;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Function call analysis implemented with AI assistance according to the design of the author
-// (symbol lookup, recursion check with the call chain, arguments checked by
-// sem_second_node_arg_list).
-// Prompt: Write sem_second_node_func_call. Find the symbol of the callee (identifier or member
-// access), analyze unvisited functions, check the recursion of the visiting ones, check the
-// arguments and set the eval type to the return type of the function.
-bool sem_second_node_func_call(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_func_call on nullptr.");
-	ast_node_t callee = node->as.func_call.callee;
-	symbol_t function_symbol;
-
-	// Find the symbol of the called function
-	if (callee->type == NODE_IDENTIFIER) {
-		function_symbol = stable_find_alllevel(context->symtable_functions, callee->as.id.name);
-		if (!function_symbol) {
-			print_error(ERR_SEM_UNDEFINED, node->line_num,
-						"Function '%s' is not defined in the current scope.", callee->as.id.name);
-			return false;
-		}
-	} else {
-		function_symbol = sem_second_find_extension_symbol(callee, context);
-		if (!function_symbol) {
-			return false;
-		}
-	}
-
-	// Analyze the function first, the return type has to be known
-	if (function_symbol->function.state == FUNCTION_UNVISITED) {
-		if (!sem_second_analyze_function(function_symbol->function.function_definition, context,
-										 function_symbol)) {
-			return false;
-		}
-	} else if (function_symbol->function.state == FUNCTION_VISITING) {
-		// Recursion, every function in the cycle needs an explicit return type
-		if (!call_chain_check_cycle(context, function_symbol->function.function_definition)) {
-			return false;
-		}
-	}
-
-	if (!sem_second_node_arg_list(node, context)) {
-		return false;
-	}
-
-	node->eval_type = function_symbol->function.return_type;
-	return true;
-}
-
-bool sem_second_node_member_access(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_member_access on nullptr.");
-
-	symbol_t mem_acc_symbol = sem_second_find_extension_symbol(node, context);
-	if (!mem_acc_symbol) {
-		return false;
-	}
-
-	if (!(mem_acc_symbol->function.parameter_lists.head == nullptr)) {
-		print_error(ERR_SEM_PARAMS, node->line_num, "Member access function can not have params!");
-		return false;
-	}
-
-	if (mem_acc_symbol->function.state == FUNCTION_UNVISITED) {
-		if (!sem_second_analyze_function(mem_acc_symbol->function.function_definition, context,
-										 mem_acc_symbol)) {
-			return false;
-		}
-	} else if (mem_acc_symbol->function.state == FUNCTION_VISITING) {
-		if (!call_chain_check_cycle(context, mem_acc_symbol->function.function_definition)) {
-			return false;
-		}
-	}
-
-	node->eval_type = mem_acc_symbol->function.return_type;
-
-	return true;
-}
-
-// Tool: Claude Code (Claude Sonnet 5.5)
-// Interpolated string implemented with AI assistance according to the design of the author.
-// Prompt: Write sem_second_node_string_interp. Analyze all the parts, any type is allowed because
-// the values are converted like toStr, the result is String.
-bool sem_second_node_string_interp(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_string_interp on nullptr.");
-
-	for (ast_node_t part = node->as.string_interp.parts.head; part; part = part->next) {
-		if (!sem_second_expr(part, context)) {
-			return false;
-		}
-	}
-
-	node->eval_type = TYPE_STRING;
-	return true;
-}
-
-bool sem_second_node_arg_list(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_arg_list on nullptr.");
-
-	// Node checks
-	if (node->type != NODE_FUNC_CALL && node->type != NODE_MEMBER_ACCESS) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_arg_list on non function call node.");
-		return false;
-	}
-	if (node->type == NODE_FUNC_CALL && !node->as.func_call.callee) {
-		print_error(ERR_INTERNAL, node->line_num, "Function call has no callee.");
-		return false;
-	}
-
-	// Get function symbol from the symbol table
-	symbol_t function_symbol = nullptr;
-	if (node->type == NODE_MEMBER_ACCESS) {
-		if (!node->as.member_access.target) {
-			print_error(ERR_INTERNAL, node->line_num, "Member access has no target.");
-			return false;
-		}
-		if (!node->as.member_access.member_name) {
-			print_error(ERR_INTERNAL, node->line_num, "Member access has no member name.");
-			return false;
-		}
-
-		// Check target eval type if not checked yet
-		if (!node->as.member_access.target->eval_type) {
-			if (!sem_second_expr(node->as.member_access.target, context)) {
-				throw_warning(node->line_num, "Failed to process member access target.");
+	switch (node->type) {
+	case NODE_BLOCK:
+		// Ensure the last statement in the block
+		if (!node->as.block.statements.tail) {
+			// Empty block is type unit
+			if (expected_type != TYPE_UNIT) {
+				print_error(potential_error_code, node->line_num,
+							"Block is empty but expected type is not Unit.");
 				return false;
 			}
+			return true;
 		}
-		if (!node->as.member_access.target->eval_type) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Member access callee has no evaluation type.");
+		if (!sem_ensure_compatible_last_type(node->as.block.statements.tail, expected_type,
+											 potential_error_code)) {
 			return false;
 		}
 
-		// Make key
-		char *key =
-			malloc(strlen(data_type_string_forms[node->as.member_access.target->eval_type]) +
-				   strlen(node->as.member_access.member_name) + 1 + 1);
-		if (!key) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for extension function key.");
+		// Set the eval type
+		node->eval_type = node->as.block.statements.tail->eval_type;
+		return true;
+		break;
+	case NODE_IF:
+		// If used as statement or without else is Unit
+		if (!node->as.if_stmt.is_expr) {
+			return sem_ensure_compatible_type(node, expected_type, potential_error_code);
+		}
+		if (!node->as.if_stmt.then_branch) {
+			print_error(ERR_INTERNAL, node->line_num, "If expression is missing a then branch.");
 			return false;
 		}
-		sprintf(key, "%s$%s", node->as.member_access.member_name,
-				data_type_string_forms[node->as.member_access.target->eval_type]);
-
-		// Search symtable
-		function_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
-		free(key);
-		if (!function_symbol) {
-			print_error(
-				ERR_SEM_UNDEFINED, node->line_num,
-				"Extension function '%s' for type '%s' is not defined in the current scope.",
-				node->as.member_access.member_name,
-				data_type_string_forms[node->as.member_access.target->eval_type]);
+		if (!node->as.if_stmt.else_branch) {
+			print_error(ERR_INTERNAL, node->line_num, "If expression is missing an else branch.");
 			return false;
 		}
 
-		// Check extension parameter type
-		if (function_symbol->function.extension_parameter_type !=
-			node->as.member_access.target->eval_type) {
-			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
-						"Extension function '%s' expects receiver type '%s', but got '%s'.",
-						node->as.member_access.member_name,
-						data_type_string_forms[function_symbol->function.extension_parameter_type],
-						data_type_string_forms[node->as.member_access.target->eval_type]);
+		// Ensure both branches
+		if (!sem_ensure_compatible_last_type(node->as.if_stmt.then_branch, expected_type,
+											 potential_error_code)) {
+			return false;
+		}
+		if (!sem_ensure_compatible_last_type(node->as.if_stmt.else_branch, expected_type,
+											 potential_error_code)) {
 			return false;
 		}
 
-		// Check symbol has no parameter lists
-		if (function_symbol->function.parameter_lists.count != 0) {
-			print_error(ERR_SEM_PARAMS, node->line_num,
-						"Extension function '%s' has parameter lists, but should not.",
-						node->as.member_access.member_name);
+		// Unify the types of the branches
+		if (sem_always_returns(node->as.if_stmt.then_branch)) { // Branch always returns
+			// Set its type to the other one
+			node->as.if_stmt.then_branch->eval_type = node->as.if_stmt.else_branch->eval_type;
+		} else if (sem_always_returns(node->as.if_stmt.else_branch)) { // Same here
+			node->as.if_stmt.else_branch->eval_type = node->as.if_stmt.then_branch->eval_type;
+		}
+		node->eval_type = sem_unify_types(node->as.if_stmt.then_branch->eval_type,
+										  node->as.if_stmt.else_branch->eval_type);
+		if (node->eval_type == TYPE_UNKNOWN) {
+			print_error(potential_error_code, node->line_num,
+						"Type mismatch between then and else branches of if statement.");
+			return false;
+		}
+
+		// Check type compatibility
+		if (!((node->eval_type == expected_type) || (expected_type == TYPE_ANY) ||
+			  (expected_type == TYPE_DOUBLE && node->eval_type == TYPE_INT))) {
+			print_error(potential_error_code, node->line_num,
+						"Type mismatch between then and else branches of if statement.");
 			return false;
 		}
 
 		return true;
-	} else if (node->type == NODE_FUNC_CALL &&
-			   node->as.func_call.callee->type == NODE_MEMBER_ACCESS) {
-		if (!node->as.func_call.callee->as.member_access.member_name) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Member access in function call has no member name.");
-			return false;
-		}
-		if (!node->as.func_call.callee->as.member_access.target) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Member access in function call has no target.");
+		break;
+
+	case NODE_EXPR_STMT:
+		// Node checks
+		if (!node->as.expr_stmt.expr) {
+			print_error(ERR_INTERNAL, node->line_num, "Expression statement has no expression.");
 			return false;
 		}
 
-		// Check target eval type if not checked yet
-		if (!node->as.func_call.callee->as.member_access.target->eval_type) {
-			if (!sem_second_expr(node->as.func_call.callee->as.member_access.target, context)) {
-				throw_warning(node->line_num,
-							  "Failed to process member access target in function call.");
-				return false;
-			}
-		}
-
-		if (!node->as.func_call.callee->as.member_access.target->eval_type) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Member access target in function call has no evaluation type.");
+		// Ensure the expression statement
+		if (!sem_ensure_compatible_type(node->as.expr_stmt.expr, expected_type,
+										potential_error_code)) {
 			return false;
 		}
 
-		// Make key
-		char *key = malloc(strlen(data_type_string_forms[node->as.func_call.callee->as.member_access
-															 .target->eval_type]) +
-						   strlen(node->as.func_call.callee->as.member_access.member_name) + 1 + 1);
-		if (!key) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for extension function key.");
-			return false;
-		}
-		sprintf(
-			key, "%s$%s", node->as.func_call.callee->as.member_access.member_name,
-			data_type_string_forms[node->as.func_call.callee->as.member_access.target->eval_type]);
-
-		// Search symtable
-		function_symbol = stable_find_alllevel(context->symtable_extension_functions, key);
-		free(key);
-		if (!function_symbol) {
-			print_error(
-				ERR_SEM_UNDEFINED, node->line_num,
-				"Extension function '%s' for type '%s' is not defined in the current scope.",
-				node->as.func_call.callee->as.member_access.member_name,
-				data_type_string_forms[node->as.func_call.callee->as.member_access.target
-										   ->eval_type]);
-			return false;
-		}
-	} else {
-		if (!node->as.func_call.callee) {
-			print_error(ERR_INTERNAL, node->line_num, "Function call has no callee.");
-			return false;
-		}
-		if (node->as.func_call.callee->type != NODE_IDENTIFIER) {
-			print_error(ERR_SEM_OTHER, node->line_num,
-						"Function call callee is not an identifier or member access.");
-			return false;
-		}
-		if (!node->as.func_call.callee->as.id.name) {
-			print_error(ERR_INTERNAL, node->line_num, "Function call callee has no name.");
-			return false;
-		}
-		function_symbol = stable_find_alllevel(context->symtable_functions,
-											   node->as.func_call.callee->as.id.name);
-		if (!function_symbol) {
-			print_error(ERR_SEM_UNDEFINED, node->line_num,
-						"Function '%s' is not defined in the current scope.",
-						node->as.func_call.callee->as.id.name);
-			return false;
-		}
+		// Set the eval type
+		node->eval_type = node->as.expr_stmt.expr->eval_type;
+		return true;
+		break;
+	default:
+		// Other statements
+		return sem_ensure_compatible_type(node, expected_type, potential_error_code);
 	}
+}
 
-	// Check argument lists lengths
-	if (function_symbol->function.parameter_lists.count != node->as.func_call.arg_lists.count) {
-		print_error(
-			ERR_SEM_PARAMS, node->line_num, "Function expects %zu argument lists, but got %zu.",
-			function_symbol->function.parameter_lists.count, node->as.func_call.arg_lists.count);
+bool sem_resolve_condition(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_resolve_condition on nullptr.");
+
+	// Resolve the condition expression
+	if (!sem_second_expression(node, context)) {
 		return false;
 	}
 
-	// Go through argument lists and check lengths
-	ast_node_t current_argument_list_node = node->as.func_call.arg_lists.head;
-	ast_node_t current_function_param_list_node = function_symbol->function.parameter_lists.head;
-	while (current_argument_list_node && current_function_param_list_node) {
-		// Node checks
-		if (current_argument_list_node->type != NODE_ARG_LIST) {
-			print_error(ERR_INTERNAL, current_argument_list_node->line_num,
-						"Invalid node type in function call argument lists.");
-			return false;
-		}
-
-		// Check argument list lengths
-		if (current_argument_list_node->as.arg_list.args.count !=
-			current_function_param_list_node->as.param_list.params.count) {
-			print_error(ERR_SEM_PARAMS, current_argument_list_node->line_num,
-						"Function expects %zu parameters in argument list, but got %zu.",
-						current_function_param_list_node->as.param_list.params.count,
-						current_argument_list_node->as.arg_list.args.count);
-			return false;
-		}
-
-		// Go through arguments and check types
-		ast_list_t *current_arg_list_for_cast_insertion =
-			&current_argument_list_node->as.arg_list.args;
-		ast_node_t previous_argument_node_for_cast_insertion = nullptr;
-
-		ast_node_t current_argument_node = current_argument_list_node->as.arg_list.args.head;
-		ast_node_t current_function_param_node =
-			current_function_param_list_node->as.param_list.params.head;
-		while (current_argument_node && current_function_param_node) {
-			// Node checks
-			if (current_function_param_node->type != NODE_PARAM) {
-				print_error(ERR_INTERNAL, current_function_param_node->line_num,
-							"Invalid node type in function parameter list.");
-				return false;
-			}
-
-			// Get argument type
-			if (!sem_second_expr(current_argument_node, context)) {
-				throw_warning(current_argument_node->line_num,
-							  "Failed to process function call argument for function.");
-				return false;
-			}
-
-			// Check correct type
-			if (current_argument_node->eval_type != current_function_param_node->eval_type) {
-				if (current_function_param_node->eval_type == TYPE_DOUBLE &&
-					current_argument_node->eval_type == TYPE_INT) {
-					// Implicit conversion from Int to Double
-					// Create cast node
-					ast_node_t cast_node =
-						ast_create_node(NODE_TYPE_CAST, current_argument_node->line_num);
-					if (!cast_node) {
-						print_error(
-							ERR_INTERNAL, current_argument_node->line_num,
-							"Failed to create type cast node for implicit conversion from Int "
-							"to Double.");
-						return false;
-					}
-					cast_node->eval_type = TYPE_DOUBLE;
-					cast_node->as.type_cast.target_type = TYPE_DOUBLE;
-					cast_node->as.type_cast.operand = current_argument_node;
-
-					// Insert to argument list
-					cast_node->next = current_argument_node->next;
-					current_argument_node->next = nullptr;
-					if (current_arg_list_for_cast_insertion->head == current_argument_node &&
-						current_arg_list_for_cast_insertion->tail == current_argument_node) {
-						// Only
-						current_arg_list_for_cast_insertion->head = cast_node;
-						current_arg_list_for_cast_insertion->tail = cast_node;
-					} else if (!previous_argument_node_for_cast_insertion) {
-						// First
-						current_arg_list_for_cast_insertion->head = cast_node;
-					} else if (!cast_node->next) {
-						// Last
-						previous_argument_node_for_cast_insertion->next = cast_node;
-						current_arg_list_for_cast_insertion->tail = cast_node;
-					} else {
-						// Middle
-						previous_argument_node_for_cast_insertion->next = cast_node;
-					}
-					current_argument_node = cast_node;
-
-				} else if (current_function_param_node->eval_type != TYPE_ANY ||
-						   !current_argument_node->eval_type) {
-					print_error(ERR_SEM_PARAMS, current_argument_node->line_num,
-								"Unexpected type in function parameter.");
-					return false;
-				}
-				// Type mismatch, but any type is allowed -> continue
-			}
-
-			// Move to next parameter
-			previous_argument_node_for_cast_insertion = current_argument_node;
-			current_argument_node = current_argument_node->next;
-			current_function_param_node = current_function_param_node->next;
-		}
-
-		// Move to next parameter list
-		current_argument_list_node = current_argument_list_node->next;
-		current_function_param_list_node = current_function_param_list_node->next;
+	// Check that the condition is of type bool
+	if (!sem_ensure_compatible_type(node, TYPE_BOOL, ERR_SEM_TYPE_COMPAT)) {
+		return false;
 	}
 
-	// TODO
+	// Success
 	return true;
 }
 
-bool sem_second_node_identifier(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_identifier on nullptr.");
+bool sem_second_while(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_while on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_WHILE) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_while on non while node.");
+		return false;
+	}
+	if (!node->as.while_stmt.condition) {
+		print_error(ERR_INTERNAL, node->line_num, "While loop has no condition.");
+		return false;
+	}
+	if (!node->as.while_stmt.body) {
+		print_error(ERR_INTERNAL, node->line_num, "While loop has no body.");
+		return false;
+	}
+
+	// Resolve the condition
+	if (!sem_resolve_condition(node->as.while_stmt.condition, context)) {
+		return false;
+	}
+
+	// Resolve the body
+	if (!sem_second_scoped_resolve(node->as.while_stmt.body, context, false)) {
+		return false;
+	}
+
+	// Success
+	return true;
+}
+
+bool sem_second_for(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_for on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_FOR) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_for on non for node.");
+		return false;
+	}
+	if (!node->as.for_stmt.var_name) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no variable.");
+		return false;
+	}
+	if (!node->as.for_stmt.from_expr) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no from expression.");
+		return false;
+	}
+	if (!node->as.for_stmt.to_expr) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no to expression.");
+		return false;
+	}
+	if (!node->as.for_stmt.body) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no body.");
+		return false;
+	}
+	if (!node->as.for_stmt.to_expr || !node->as.for_stmt.body) {
+		print_error(ERR_INTERNAL, node->line_num, "For loop has no variable, range bound or body.");
+		return false;
+	}
+
+	// Check bounds
+	// From
+	if (!sem_second_expression(node->as.for_stmt.from_expr, context)) {
+		return false;
+	}
+	if (!sem_ensure_compatible_type(node->as.for_stmt.from_expr, TYPE_INT, ERR_SEM_TYPE_COMPAT)) {
+		return false;
+	}
+	// To
+	if (!sem_second_expression(node->as.for_stmt.to_expr, context)) {
+		return false;
+	}
+	if (!sem_ensure_compatible_type(node->as.for_stmt.to_expr, TYPE_INT, ERR_SEM_TYPE_COMPAT)) {
+		return false;
+	}
+	// Step
+	if (node->as.for_stmt.step_expr) {
+		if (!sem_second_expression(node->as.for_stmt.step_expr, context)) {
+			return false;
+		}
+		if (!sem_ensure_compatible_type(node->as.for_stmt.step_expr, TYPE_INT,
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		if (is_zero_literal(node->as.for_stmt.step_expr)) {
+			// Zero as step
+			print_error(ERR_SEM_OTHER, node->line_num, "For loop step cannot be zero.");
+			return false;
+		}
+	}
+
+	// Create scope
+	if (!stable_enter_scope(context->function_stack->local_scope)) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to enter scope of the for loop.");
+		return false;
+	}
+
+	// Declare loop variable
+	symbol_t symbol = declare_variable(context, node->as.for_stmt.var_name, TYPE_INT, false, true);
+	if (!symbol) {
+		return false;
+	}
+	node->as.for_stmt.unique_var_name = strdup(symbol->variable.unique_name);
+	if (!node->as.for_stmt.unique_var_name) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for loop variable unique name.");
+		return false;
+	}
+
+	// Check guards
+	for (ast_node_t current_guard_node = node->as.for_stmt.guards.head; current_guard_node;
+		 current_guard_node = current_guard_node->next) {
+		// Resolve the guard condition
+		if (!sem_resolve_condition(current_guard_node, context)) {
+			return false;
+		}
+	}
+
+	// Resolve the body
+	if (!sem_second_scoped_resolve(node->as.for_stmt.body, context, false)) {
+		return false;
+	}
+
+	// Leave the scope of the for loop
+	stable_leave_scope(context->function_stack->local_scope);
+
+	// Success
+	return true;
+}
+
+bool is_zero_literal(ast_node_t node) {
+	assert(node && "Called is_zero_literal on nullptr.");
+
+	if (node->type == NODE_LIT_INT) {
+		return node->as.int_val == 0;
+	}
+
+	if (node->type == NODE_UNARY_OP && (node->as.unary_op.operator_type == OPERATOR_MINUS ||
+										node->as.unary_op.operator_type == OPERATOR_PLUS)) {
+		return is_zero_literal(node->as.unary_op.operand);
+	}
+
+	return false;
+}
+
+bool sem_second_return(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_return on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_RETURN) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_second_return on non return node.");
+		return false;
+	}
+	if (!context->function_stack) {
+		print_error(ERR_INTERNAL, node->line_num, "Return statement outside of a function.");
+		return false;
+	}
+	if (!context->function_stack->symbol) {
+		print_error(ERR_INTERNAL, node->line_num, "Return statement outside of a function.");
+		return false;
+	}
+
+	// Default unit
+	node->eval_type = TYPE_UNIT;
+
+	// Check explicit return type
+	if (!context->function_stack->symbol->function.has_explicit_return_type) {
+		print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+					"Return statement in function without explicit return type.");
+		return false;
+	}
+
+	// Check empty return
+	if (!node->as.return_stmt.expr) {
+		if (context->function_stack->symbol->function.return_type != TYPE_UNIT) {
+			print_error(ERR_SEM_OTHER, node->line_num,
+						"Return without a value is allowed only in a function returning Unit.");
+			return false;
+		}
+		return true;
+	}
+
+	// Resolve the return expression
+	if (!sem_second_expression(node->as.return_stmt.expr, context)) {
+		return false;
+	}
+
+	// Discard return value for unit functions
+	if (context->function_stack->symbol->function.return_type == TYPE_UNIT) {
+		return sem_discard_return_value(node);
+	}
+
+	// Check return type compatibility
+	return sem_ensure_compatible_type(node->as.return_stmt.expr,
+									  context->function_stack->symbol->function.return_type,
+									  ERR_SEM_TYPE_COMPAT);
+
+	// Success
+	return true;
+}
+
+bool sem_discard_return_value(ast_node_t node) {
+	assert(node && "Called sem_discard_return_value on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_RETURN) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_discard_return_value on non return node.");
+		return false;
+	}
+	if (!node->as.return_stmt.expr) {
+		print_error(ERR_INTERNAL, node->line_num, "Return statement has no value to discard.");
+		return false;
+	}
+
+	// Discard by creating block with expression and return
+	// Create nodes
+	ast_node_t expr_stmt_node = ast_create_node(NODE_EXPR_STMT, node->line_num);
+	ast_node_t return_node = ast_create_node(NODE_RETURN, node->line_num);
+	if (!expr_stmt_node || !return_node) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to create new expression statement or return node.");
+		ast_dtor(expr_stmt_node);
+		ast_dtor(return_node);
+		return false;
+	}
+	// Connect nodes
+	expr_stmt_node->as.expr_stmt.expr = node->as.return_stmt.expr;
+	expr_stmt_node->eval_type = expr_stmt_node->as.expr_stmt.expr->eval_type;
+	return_node->eval_type = TYPE_UNIT;
+	node->type = NODE_BLOCK;
+	node->eval_type = TYPE_UNIT;
+	ast_list_init(&(node->as.block.statements));
+	ast_list_append(&(node->as.block.statements), expr_stmt_node);
+	ast_list_append(&(node->as.block.statements), return_node);
+
+	return true;
+}
+
+bool sem_second_expression(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_expression on nullptr.");
+
+	switch (node->type) {
+	case NODE_IF:
+		return sem_second_if(node, context, true);
+	case NODE_BINARY_OP:
+		return sem_second_binary_operator(node, context);
+	case NODE_UNARY_OP:
+		return sem_second_unary_operator(node, context);
+	case NODE_FUNC_CALL:
+		return sem_second_function_call(node, context);
+	case NODE_MEMBER_ACCESS:
+		return sem_second_member_access(node, context);
+	case NODE_STRING_INTERP:
+		return sem_second_interpolateds(node, context);
+	case NODE_IDENTIFIER:
+		return sem_second_identifier(node, context);
+	case NODE_LIT_INT:
+		node->eval_type = TYPE_INT;
+		return true;
+	case NODE_LIT_DOUBLE:
+		node->eval_type = TYPE_DOUBLE;
+		return true;
+	case NODE_LIT_STRING:
+		node->eval_type = TYPE_STRING;
+		return true;
+	case NODE_LIT_BOOL:
+		node->eval_type = TYPE_BOOL;
+		return true;
+	case NODE_LIT_UNIT:
+		node->eval_type = TYPE_UNIT;
+		return true;
+	default:
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_expression on unexpected node type.");
+		return false;
+	}
+}
+
+bool sem_second_identifier(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_identifier on nullptr.");
 
 	// Node checks
 	if (node->type != NODE_IDENTIFIER) {
 		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_identifier on non identifier node.");
+					"Called sem_second_identifier on non identifier node.");
 		return false;
 	}
 	if (!node->as.id.name) {
-		print_error(ERR_INTERNAL, node->line_num, "Identifier node has no name.");
+		print_error(ERR_INTERNAL, node->line_num, "Identifier has no name.");
 		return false;
 	}
 
-	// Check if identifier is defined in the current scope
-	symbol_t variable_symbol = stable_find_alllevel(context->symtable_local, node->as.id.name);
-	symbol_t function_symbol = stable_find_alllevel(context->symtable_functions, node->as.id.name);
-
-	// Check if identifier is defined
-	if (variable_symbol) {
-		node->eval_type = variable_symbol->variable.type;
-		node->as.id.unique_name = strdup(variable_symbol->variable.unique_name);
+	// Find the variable in the local scope
+	symbol_t symbol = stable_find_alllevel(context->function_stack->local_scope, node->as.id.name);
+	if (symbol) {
+		if (symbol->symbol_variant != SYMBOL_VARIABLE) {
+			print_error(ERR_INTERNAL, node->line_num, "Local symbol is not a variable.");
+			return false;
+		}
+		// Fill out symbol
+		node->sym_entry = symbol;
+		node->eval_type = symbol->variable.type;
+		node->as.id.unique_name = strdup(symbol->variable.unique_name);
 		if (!node->as.id.unique_name) {
 			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for variable unique name in identifier.");
+						"Failed to allocate memory for identifier unique name.");
 			return false;
 		}
-	} else if (function_symbol) {
-		char *function_name = node->as.id.name;
+		return true;
+	}
 
-		ast_node_t identifier_node = ast_create_node(NODE_IDENTIFIER, node->line_num);
-
-		if (!identifier_node) {
-			print_error(ERR_INTERNAL, node->line_num, "AST node allocation failed!");
-			return false;
-		}
-		identifier_node->as.id.name = function_name;
-
-		node->type = NODE_FUNC_CALL;
-		node->as.func_call.callee = identifier_node;
-		node->as.func_call.has_parens = false;
-		ast_list_init(&node->as.func_call.arg_lists);
-
-		if (!sem_second_node_func_call(node, context)) {
-			throw_warning(node->line_num, "Failed to process function call for identifier '%s'.",
-						  node->as.id.name);
-			return false;
-		}
-		node->eval_type = function_symbol->function.return_type;
-	} else {
-		print_error(ERR_SEM_UNDEFINED, node->line_num,
-					"Identifier '%s' is not defined in the current scope.", node->as.id.name);
+	// Function
+	symbol = stable_find_alllevel(context->symtable_functions, node->as.id.name);
+	if (!symbol) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num, "Undefined identifier.");
 		return false;
 	}
+	// Convert to function call without parentheses
+	ast_node_t callee_node = sem_wrap_in_place(node, NODE_FUNC_CALL);
+	if (!callee_node) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to wrap identifier in function call node.");
+		return false;
+	}
+	node->as.func_call.callee = callee_node;
+	node->as.func_call.has_parens = false;
+
+	// Check arguments
+	if (!sem_arguments(node, context, symbol)) {
+		return false;
+	}
+	// Need function resolved
+	if (!symbol->function.is_builtin &&
+		!sem_second_want_function(symbol->function.function_definition, context)) {
+		return false;
+	}
+	node->sym_entry = symbol;
+	node->eval_type = symbol->function.return_type;
 
 	return true;
 }
 
-bool sem_second_node_lit_int(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_lit_int on nullptr.");
+bool sem_arguments(ast_node_t node, semantic_context_t *context, symbol_t function_symbol) {
+	assert(node && context && function_symbol &&
+		   "Called sem_arguments on nullptr or invalid function symbol.");
 
 	// Node checks
-	if (node->type != NODE_LIT_INT) {
+	if (node->type != NODE_FUNC_CALL) {
 		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_lit_int on non integer literal node.");
+					"Called sem_arguments on non function call node.");
+		return false;
+	}
+	if (function_symbol->symbol_variant != SYMBOL_FUNCTION) {
+		print_error(ERR_INTERNAL, node->line_num, "Called sem_arguments with non function symbol.");
 		return false;
 	}
 
-	// Set eval type
-	node->eval_type = TYPE_INT;
-
-	return true;
-}
-
-bool sem_second_node_lit_double(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_lit_double on nullptr.");
-
-	// Node checks
-	if (node->type != NODE_LIT_DOUBLE) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_lit_double on non double literal node.");
+	// Check list lengths
+	if (function_symbol->function.parameter_lists.count != node->as.func_call.arg_lists.count) {
+		print_error(ERR_SEM_PARAMS, node->line_num, "Invalid arguments count for function call.");
 		return false;
 	}
 
-	// Set eval type
-	node->eval_type = TYPE_DOUBLE;
-
-	return true;
-}
-
-bool sem_second_node_lit_string(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_lit_string on nullptr.");
-
-	// Node checks
-	if (node->type != NODE_LIT_STRING) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_lit_string on non string literal node.");
-		return false;
-	}
-
-	// Set eval type
-	node->eval_type = TYPE_STRING;
-
-	return true;
-}
-
-bool sem_second_node_lit_bool(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_lit_bool on nullptr.");
-
-	// Node checks
-	if (node->type != NODE_LIT_BOOL) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_lit_bool on non boolean literal node.");
-		return false;
-	}
-
-	// Set eval type
-	node->eval_type = TYPE_BOOL;
-
-	return true;
-}
-
-bool sem_second_node_lit_unit(ast_node_t node, semantic_context_t *context) {
-	assert(node && context && "Called sem_second_node_lit_unit on nullptr.");
-
-	// Node checks
-	if (node->type != NODE_LIT_UNIT) {
-		print_error(ERR_INTERNAL, node->line_num,
-					"Called sem_second_node_lit_unit on non unit literal node.");
-		return false;
-	}
-
-	// Set eval type
-	node->eval_type = TYPE_UNIT;
-
-	return true;
-}
-
-bool sem_second_load_params(ast_node_t node, semantic_context_t *context,
-							symbol_t function_symbol) {
-	assert(node && context && function_symbol && "Called sem_second_load_params on nullptr.");
-
-	// Tool: Claude Code (Claude Sonnet 5.5)
-	// The receiver of an extension method is added to the local symtable, implemented with AI
-	// assistance (the code is a shorter version of the removed branch of this function).
-	// Prompt: Load the receiver of the extension method as an immutable variable.
-	if (function_symbol->function.extension_parameter_name) {
-		symbol_t receiver_symbol = stable_init_symbol();
-		if (!receiver_symbol) {
-			print_error(ERR_INTERNAL, node->line_num, "Failed to create receiver symbol.");
-			return false;
-		}
-
-		receiver_symbol->symbol_variant = SYMBOL_VARIABLE;
-		receiver_symbol->variable.type = function_symbol->function.extension_parameter_type;
-		receiver_symbol->variable.is_mutable = false;
-		receiver_symbol->variable.unique_name =
-			strdup(function_symbol->function.extension_parameter_name);
-		if (!receiver_symbol->variable.unique_name) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to allocate memory for the receiver unique name.");
-			stable_destroy_symbol(receiver_symbol);
-			return false;
-		}
-
-		if (!stable_write(context->symtable_local,
-						  function_symbol->function.extension_parameter_name, receiver_symbol)) {
-			print_error(ERR_INTERNAL, node->line_num,
-						"Failed to store the receiver in the local symbol table.");
-			stable_destroy_symbol(receiver_symbol);
-			return false;
-		}
-	}
-
-	// Go through parameter lists
-	ast_node_t current_function_param_list_node = function_symbol->function.parameter_lists.head;
-	while (current_function_param_list_node) {
+	// Go through arguments
+	ast_node_t current_arg_list_node = node->as.func_call.arg_lists.head;
+	ast_node_t current_param_list_node = function_symbol->function.parameter_lists.head;
+	while (current_arg_list_node && current_param_list_node) {
 		// Node checks
-		if (current_function_param_list_node->type != NODE_PARAM_LIST) {
-			print_error(ERR_INTERNAL, current_function_param_list_node->line_num,
-						"Invalid node type in function parameter lists.");
+		if (current_arg_list_node->type != NODE_ARG_LIST) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Invalid node type in argument or parameter lists.");
+			return false;
+		}
+		if (current_param_list_node->type != NODE_PARAM_LIST) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Invalid node type in argument or parameter lists.");
 			return false;
 		}
 
-		// Go through parameters
-		ast_node_t current_function_param_node =
-			current_function_param_list_node->as.param_list.params.head;
-		while (current_function_param_node) {
-			// Node checks
-			if (current_function_param_node->type != NODE_PARAM) {
-				print_error(ERR_INTERNAL, current_function_param_node->line_num,
-							"Invalid node type in function parameter list.");
-				return false;
-			}
-
-			// Check if parameter is defined
-			if (stable_find_alllevel(context->symtable_local,
-									 current_function_param_node->as.param.name)) {
-				print_error(ERR_INTERNAL, current_function_param_node->line_num,
-							"Parameter '%s' is already defined in the current scope.",
-							current_function_param_node->as.param.name);
-				return false;
-			}
-
-			// Create symbol
-			symbol_t param_symbol = stable_init_symbol();
-			if (!param_symbol) {
-				print_error(ERR_INTERNAL, current_function_param_node->line_num,
-							"Failed to create parameter symbol for parameter '%s'.",
-							current_function_param_node->as.param.name);
-				return false;
-			}
-
-			// Fill out symbol
-			param_symbol->symbol_variant = SYMBOL_VARIABLE;
-			param_symbol->variable.is_mutable = false; // Parameters are immutable
-			param_symbol->variable.type = current_function_param_node->eval_type;
-			param_symbol->variable.unique_name = strdup(current_function_param_node->as.param.name);
-			if (!param_symbol->variable.unique_name) {
-				print_error(ERR_INTERNAL, current_function_param_node->line_num,
-							"Failed to allocate memory for parameter unique name '%s'.",
-							current_function_param_node->as.param.name);
-				stable_destroy_symbol(param_symbol);
-				return false;
-			}
-
-			// Set unique name in AST node
-			current_function_param_node->as.param.unique_name =
-				strdup(param_symbol->variable.unique_name);
-			if (!current_function_param_node->as.param.unique_name) {
-				print_error(ERR_INTERNAL, current_function_param_node->line_num,
-							"Failed to allocate memory for parameter unique name in AST node '%s'.",
-							current_function_param_node->as.param.name);
-				stable_destroy_symbol(param_symbol);
-				return false;
-			}
-
-			// Store symbol in the local symbol table
-			if (!stable_write(context->symtable_local, current_function_param_node->as.param.name,
-							  param_symbol)) {
-				print_error(ERR_INTERNAL, current_function_param_node->line_num,
-							"Failed to store parameter '%s' in the local symbol table.",
-							current_function_param_node->as.param.name);
-				stable_destroy_symbol(param_symbol);
-				return false;
-			}
-
-			// Move to next parameter
-			current_function_param_node = current_function_param_node->next;
+		// Check list lengths
+		if (current_param_list_node->as.param_list.params.count !=
+			current_arg_list_node->as.arg_list.args.count) {
+			print_error(ERR_SEM_PARAMS, node->line_num,
+						"Invalid arguments count for function call.");
+			return false;
 		}
 
-		// Move to next parameter list
-		current_function_param_list_node = current_function_param_list_node->next;
+		// Go through arguments in the list
+		ast_node_t current_arg_node = current_arg_list_node->as.arg_list.args.head;
+		ast_node_t current_param_node = current_param_list_node->as.param_list.params.head;
+		while (current_arg_node && current_param_node) {
+			// Resolve the argument expression
+			if (!sem_second_expression(current_arg_node, context)) {
+				return false;
+			}
+
+			// Check type compatibility
+			if (!sem_ensure_compatible_type(current_arg_node, current_param_node->eval_type,
+											ERR_SEM_PARAMS)) {
+				return false;
+			}
+
+			// Move to next
+			current_arg_node = current_arg_node->next;
+			current_param_node = current_param_node->next;
+		}
+
+		// Move to next
+		current_arg_list_node = current_arg_list_node->next;
+		current_param_list_node = current_param_list_node->next;
 	}
 
 	return true;
 }
 
-bool call_chain_add(semantic_context_t *context, ast_node_t function_node) {
-	call_chain_item_t new_item = malloc(sizeof(struct call_chain_item));
+bool sem_second_unary_operator(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_unary_operator on nullptr.");
 
-	if (!new_item) {
+	// Node checks
+	if (node->type != NODE_UNARY_OP) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_unary_operator on non unary operator node.");
+		return false;
+	}
+	if (!node->as.unary_op.operand) {
+		print_error(ERR_INTERNAL, node->line_num, "Unary operator has no operand.");
 		return false;
 	}
 
-	new_item->function_node = function_node;
-	new_item->previous_item = context->call_chain.top;
-
-	context->call_chain.top = new_item;
-	context->call_chain.size++;
-
-	return true;
-}
-
-void call_chain_init(semantic_context_t *context) {
-	context->call_chain.size = 0;
-	context->call_chain.top = nullptr;
-}
-
-void call_chain_destroy(semantic_context_t *context) {
-	call_chain_item_t current_item = context->call_chain.top;
-
-	while (current_item) {
-		call_chain_item_t temp_item = current_item;
-		current_item = current_item->previous_item;
-		free(temp_item);
-		context->call_chain.size--;
+	// Resolve expression
+	if (!sem_second_expression(node->as.unary_op.operand, context)) {
+		return false;
 	}
 
-	context->call_chain.top = nullptr;
-}
-
-void call_chain_pop(semantic_context_t *context) {
-	assert(context->call_chain.top != nullptr);
-	call_chain_item_t temp_item = context->call_chain.top;
-	context->call_chain.top = context->call_chain.top->previous_item;
-	free(temp_item);
-	context->call_chain.size--;
-}
-
-bool call_chain_check_cycle(semantic_context_t *context, ast_node_t cycle_start) {
-	call_chain_item_t current_item = context->call_chain.top;
-
-	while (current_item) {
-		if (current_item->function_node->as.func_def.return_type == NULL) {
-			print_error(ERR_SEM_TYPE_COMPAT, cycle_start->line_num,
-						"Recursion without explicit function type!");
+	// Type compatinility checking
+	if (node->as.unary_op.operator_type == OPERATOR_PLUS ||
+		node->as.unary_op.operator_type == OPERATOR_MINUS) {
+		if (node->as.unary_op.operand->eval_type != TYPE_INT &&
+			node->as.unary_op.operand->eval_type != TYPE_DOUBLE) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Unary operator '+' or '-' requires operand of type Int or Double.");
 			return false;
 		}
-		if (current_item->function_node == cycle_start) {
+		node->eval_type = node->as.unary_op.operand->eval_type;
+		return true;
+	} else if (node->as.unary_op.operator_type == OPERATOR_EX_MARK) {
+		if (!sem_ensure_compatible_type(node->as.unary_op.operand, TYPE_BOOL,
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		node->eval_type = TYPE_BOOL;
+		return true;
+	}
+
+	print_error(ERR_INTERNAL, node->line_num, "Unknown unary operator.");
+	return false;
+}
+
+bool sem_second_binary_operator(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_binary_operator on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_BINARY_OP) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_binary_operator on non binary operator node.");
+		return false;
+	}
+	if (!node->as.binary_op.left) {
+		print_error(ERR_INTERNAL, node->line_num, "Binary operator is missing an operand.");
+		return false;
+	}
+	if (!node->as.binary_op.right) {
+		print_error(ERR_INTERNAL, node->line_num, "Binary operator is missing an operand.");
+		return false;
+	}
+
+	// Resolve expressions
+	if (!sem_second_expression(node->as.binary_op.left, context)) {
+		return false;
+	}
+	if (!sem_second_expression(node->as.binary_op.right, context)) {
+		return false;
+	}
+
+	// Type compatibility checking
+	switch (node->as.binary_op.operator_type) {
+	case OPERATOR_AND:
+	case OPERATOR_OR:
+		if (!sem_ensure_compatible_type(node->as.binary_op.left, TYPE_BOOL, ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		if (!sem_ensure_compatible_type(node->as.binary_op.right, TYPE_BOOL, ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		node->eval_type = TYPE_BOOL;
+		return true;
+		break;
+	case OPERATOR_PLUS:
+		// Check if both strings
+		if (node->as.binary_op.left->eval_type == TYPE_STRING &&
+			node->as.binary_op.right->eval_type == TYPE_STRING) {
+			node->eval_type = TYPE_STRING;
 			return true;
 		}
-		current_item = current_item->previous_item;
+
+		// Else fallthrough to numeric
+		[[fallthrough]];
+	case OPERATOR_STAR:
+	case OPERATOR_MINUS:
+	case OPERATOR_SLASH:
+		// Check numeric operands
+		if (!(node->as.binary_op.left->eval_type == TYPE_INT ||
+			  node->as.binary_op.left->eval_type == TYPE_DOUBLE) ||
+			!(node->as.binary_op.right->eval_type == TYPE_INT ||
+			  node->as.binary_op.right->eval_type == TYPE_DOUBLE)) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Binary operator requires operands of type Int or Double.");
+			return false;
+		}
+
+		// Unify types
+		node->eval_type = sem_unify_types(node->as.binary_op.left->eval_type,
+										  node->as.binary_op.right->eval_type);
+
+		// Ensure compatibility with both operands
+		if (!sem_ensure_compatible_type(node->as.binary_op.left, node->eval_type,
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		if (!sem_ensure_compatible_type(node->as.binary_op.right, node->eval_type,
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		return true;
+		break;
+	case OPERATOR_LESS_EQUAL:
+	case OPERATOR_GREATER_EQUAL:
+	case OPERATOR_GREATER:
+	case OPERATOR_LESS:
+		if (node->as.binary_op.left->eval_type == TYPE_STRING &&
+			node->as.binary_op.right->eval_type == TYPE_STRING) {
+			// Both strings
+			node->eval_type = TYPE_BOOL;
+			return true;
+		} else if ((node->as.binary_op.left->eval_type == TYPE_INT ||
+					node->as.binary_op.left->eval_type == TYPE_DOUBLE) &&
+				   (node->as.binary_op.right->eval_type == TYPE_INT ||
+					node->as.binary_op.right->eval_type == TYPE_DOUBLE)) {
+			// Both numeric
+			node->eval_type = TYPE_BOOL;
+			// Ensure compatibility with both operands
+			if (!sem_ensure_compatible_type(node->as.binary_op.left,
+											sem_unify_types(node->as.binary_op.left->eval_type,
+															node->as.binary_op.right->eval_type),
+											ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+			if (!sem_ensure_compatible_type(node->as.binary_op.right,
+											sem_unify_types(node->as.binary_op.left->eval_type,
+															node->as.binary_op.right->eval_type),
+											ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+			return true;
+		} else {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Binary operator requires operands of type Int, Double or String.");
+			return false;
+		}
+
+	case OPERATOR_EQUAL:
+	case OPERATOR_NOT_EQUAL:
+		if (sem_unify_types(node->as.binary_op.left->eval_type,
+							node->as.binary_op.right->eval_type) == TYPE_DOUBLE) {
+			// Maybe needs conversion
+			node->eval_type = TYPE_BOOL;
+			if (!sem_ensure_compatible_type(node->as.binary_op.left, TYPE_DOUBLE,
+											ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+			if (!sem_ensure_compatible_type(node->as.binary_op.right, TYPE_DOUBLE,
+											ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+			return true;
+		} else if (node->as.binary_op.left->eval_type == node->as.binary_op.right->eval_type) {
+			// Types match
+			node->eval_type = TYPE_BOOL;
+			return true;
+		} else {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Binary operator requires operands of compatible types.");
+			return false;
+		}
+	default:
+		print_error(ERR_INTERNAL, node->line_num, "Unknown binary operator.");
+		return false;
+	}
+	return true;
+}
+
+bool sem_second_interpolateds(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_interpolateds on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_STRING_INTERP) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_interpolateds on non string interpolation node.");
+		return false;
 	}
 
-	print_error(ERR_INTERNAL, cycle_start->line_num,
-				"Function is being analyzed but is missing from the call chain!");
-	return false;
+	// Resolve all expressions in the interpolated string
+	ast_node_t current_expr_node = node->as.string_interp.parts.head;
+	while (current_expr_node) {
+		// Resolve current expression
+		if (!sem_second_expression(current_expr_node, context)) {
+			return false;
+		}
+
+		// Move to next
+		current_expr_node = current_expr_node->next;
+	}
+
+	// Set the eval type to string
+	node->eval_type = TYPE_STRING;
+	return true;
+}
+
+bool sem_second_function_call(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_function_call on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_FUNC_CALL) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_function_call on non function call node.");
+		return false;
+	}
+	if (!node->as.func_call.callee) {
+		print_error(ERR_INTERNAL, node->line_num, "Function call has no callee.");
+		return false;
+	}
+
+	// Find function symbol
+	symbol_t symbol = nullptr;
+	if (node->as.func_call.callee->type == NODE_IDENTIFIER) {
+		// Node checks
+		if (!node->as.func_call.callee->as.id.name) {
+			print_error(ERR_INTERNAL, node->line_num, "Function call callee has no name.");
+			return false;
+		}
+
+		// Search
+		symbol = stable_find_alllevel(context->symtable_functions,
+									  node->as.func_call.callee->as.id.name);
+	} else if (node->as.func_call.callee->type == NODE_MEMBER_ACCESS) {
+		// Node checks
+		if (!node->as.func_call.callee->as.member_access.target) {
+			print_error(ERR_INTERNAL, node->line_num, "Method call has no target.");
+			return false;
+		}
+
+		// Resolve the target expression
+		if (!sem_second_expression(node->as.func_call.callee->as.member_access.target, context)) {
+			return false;
+		}
+		// Search
+		symbol = sem_find_extension_symbol(node->as.func_call.callee, context);
+	} else {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function call callee is neither identifier nor member access.");
+		return false;
+	}
+	if (!symbol) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num, "Undefined function.");
+		return false;
+	}
+
+	// Check arguments
+	if (!sem_arguments(node, context, symbol)) {
+		return false;
+	}
+	// Need function resolved
+	if (!symbol->function.is_builtin &&
+		!sem_second_want_function(symbol->function.function_definition, context)) {
+		return false;
+	}
+	node->sym_entry = symbol;
+	node->eval_type = symbol->function.return_type;
+	return true;
+}
+
+bool sem_second_member_access(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_member_access on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_MEMBER_ACCESS) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_member_access on non member access node.");
+		return false;
+	}
+	if (!node->as.member_access.target) {
+		print_error(ERR_INTERNAL, node->line_num, "Member access has no target.");
+		return false;
+	}
+
+	// Resolve the target expression
+	if (!sem_second_expression(node->as.member_access.target, context)) {
+		return false;
+	}
+
+	// Get extension symbol
+	symbol_t symbol = sem_find_extension_symbol(node, context);
+	if (!symbol) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num, "Member not found.");
+		return false;
+	}
+
+	// Check builtin
+	if (symbol->function.is_builtin) {
+		// Done
+		// Fill out
+		node->sym_entry = symbol;
+		node->eval_type = symbol->function.return_type;
+		return true;
+	}
+
+	// Users, withou parameter list
+	ast_node_t member_node = sem_wrap_in_place(node, NODE_FUNC_CALL);
+	if (!member_node) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to wrap member access in function call node.");
+		return false;
+	}
+	node->as.func_call.callee = member_node;
+	node->as.func_call.has_parens = false;
+
+	// Check arguments
+	if (!sem_arguments(node, context, symbol)) {
+		return false;
+	}
+	// Need function resolved
+	if (!symbol->function.is_builtin &&
+		!sem_second_want_function(symbol->function.function_definition, context)) {
+		return false;
+	}
+	node->sym_entry = symbol;
+	node->eval_type = symbol->function.return_type;
+	return true;
+}
+
+symbol_t sem_find_extension_symbol(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_find_extension_symbol on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_MEMBER_ACCESS) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_find_extension_symbol on non member access node.");
+		return nullptr;
+	}
+	if (!node->as.member_access.member_name || !node->as.member_access.target) {
+		print_error(ERR_INTERNAL, node->line_num, "Member access has no member name or target.");
+		return nullptr;
+	}
+
+	// Create key
+	char *key =
+		malloc(strlen(node->as.member_access.member_name) + 1 +
+			   strlen(data_type_string_forms[node->as.member_access.target->eval_type]) + 1);
+	if (!key) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for extension symbol key.");
+		return nullptr;
+	}
+	sprintf(key, "%s$%s", node->as.member_access.member_name,
+			data_type_string_forms[node->as.member_access.target->eval_type]);
+
+	// Search
+	symbol_t symbol = stable_find_alllevel(context->symtable_extension_functions, key);
+
+	free(key);
+	return symbol;
+}
+
+/*
+Tool: Claude Sonnet 5.5
+Prompt paraphrase: Please write logit that inserts return to all possible branch ends that dont have
+them
+use same style, write clean code, dont break anything, explain what you did
++ other files as context
+*/
+bool sem_second_insert_returns(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_insert_returns on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_BLOCK) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_insert_returns on non block node.");
+		return false;
+	}
+	if (!context->function_stack || !context->function_stack->symbol) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_insert_returns outside of a function.");
+		return false;
+	}
+
+	ast_node_t tail = node->as.block.statements.tail;
+
+	if (sem_always_returns(tail)) {
+		// Never completes with value - return not needed
+		return true;
+	}
+
+	// Explicit Unit function discards the value of its body
+	bool needs_value = !context->function_stack->symbol->function.has_explicit_return_type ||
+					   context->function_stack->symbol->function.return_type != TYPE_UNIT;
+
+	// Last statement gives the value of the function
+	if (needs_value && tail) {
+		if (tail->type == NODE_EXPR_STMT) { // Last expression statement
+			// Change the expression statement to a return statement (it should return)
+			ast_node_t expr = tail->as.expr_stmt.expr;
+			tail->type = NODE_RETURN;
+			tail->as.return_stmt.expr = expr;
+			return true;
+		}
+		if (tail->type == NODE_IF && tail->as.if_stmt.is_expr) { // Last if
+			// Chenge "if" to return "if"
+			ast_node_t if_node = sem_wrap_in_place(tail, NODE_RETURN);
+			if (!if_node) {
+				print_error(ERR_INTERNAL, tail->line_num,
+							"Failed to wrap if expression in return node.");
+				return false;
+			}
+			tail->as.return_stmt.expr = if_node;
+			tail->eval_type = TYPE_UNIT;
+			return true;
+		}
+	}
+
+	// No value or thrown away value - just append return without expression (returns Unit)
+	ast_node_t return_node = ast_create_node(NODE_RETURN, tail ? tail->line_num : node->line_num);
+	if (!return_node) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to create return node.");
+		return false;
+	}
+	return_node->eval_type = TYPE_UNIT;
+	ast_list_append(&(node->as.block.statements), return_node);
+
+	return true;
 }

@@ -340,7 +340,7 @@ token lexer_get_token(void) {
 			} else if (c == 'd' || c == 'D') {
 				// move
 				lexer_state.fsm_state = D_RETURN;
-			} else if (!isalpha(c)) {
+			} else /*if (!isalpha(c))*/ {
 				// unget
 				ungetc(c, lexer_state.source_file);
 				// move
@@ -362,9 +362,12 @@ token lexer_get_token(void) {
 					free(num_str);
 					return lexer_fail("Invalid integer literal");
 				}
-			} else {
+			}
+			/*
+			else {
 				return lexer_fail("Invalid character in integer literal");
 			}
+			*/
 			break;
 		case UND_FOR_NUMS:
 			if (c == '_') {
@@ -849,10 +852,11 @@ token lexer_get_token(void) {
 			}
 			break;
 		case STRING_END:
+			/*
 			// check invalid characters after string
 			if (isalpha(c) || isdigit(c)) {
 				return lexer_fail("Invalid character after string");
-			}
+			}*/
 			// unget
 			ungetc(c, lexer_state.source_file);
 			// send correct token
