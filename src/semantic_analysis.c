@@ -1925,27 +1925,233 @@ bool sem_second_expression(ast_node_t node, semantic_context_t *context) {
 }
 
 bool sem_second_identifier(ast_node_t node, semantic_context_t *context) {
-	// TODO
+	assert(node && context && "Called sem_second_identifier on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_IDENTIFIER) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_identifier on non identifier node.");
+		return false;
+	}
+
+	// Find the variable in the local scope
+	symbol_t symbol = stable_find_alllevel(context->function_stack->local_scope, node->as.id.name);
+	if (symbol) {
+		// Fill out symbol
+		node->sym_entry = symbol;
+		node->eval_type = symbol->variable.type;
+		if (!(node->as.id.unique_name = strdup(symbol->variable.unique_name))) {
+			print_error(ERR_INTERNAL, node->line_num,
+						"Failed to allocate memory for identifier unique name.");
+			return false;
+		}
+		return true;
+	}
+
+	// Function
+	symbol = stable_find_alllevel(context->symtable_functions, node->as.id.name);
+	if (!symbol) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num, "Undefined identifier.");
+		return false;
+	}
+	// Convert to extension function
+	ast_node_t callee_node = sem_wrap_in_place(node, NODE_FUNC_CALL);
+	if (!callee_node) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to wrap identifier in function call node.");
+		return false;
+	}
+	node->as.func_call.callee = callee_node;
+	node->as.func_call.has_parens = false;
+
+	// Check arguments
+	if (!sem_arguments(node, context, symbol)) {
+		return false;
+	}
+	// Need function resolved
+	if (!symbol->function.is_builtin &&
+		!sem_second_want_function(symbol->function.function_definition, context)) {
+		return false;
+	}
+	node->sym_entry = symbol;
+	node->eval_type = symbol->function.return_type;
+
+	return true;
+}
+
+bool sem_arguments(ast_node_t node, semantic_context_t *context, symbol_t function_symbol) {
+	assert(node && context && function_symbol &&
+		   "Called sem_arguments on nullptr or invalid function symbol.");
+
+	// Check list lengths
+	if (function_symbol->function.parameter_lists.count != node->as.func_call.arg_lists.count) {
+		print_error(ERR_SEM_PARAMS, node->line_num, "Invalid arguments count for function call.");
+		return false;
+	}
+
+	// Go through arguments
+	ast_node_t current_arg_list_node = node->as.func_call.arg_lists.head;
+	ast_node_t current_param_list_node = function_symbol->function.parameter_lists.head;
+	while (current_arg_list_node && current_param_list_node) {
+		// Check list lengths
+		if (current_param_list_node->as.param_list.params.count !=
+			current_arg_list_node->as.arg_list.args.count) {
+			print_error(ERR_SEM_PARAMS, node->line_num,
+						"Invalid arguments count for function call.");
+			return false;
+		}
+
+		// Go through arguments in the list
+		ast_node_t current_arg_node = current_arg_list_node->as.arg_list.args.head;
+		ast_node_t current_param_node = current_param_list_node->as.param_list.params.head;
+		while (current_arg_node && current_param_node) {
+			// Resolve the argument expression
+			if (!sem_second_expression(current_arg_node, context)) {
+				return false;
+			}
+
+			// Check type compatibility
+			if (!sem_ensure_compatible_type(current_arg_node, current_param_node->eval_type,
+											ERR_SEM_PARAMS)) {
+				return false;
+			}
+
+			// Move to next
+			current_arg_node = current_arg_node->next;
+			current_param_node = current_param_node->next;
+		}
+
+		// Move to next
+		current_arg_list_node = current_arg_list_node->next;
+		current_param_list_node = current_param_list_node->next;
+	}
+
+	return true;
 }
 
 bool sem_second_unary_operator(ast_node_t node, semantic_context_t *context) {
 	// TODO
+	return true;
 }
 
 bool sem_second_binary_operator(ast_node_t node, semantic_context_t *context) {
 	// TODO
+	return true;
 }
 
 bool sem_second_interpolateds(ast_node_t node, semantic_context_t *context) {
 	// TODO
+	return true;
 }
 
 bool sem_second_function_call(ast_node_t node, semantic_context_t *context) {
-	// TODO
+	assert(node && context && "Called sem_second_function_call on nullptr.");
+
+	// Find function symbol
+	symbol_t symbol = nullptr;
+	if (node->as.func_call.callee->type == NODE_IDENTIFIER) {
+		// Search
+		symbol = stable_find_alllevel(context->symtable_functions,
+									  node->as.func_call.callee->as.id.name);
+	} else if (node->as.func_call.callee->type == NODE_MEMBER_ACCESS) {
+		// Resolve the target expression
+		if (!sem_second_expression(node->as.func_call.callee->as.member_access.target, context)) {
+			return false;
+		}
+		// Search
+		symbol = sem_find_extension_symbol(node->as.func_call.callee, context);
+	} else {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Function call callee is neither identifier nor member access.");
+		return false;
+	}
+	if (!symbol) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num, "Undefined function.");
+		return false;
+	}
+
+	// Check arguments
+	if (!sem_arguments(node, context, symbol)) {
+		return false;
+	}
+	// Need function resolved
+	if (!symbol->function.is_builtin &&
+		!sem_second_want_function(symbol->function.function_definition, context)) {
+		return false;
+	}
+	node->sym_entry = symbol;
+	node->eval_type = symbol->function.return_type;
+	return true;
 }
 
 bool sem_second_member_access(ast_node_t node, semantic_context_t *context) {
-	// TODO
+	assert(node && context && "Called sem_second_member_access on nullptr.");
+
+	// Resolve the target expression
+	if (!sem_second_expression(node->as.member_access.target, context)) {
+		return false;
+	}
+
+	// Get extension symbol
+	symbol_t symbol = sem_find_extension_symbol(node, context);
+	if (!symbol) {
+		print_error(ERR_SEM_UNDEFINED, node->line_num, "Member not found.");
+		return false;
+	}
+
+	// Check builtin
+	if (symbol->function.is_builtin) {
+		// Done
+		// Fill out
+		node->sym_entry = symbol;
+		node->eval_type = symbol->function.return_type;
+		return true;
+	}
+
+	// Users, withou parameter list
+	ast_node_t member_node = sem_wrap_in_place(node, NODE_FUNC_CALL);
+	if (!member_node) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to wrap member access in function call node.");
+		return false;
+	}
+	node->as.func_call.callee = member_node;
+	node->as.func_call.has_parens = false;
+
+	// Check arguments
+	if (!sem_arguments(node, context, symbol)) {
+		return false;
+	}
+	// Need function resolved
+	if (!symbol->function.is_builtin &&
+		!sem_second_want_function(symbol->function.function_definition, context)) {
+		return false;
+	}
+	node->sym_entry = symbol;
+	node->eval_type = symbol->function.return_type;
+	return true;
+}
+
+symbol_t sem_find_extension_symbol(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_find_extension_symbol on nullptr.");
+
+	// Create key
+	char *key =
+		malloc(strlen(node->as.member_access.member_name) + 1 +
+			   strlen(data_type_string_forms[node->as.member_access.target->eval_type]) + 1);
+	if (!key) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Failed to allocate memory for extension symbol key.");
+		return nullptr;
+	}
+	sprintf(key, "%s$%s", node->as.member_access.member_name,
+			data_type_string_forms[node->as.member_access.target->eval_type]);
+
+	// Search
+	symbol_t symbol = stable_find_alllevel(context->symtable_extension_functions, key);
+
+	free(key);
+	return symbol;
 }
 
 bool sem_second_return_type_compatibility(ast_node_t body, data_type_t expected_type) {

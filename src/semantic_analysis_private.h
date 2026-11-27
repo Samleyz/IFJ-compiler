@@ -560,4 +560,24 @@ bool sem_second_function_call(ast_node_t node, semantic_context_t *context);
  */
 bool sem_second_member_access(ast_node_t node, semantic_context_t *context);
 
+/**
+ * @brief Checks the semantic correctness of a parameter list in a function call
+ *
+ * @param node Node with a parameter list to analyze
+ * @param context Semantic analysis context
+ * @param function_symbol Symbol of the function (or of the extension method)
+ * @return true Success
+ * @return false Semantic error
+ */
+bool sem_arguments(ast_node_t node, semantic_context_t *context, symbol_t function_symbol);
+
+/**
+ * @brief Finds the symbol of an extension method
+ *
+ * @param node Member access node to find the symbol for
+ * @param context Semantic analysis context
+ * @return symbol_t Symbol of the extension method, or nullptr if not found
+ */
+symbol_t sem_find_extension_symbol(ast_node_t node, semantic_context_t *context);
+
 #endif
