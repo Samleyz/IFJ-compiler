@@ -2204,7 +2204,29 @@ bool sem_second_binary_operator(ast_node_t node, semantic_context_t *context) {
 }
 
 bool sem_second_interpolateds(ast_node_t node, semantic_context_t *context) {
-	// TODO
+	assert(node && context && "Called sem_second_interpolateds on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_STRING_INTERP) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_interpolateds on non string interpolation node.");
+		return false;
+	}
+
+	// Resolve all expressions in the interpolated string
+	ast_node_t current_expr_node = node->as.string_interp.parts.head;
+	while (current_expr_node) {
+		// Resolve current expression
+		if (!sem_second_expression(current_expr_node, context)) {
+			return false;
+		}
+
+		// Move to next
+		current_expr_node = current_expr_node->next;
+	}
+
+	// Set the eval type to string
+	node->eval_type = TYPE_STRING;
 	return true;
 }
 
