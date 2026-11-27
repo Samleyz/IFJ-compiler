@@ -2069,7 +2069,137 @@ bool sem_second_unary_operator(ast_node_t node, semantic_context_t *context) {
 }
 
 bool sem_second_binary_operator(ast_node_t node, semantic_context_t *context) {
-	// TODO
+	assert(node && context && "Called sem_second_binary_operator on nullptr.");
+
+	// Node checks
+	if (node->type != NODE_BINARY_OP) {
+		print_error(ERR_INTERNAL, node->line_num,
+					"Called sem_second_binary_operator on non binary operator node.");
+		return false;
+	}
+
+	// Resolve expressions
+	if (!sem_second_expression(node->as.binary_op.left, context)) {
+		return false;
+	}
+	if (!sem_second_expression(node->as.binary_op.right, context)) {
+		return false;
+	}
+
+	// Type compatibility checking
+	switch (node->as.binary_op.operator_type) {
+	case OPERATOR_AND:
+	case OPERATOR_OR:
+		if (!sem_ensure_compatible_type(node->as.binary_op.left, TYPE_BOOL, ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		if (!sem_ensure_compatible_type(node->as.binary_op.right, TYPE_BOOL, ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		node->eval_type = TYPE_BOOL;
+		return true;
+		break;
+	case OPERATOR_PLUS:
+		// Check if both strings
+		if (node->as.binary_op.left->eval_type == TYPE_STRING &&
+			node->as.binary_op.right->eval_type == TYPE_STRING) {
+			node->eval_type = TYPE_STRING;
+			return true;
+		}
+
+		// Else fallthrough to numeric
+		[[fallthrough]];
+	case OPERATOR_STAR:
+	case OPERATOR_MINUS:
+	case OPERATOR_SLASH:
+		// Check numeric operands
+		if (!(node->as.binary_op.left->eval_type == TYPE_INT ||
+			  node->as.binary_op.left->eval_type == TYPE_DOUBLE) ||
+			!(node->as.binary_op.right->eval_type == TYPE_INT ||
+			  node->as.binary_op.right->eval_type == TYPE_DOUBLE)) {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Binary operator requires operands of type Int or Double.");
+			return false;
+		}
+
+		// Unify types
+		node->eval_type = sem_unify_types(node->as.binary_op.left->eval_type,
+										  node->as.binary_op.right->eval_type);
+
+		// Ensure compatibility with both operands
+		if (!sem_ensure_compatible_type(node->as.binary_op.left, node->eval_type,
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		if (!sem_ensure_compatible_type(node->as.binary_op.right, node->eval_type,
+										ERR_SEM_TYPE_COMPAT)) {
+			return false;
+		}
+		return true;
+		break;
+	case OPERATOR_LESS_EQUAL:
+	case OPERATOR_GREATER_EQUAL:
+	case OPERATOR_GREATER:
+	case OPERATOR_LESS:
+		if (node->as.binary_op.left->eval_type == TYPE_STRING &&
+			node->as.binary_op.right->eval_type == TYPE_STRING) {
+			// Both strings
+			node->eval_type = TYPE_BOOL;
+			return true;
+		} else if ((node->as.binary_op.left->eval_type == TYPE_INT ||
+					node->as.binary_op.left->eval_type == TYPE_DOUBLE) &&
+				   (node->as.binary_op.right->eval_type == TYPE_INT ||
+					node->as.binary_op.right->eval_type == TYPE_DOUBLE)) {
+			// Both numeric
+			node->eval_type = TYPE_BOOL;
+			// Ensure compatibility with both operands
+			if (!sem_ensure_compatible_type(node->as.binary_op.left,
+											sem_unify_types(node->as.binary_op.left->eval_type,
+															node->as.binary_op.right->eval_type),
+											ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+			if (!sem_ensure_compatible_type(node->as.binary_op.right,
+											sem_unify_types(node->as.binary_op.left->eval_type,
+															node->as.binary_op.right->eval_type),
+											ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+			return true;
+		} else {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Binary operator requires operands of type Int, Double or String.");
+			return false;
+		}
+
+	case OPERATOR_EQUAL:
+	case OPERATOR_NOT_EQUAL:
+		if (sem_unify_types(node->as.binary_op.left->eval_type,
+							node->as.binary_op.right->eval_type) == TYPE_DOUBLE) {
+			// Maybe needs conversion
+			node->eval_type = TYPE_BOOL;
+			if (!sem_ensure_compatible_type(node->as.binary_op.left, TYPE_DOUBLE,
+											ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+			if (!sem_ensure_compatible_type(node->as.binary_op.right, TYPE_DOUBLE,
+											ERR_SEM_TYPE_COMPAT)) {
+				return false;
+			}
+			return true;
+		} else if (node->as.binary_op.left->eval_type == node->as.binary_op.right->eval_type) {
+			// Types match
+			node->eval_type = TYPE_BOOL;
+			return true;
+		} else {
+			print_error(ERR_SEM_TYPE_COMPAT, node->line_num,
+						"Binary operator requires operands of compatible types.");
+			return false;
+		}
+	default:
+		print_error(ERR_INTERNAL, node->line_num, "Unknown binary operator.");
+		return false;
+	}
 	return true;
 }
 
