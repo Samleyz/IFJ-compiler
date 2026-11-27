@@ -1339,7 +1339,7 @@ bool sem_second_var_def(ast_node_t node, semantic_context_t *context) {
 
 /*
 Tool: Claude Sonnet 5.5
-Prompt paraphrase: Najdi v tom chyby a oprav to
+Prompt paraphrase: Find misstakes and correct them
 use same style, write clean code, dont break anything, explain what you did
 + other files as context
 */
@@ -2341,8 +2341,58 @@ symbol_t sem_find_extension_symbol(ast_node_t node, semantic_context_t *context)
 	return symbol;
 }
 
-bool sem_second_insert_returns(ast_node_t body, semantic_context_t *context) {
-	assert(body && context && "Called sem_second_insert_returns on nullptr.");
-	// TODO
+/*
+Tool: Claude Sonnet 5.5
+Prompt paraphrase: Please write logit that inserts return to all possible branch ends that dont have
+them
+use same style, write clean code, dont break anything, explain what you did
++ other files as context
+*/
+bool sem_second_insert_returns(ast_node_t node, semantic_context_t *context) {
+	assert(node && context && "Called sem_second_insert_returns on nullptr.");
+
+	ast_node_t tail = node->as.block.statements.tail;
+
+	if (sem_always_returns(tail)) {
+		// Never completes with value - return not needed
+		return true;
+	}
+
+	// Explicit Unit function discards the value of its body
+	bool needs_value = !context->function_stack->symbol->function.has_explicit_return_type ||
+					   context->function_stack->symbol->function.return_type != TYPE_UNIT;
+
+	// Last statement gives the value of the function
+	if (needs_value && tail) {
+		if (tail->type == NODE_EXPR_STMT) { // Last expression statement
+			// Change the expression statement to a return statement (it should return)
+			ast_node_t expr = tail->as.expr_stmt.expr;
+			tail->type = NODE_RETURN;
+			tail->as.return_stmt.expr = expr;
+			return true;
+		}
+		if (tail->type == NODE_IF && tail->as.if_stmt.is_expr) { // Last if
+			// Chenge "if" to return "if"
+			ast_node_t if_node = sem_wrap_in_place(tail, NODE_RETURN);
+			if (!if_node) {
+				print_error(ERR_INTERNAL, tail->line_num,
+							"Failed to wrap if expression in return node.");
+				return false;
+			}
+			tail->as.return_stmt.expr = if_node;
+			tail->eval_type = TYPE_UNIT;
+			return true;
+		}
+	}
+
+	// No value or thrown away value - just append return without expression (returns Unit)
+	ast_node_t return_node = ast_create_node(NODE_RETURN, tail ? tail->line_num : node->line_num);
+	if (!return_node) {
+		print_error(ERR_INTERNAL, node->line_num, "Failed to create return node.");
+		return false;
+	}
+	return_node->eval_type = TYPE_UNIT;
+	ast_list_append(&(node->as.block.statements), return_node);
+
 	return true;
 }
